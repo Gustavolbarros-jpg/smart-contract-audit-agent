@@ -1,0 +1,31 @@
+# ========================
+# PYTHON E AMBIENTE
+# ========================
+__pycache__/
+*.pyc
+.venv/
+.env
+*.save
+
+# ========================
+# LOGS DO CERTORA (A sujeira principal)
+# ========================
+emv-*-certora-*
+*_logs.txt
+out/
+.certora_internal/
+.certora_build/
+certora_mutations/
+
+# ========================
+# SLITHER E OUTPUTS DE AUDITORIA
+# ========================
+audit_outputs/
+slither*.json
+resultado*.json
+relatorio_final.csv
+crytic-export/
+# OUTROS
+logs_antigos/
+agent_outputs/
+.DS_Store
