@@ -1,0 +1,99 @@
+Metadata-Version: 2.1
+Name: comby
+Version: 0.0.3
+Summary: Lightweight language-independent syntax rewriting.
+Home-page: https://github.com/ChrisTimperley/comby-python
+Author: Christopher Timperley
+Author-email: christimperley@googlemail.com
+License: MIT
+Keywords: rewrite,syntax,comby,transformation
+Platform: UNKNOWN
+Classifier: Natural Language :: English
+Classifier: Intended Audience :: Developers
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.6
+Classifier: Programming Language :: Python :: 3.7
+Classifier: Programming Language :: Python :: 3.8
+Requires-Python: >=3.6
+License-File: LICENSE
+Requires-Dist: attrs (>=19.2.0)
+Requires-Dist: loguru (>=0.4)
+Requires-Dist: requests (~=2.0)
+Requires-Dist: typing (>=0.4)
+
+.. -*-restructuredtext-*-
+
+comby-python
+============
+
+
+.. image:: https://travis-ci.org/ChrisTimperley/comby-python.svg?branch=master
+    :target: https://travis-ci.org/ChrisTimperley/comby-python
+
+.. image:: https://badge.fury.io/py/comby.svg
+    :target: https://badge.fury.io/py/comby
+
+.. image:: https://img.shields.io/pypi/pyversions/comby.svg
+    :target: https://pypi.org/project/comby
+
+Python bindings for `Comby <https://github.com/comby-tools/comby>`_.
+
+
+Installation
+------------
+
+Comby must be installed: https://github.com/comby-tools/comby
+
+To install the latest release from PyPI:
+
+.. code:: shell
+
+   $ pip install comby
+
+or to install from source:
+
+.. code:: shell
+
+   $ pip install .
+
+
+Getting Started
+---------------
+
+To perform a basic match-rewrite on a given source text:
+
+.. code:: python
+
+   from comby import Comby
+
+   comby = Comby()
+   match = 'print :[[1]]'
+   rewrite = 'print(:[1])'
+   source_old = 'print "hello world"'
+   source_new = comby.rewrite(source_old, match, rewrite)
+   # -> 'print("hello world")
+
+MIT License
+
+Copyright (c) 2019 Christopher Timperley
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+

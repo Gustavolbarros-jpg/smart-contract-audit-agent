@@ -1,0 +1,11 @@
+
+    [console_scripts]
+    mutate = universalmutator.genmutants:main
+    analyze_mutants = universalmutator.analyze:main
+    check_covered = universalmutator.checkcov:main
+    prioritize_mutants = universalmutator.prioritize:main
+    show_mutants = universalmutator.show:main
+    prune_mutants = universalmutator.prune:main
+    intersect_mutants = universalmutator.intersect:main
+    mutant_server = universalmutator.server:main
+    
