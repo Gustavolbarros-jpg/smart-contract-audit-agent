@@ -1,0 +1,9 @@
+[console_scripts]
+certoraCVLFormatter = certora_cli.certoraCVLFormatter:entry_point
+certoraEVMProver = certora_cli.certoraEVMProver:entry_point
+certoraEqCheck = certora_cli.certoraEqCheck:equiv_check_entry_point
+certoraMutate = certora_cli.certoraMutate:mutate_entry_point
+certoraRanger = certora_cli.certoraRanger:entry_point
+certoraRun = certora_cli.certoraRun:entry_point
+certoraSolanaProver = certora_cli.certoraSolanaProver:entry_point
+certoraSorobanProver = certora_cli.certoraSorobanProver:entry_point

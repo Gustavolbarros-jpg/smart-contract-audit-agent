@@ -1,0 +1,3 @@
+certoraRun smart-audt/contracts/VulnerableBankToken.sol \
+    --verify VulnerableBankToken:specs/reentrancy_withdraw.spec \
+    --link VulnerableBankToken:specs/storage.spec
