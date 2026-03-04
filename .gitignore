@@ -29,3 +29,4 @@ crytic-export/
 logs_antigos/
 agent_outputs/
 .DS_Storesmart-audt/certora-env/
+smart-audt/certora-env/
