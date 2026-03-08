@@ -5,38 +5,49 @@ Ferramenta para executar a Verificação Formal via Certora Prover.
 import subprocess
 import os
 
-def run_certora(contract_path: str, spec_path: str, output_dir: str) -> str:
-    """Roda o Certora Prover e retorna o output bruto (stdout + stderr)."""
+
+def run_certora(
+    contract_path: str,
+    spec_path: str,
+    output_dir: str,
+    contract_name_override: str = None
+) -> str:
+    """
+    Roda o Certora Prover e retorna o output bruto (stdout + stderr).
+
+    contract_path: caminho REAL do arquivo .sol (pode ser agent_outputs/ ou smart-audt/contracts/)
+    contract_name_override: nome do contrato DENTRO do arquivo .sol.
+      Útil quando o arquivo se chama DeFiVault_FIXED.sol mas o contrato
+      interno ainda se chama DeFiVault.
+      Se não informado, usa o nome do arquivo como padrão.
+    """
     if not os.path.exists(contract_path):
         raise FileNotFoundError(f"Contrato não encontrado: {contract_path}")
     if not os.path.exists(spec_path):
         raise FileNotFoundError(f"Spec CVL não encontrado: {spec_path}")
-    
-    # Extrai o nome do contrato (ex: "DeFiVault") a partir do caminho do arquivo
-    contract_name = os.path.basename(contract_path).split('.')[0]
-    json_output_path = os.path.join(output_dir, "certora_result.json")
-    
+
+    # Usa o contract_path REAL passado pelo chamador
+    file_name     = os.path.basename(contract_path).split('.')[0]
+    contract_name = contract_name_override if contract_name_override else file_name
+
     cmd = [
-        "certoraRun", 
-        contract_path, 
-        "--verify", f"{contract_name}:{spec_path}",
-        "--solc", "solc",
-        "--msg", "Agent_Automated_Run",
-        "--json_output", json_output_path
+        "certoraRun",
+        f"{contract_path}:{contract_name}",   # ← usa o caminho real
+        "--verify",
+        f"{contract_name}:{spec_path}",
+        "--solc_allow_path", "..",
+        "--msg", "Agent Verification"
     ]
-    
+
     try:
-        print(f"🔬 [Certora] Iniciando Prover para {contract_name} com {os.path.basename(spec_path)}...")
+        print(f"🔬 [Certora] Iniciando Prover para {file_name} ({contract_name}) com {os.path.basename(spec_path)}...")
         print("⏳ Isso pode demorar alguns minutos...")
-        
-        # Certora precisa de um timeout longo (10 minutos)
+
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
-        
-        # Juntamos stdout e stderr para o LLM ter todo o contexto se der erro de sintaxe
-        output_completo = result.stdout + "\n" + result.stderr
-        return output_completo
-        
+
+        return result.stdout + "\n" + result.stderr
+
     except subprocess.TimeoutExpired:
-        raise TimeoutError("Certora abortado: excedeu o limite de 10 minutos de prova.")
+        raise TimeoutError("Certora abortado: excedeu 10 minutos.")
     except FileNotFoundError:
-        raise RuntimeError("O comando 'certoraRun' não foi encontrado. O Certora CLI está instalado?")
+        raise RuntimeError("'certoraRun' não encontrado. Certora CLI está instalado?")

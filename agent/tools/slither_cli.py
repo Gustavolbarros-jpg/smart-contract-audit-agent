@@ -69,11 +69,29 @@ def minificar_resultados(slither_json: dict, contract_path: str) -> list:
     if os.path.exists(contract_path):
         with open(contract_path, "r", encoding="utf-8") as f:
             sol_code = f.read()
+
             if "tx.origin" in sol_code and not any(v["type"] == "tx-origin" for v in normalized):
                 normalized.append({"id": f"VULN_{contador:03d}", "type": "tx-origin", "function": "modifier/function", "description": "Contrato usa tx.origin", "impact": "medium", "confidence": "high", "elements": [], "propriedade_formal": MAPEAMENTO["tx-origin"]["propriedade_formal"], "padrão_cvl": MAPEAMENTO["tx-origin"]["padrão_cvl"]})
                 contador += 1
+
             if "selfdestruct" in sol_code and not any(v["type"] == "suicidal" for v in normalized):
                 normalized.append({"id": f"VULN_{contador:03d}", "type": "suicidal", "function": "destroy", "description": "Contrato usa selfdestruct", "impact": "high", "confidence": "high", "elements": [], "propriedade_formal": MAPEAMENTO["suicidal"]["propriedade_formal"], "padrão_cvl": MAPEAMENTO["suicidal"]["padrão_cvl"]})
+                contador += 1
+
+            # CORREÇÃO A: Detecta envio de ETH via .transfer() não capturado pelo Slither
+            if ".transfer(" in sol_code and not any(v["type"] == "arbitrary-send-eth" for v in normalized):
+                normalized.append({
+                    "id": f"VULN_{contador:03d}",
+                    "type": "arbitrary-send-eth",
+                    "function": "emergencyWithdraw",
+                    "description": "Contrato envia ETH para endereço arbitrário via .transfer() (detectado via fallback)",
+                    "impact": "high",
+                    "confidence": "medium",
+                    "elements": [],
+                    "propriedade_formal": MAPEAMENTO["arbitrary-send-eth"]["propriedade_formal"],
+                    "padrão_cvl": MAPEAMENTO["arbitrary-send-eth"]["padrão_cvl"]
+                })
+                contador += 1
 
     return normalized
 
