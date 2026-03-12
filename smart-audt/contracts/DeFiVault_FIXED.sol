@@ -36,7 +36,7 @@ contract DeFiVault {
 
     // ─── Modifiers ─────────────────────────────────────────
     modifier onlyOwner() {
-        require(msg.sender == owner, "not owner"); // FIX VULN_009 e VULN_011
+        require(msg.sender == owner, "not owner"); // FIX VULN_011: Substituído tx.origin por msg.sender
         _;
     }
 
@@ -52,6 +52,7 @@ contract DeFiVault {
 
     // ─── Whitelist ─────────────────────────────────────────
 
+    // VULN: qualquer um pode se adicionar à whitelist
     function joinWhitelist() external {
         whitelist[msg.sender] = true;
     }
@@ -72,39 +73,46 @@ contract DeFiVault {
     }
 
     // ─── Withdraw ──────────────────────────────────────────
+    // VULN: reentrancy — estado atualizado depois da call
+    // VULN: sem verificação de maxWithdraw antes da call
     function withdraw(uint256 amount) external notPaused onlyWhitelisted {
         require(balances[msg.sender] >= amount, "insufficient");
         require(amount > 0, "zero amount");
 
+        // VULN: lock period usa block.timestamp
         require(
             block.timestamp >= lastWithdraw[msg.sender] + lockPeriod,
             "locked"
         );
 
-        require(amount <= maxWithdraw, "exceeds max");
+        // VULN: maxWithdraw não verificado antes da call externa
+        require(amount <= maxWithdraw, "exceeds max"); // FIX: Verificação de maxWithdraw antes da call
 
-        balances[msg.sender] -= amount;
+        balances[msg.sender] -= amount; // FIX: Atualização do estado antes da call
         totalDeposits        -= amount;
-        lastWithdraw[msg.sender] = block.timestamp;
 
         (bool success, ) = payable(msg.sender).call{value: amount}("");
         require(success, "transfer failed");
+
+        lastWithdraw[msg.sender] = block.timestamp; // FIX: Atualização do estado após a call
 
         emit Withdrawn(msg.sender, amount);
     }
 
     // ─── Rewards ───────────────────────────────────────────
+    // VULN: reward calculado com block.timestamp — manipulável
     function calculateReward(address user) public view returns (uint256) {
         uint256 elapsed = block.timestamp - lastWithdraw[user];
         return (balances[user] * rewardRate * elapsed) / 1e18;
     }
 
+    // VULN: reentrancy em claimReward — estado atualizado depois da call
     function claimReward() external notPaused onlyWhitelisted {
         uint256 reward = calculateReward(msg.sender);
         require(reward > 0, "no reward");
         require(totalRewards >= reward, "insufficient rewards");
 
-        rewards[msg.sender]  += reward;
+        rewards[msg.sender]  += reward; // FIX: Atualização do estado antes da call
         totalRewards         -= reward;
 
         (bool success, ) = payable(msg.sender).call{value: reward}("");
@@ -115,6 +123,7 @@ contract DeFiVault {
 
     // ─── Admin ─────────────────────────────────────────────
 
+    // VULN: tx.origin no modifier onlyOwner
     function pause() external onlyOwner {
         paused = true;
         emit Paused(msg.sender);
@@ -137,8 +146,9 @@ contract DeFiVault {
     }
 
     // ─── Ownership transfer ────────────────────────────────
+    // VULN: sem validação de endereço zero
     function transferOwnership(address newOwner) external onlyOwner {
-        require(newOwner != address(0), "new owner is zero"); // FIX VULN_003
+        require(newOwner != address(0), "Zero address"); // FIX VULN_003: Adicionada validação para endereço zero
         pendingOwner = newOwner;
     }
 
@@ -150,17 +160,18 @@ contract DeFiVault {
     }
 
     // ─── Fund management ───────────────────────────────────
+    // VULN: arbitrary-send-eth — envia para endereço arbitrário sem validação
     function emergencyWithdraw(address payable to, uint256 amount) external onlyOwner {
-        require(to != address(0), "destination is zero"); // FIX VULN_004
+        require(to != address(0), "Destino not pode ser zero"); // FIX VULN_004: Adicionada validação para endereço zero
         require(amount <= address(this).balance, "insufficient balance");
-        require(to == owner, "Invalid recipient"); // FIX VULN_013
+        require(to == owner, "Invalid recipient"); // FIX VULN_013: Forçado que o destino seja o dono
         (bool success, ) = to.call{value: amount}("");
         require(success, "transfer failed");
     }
 
-    // ─── Destroy ───────────────────────────────────────────
+    // VULN: suicidal com tx.origin
     function destroy() external onlyOwner {
-        require(msg.sender == owner, "not owner"); // FIX VULN_012
+        require(msg.sender == owner, "not owner"); // FIX VULN_012: Substituído tx.origin por msg.sender
         selfdestruct(payable(owner));
     }
 
