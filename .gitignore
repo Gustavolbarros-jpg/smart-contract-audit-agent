@@ -28,5 +28,6 @@ crytic-export/
 # OUTROS
 logs_antigos/
 agent_outputs/
-.DS_Storesmart-audt/certora-env/
+runs/
+.DS_Store
 smart-audt/certora-env/

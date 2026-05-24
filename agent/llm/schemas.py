@@ -1,68 +1,91 @@
 """
 agent/llm/schemas.py
-Define a estrutura rígida de dados que esperamos da IA (Grok).
-Isso substitui o parseamento frágil de strings.
+Defines the strict structured outputs expected from the LLM.
+This replaces fragile string parsing.
 """
 from pydantic import BaseModel, Field
 from typing import List, Literal, Optional
 
-# --- Modelos para a Etapa 1 (Slither) ---
+# --- Stage 1 models (Slither) ---
 
 class ElementoVulneravel(BaseModel):
-    name: str = Field(description="Nome da variável, função ou expressão")
-    type: str = Field(description="O tipo do elemento (ex: variable, function, node)")
-    line: Optional[str] = Field(default="", description="Número da linha (se existir)")
+    name: str = Field(description="Variable, function, node, or expression name")
+    type: str = Field(description="Element type, such as variable, function, or node")
+    line: Optional[str] = Field(default="", description="Source line, when available")
 
 class Vulnerabilidade(BaseModel):
-    id: str = Field(description="ID sequencial: VULN_001, VULN_002...")
-    type: str = Field(description="O tipo da vulnerabilidade reportado pelo Slither")
+    id: str = Field(description="Exact sequential ID: VULN_001, VULN_002...")
+    type: str = Field(description="Slither detector type")
     description: str
     function: str
-    line: Optional[str] = Field(default="", description="Linha da vulnerabilidade (se existir)")
-    impact: str = Field(description="Ex: high, medium, low, informational")
-    confidence: str = Field(description="Ex: high, medium, low")
+    line: Optional[str] = Field(default="", description="Finding line or line range, when available")
+    impact: str = Field(description="Example: high, medium, low, informational")
+    confidence: str = Field(description="Example: high, medium, low")
     elements: List[ElementoVulneravel]
-    propriedade_formal: str = Field(description="Deixe vazio se não for verificável via Certora")
-    padrao_cvl: str = Field(default="", description="Deixe vazio se não for verificável via Certora")
+    propriedade_formal: str = Field(description="Formal property; leave empty if not suitable for Certora")
+    padrao_cvl: str = Field(default="", description="CVL pattern name; leave empty if not suitable for Certora")
 
 class RelatorioSlitherNormalizado(BaseModel):
     vulnerabilidades: List[Vulnerabilidade]
 
 
-# --- Modelos para a Etapa 4 (Análise do Certora) ---
+# --- Formal planning model (LLM as agent) ---
+
+class RegraFormalPlanejada(BaseModel):
+    id: str = Field(description="Exact vulnerability ID; never renumber")
+    rule_names: List[str] = Field(description="Valid, unique CVL rule names")
+    formal_property: str = Field(description="Formal property to verify")
+    cvl_strategy: str = Field(description="Concrete CVL strategy to test the property")
+    required_methods: List[str] = Field(default_factory=list, description="Required CVL methods{} signatures or function names")
+    assumptions: List[str] = Field(default_factory=list, description="Assumptions needed by the proof")
+    reason: str = Field(description="Reason for selecting this vulnerability")
+
+
+class FindingFormalIgnorado(BaseModel):
+    id: str = Field(description="Exact skipped vulnerability ID")
+    reason: str = Field(description="Reason for not formalizing this finding now")
+
+
+class PlanoFormal(BaseModel):
+    selected_rules: List[RegraFormalPlanejada]
+    skipped_findings: List[FindingFormalIgnorado] = Field(default_factory=list)
+    global_assumptions: List[str] = Field(default_factory=list)
+
+
+# --- Stage 4 models (Certora analysis) ---
 
 class VulnerabilidadeAnalisada(BaseModel):
     id: str
     type: str
     function: str
-    rule: str = Field(description="A regra CVL que foi verificada")
+    rule: str = Field(description="The checked CVL rule")
     status: Literal["confirmed", "confirmed_static", "not_confirmed", "inconclusive"]
-    evidencia: Optional[str] = Field(default=None, description="Explicação do porquê foi confirmada ou não")
+    evidencia: Optional[str] = Field(default=None, description="Evidence explaining the result")
 
 class AnaliseCertora(BaseModel):
     analises: List[VulnerabilidadeAnalisada]
 
 
-# --- Modelos para as Etapas de Geração de Código (2, 3 e 5) ---
+# --- Code-generation models ---
 
 class CodigoGerado(BaseModel):
-    codigo: str = Field(description="O código-fonte completo gerado (pode ser CVL ou Solidity, dependendo da etapa)")
+    codigo: str = Field(description="Complete generated source code, either CVL or Solidity depending on the step")
 
 class ValidacaoSpec(BaseModel):
-    valido: bool = Field(description="True se o .spec estiver perfeito, False se tiver erros de sintaxe")
-    erros: List[str] = Field(description="Lista de erros encontrados (se houver)")
-    codigo_corrigido: str = Field(description="O código .spec completo, corrigido caso haja erros, ou original se for válido")
+    valido: bool = Field(description="True if the spec is valid; false if syntax/type issues remain")
+    erros: List[str] = Field(description="List of detected errors")
+    codigo_corrigido: str = Field(description="Complete corrected spec, or original if already valid")
 
 
-# --- Modelo para o Diagnóstico de Falhas (Etapa 6) ---
+# --- Failure diagnosis model ---
 
 class FalhaDiagnosticada(BaseModel):
-    id: str = Field(description="ID da vulnerabilidade: VULN_XXX")
-    rule_que_falhou: str = Field(description="Nome da rule CVL que foi violada")
-    motivo: str = Field(description="Causa raiz da falha no código Solidity")
-    linha: Optional[int] = Field(default=None, description="Linha exata do contrato que precisa ser corrigida")
-    codigo_atual: Optional[str] = Field(default=None, description="Trecho atual do código que está errado")
-    correcao_necessaria: str = Field(description="O que exatamente precisa mudar")
+    id: str = Field(description="Vulnerability ID: VULN_XXX")
+    rule_que_falhou: str = Field(description="Failed CVL rule name")
+    motivo: str = Field(description="Root cause in Solidity code")
+    linha: Optional[int] = Field(default=None, description="Exact contract line to patch, when available")
+    codigo_atual: Optional[str] = Field(default=None, description="Current buggy snippet")
+    correcao_necessaria: str = Field(description="Exact required change")
 
 class DiagnosticoFalhas(BaseModel):
     falhas: List[FalhaDiagnosticada]
