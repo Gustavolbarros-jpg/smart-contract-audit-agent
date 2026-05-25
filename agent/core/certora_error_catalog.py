@@ -76,6 +76,14 @@ CERTORA_ERROR_PATTERNS = [
         "source": "https://docs.certora.com/en/latest/docs/user-guide/getting-started/install.html",
     },
     {
+        "id": "certora_contract_name_mismatch",
+        "severity": "blocking",
+        "pattern": r"Failed to find a contract named",
+        "cause": "Certora was invoked with a contract name that does not exist inside the Solidity file.",
+        "pipeline_action": "Detect the Solidity contract name from source instead of assuming file stem equals contract name.",
+        "source": "https://docs.certora.com/en/latest/docs/user-guide/getting-started/install.html",
+    },
+    {
         "id": "spec_error",
         "severity": "blocking",
         "pattern": r"Error in spec file|CVL syntax or type check failed",

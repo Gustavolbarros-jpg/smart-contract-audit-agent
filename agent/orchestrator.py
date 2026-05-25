@@ -18,7 +18,12 @@ import shutil
 
 from core.certora_parser import analyze_certora_log
 from core.certora_error_catalog import analyze_certora_errors, has_certora_blocking_error
-from core.contract_context import build_contract_brief, build_methods_block, choose_auth_probe_function
+from core.contract_context import (
+    build_contract_brief,
+    build_methods_block,
+    choose_auth_probe_function,
+    extract_primary_contract_name,
+)
 from core.diagnosis_context import compact_certora_log, filter_plan_by_ids, sanitize_diagnosis_ids
 from core.formal_candidate import build_formal_candidates
 from core.formal_plan import build_planner_input, build_spec_plan_input, sanitize_formal_plan
@@ -421,13 +426,16 @@ def executar_pipeline(contract_path: str, copy_final: bool = True):
     with open(contract_path, "r", encoding="utf-8") as f:
         contract_source = f.read()
 
-    nome_contrato = Path(contract_path).stem
+    nome_arquivo = Path(contract_path).stem
+    nome_contrato = extract_primary_contract_name(contract_source, nome_arquivo) or nome_arquivo
+    if nome_contrato != nome_arquivo:
+        print(f"ℹ️  Contrato interno detectado: {nome_contrato} (arquivo: {nome_arquivo})")
     pasta_output  = Path("agent_outputs")
     pasta_output.mkdir(exist_ok=True)
     repo_root = Path(__file__).resolve().parents[1]
     run_dir = create_run_dir(contract_path, root=str(repo_root / "runs"))
     copy_contract(contract_path, run_dir)
-    write_metadata(run_dir, contract_path, MODELO_LLM)
+    write_metadata(run_dir, contract_path, MODELO_LLM, internal_contract_name=nome_contrato)
     print(f"📁 Run artifacts: {run_dir}")
 
     toolchain_status = check_solidity_toolchain(contract_source)
@@ -580,7 +588,12 @@ def executar_pipeline(contract_path: str, copy_final: bool = True):
 
         # ── CERTORA no ORIGINAL ──────────────────────────────────────
         print("\n▶️  CERTORA PROVER: Verificando contrato ORIGINAL...")
-        certora_log = run_certora(contract_path, str(caminho_spec), str(pasta_output))
+        certora_log = run_certora(
+            contract_path,
+            str(caminho_spec),
+            str(pasta_output),
+            contract_name_override=nome_contrato,
+        )
         salvar_arquivo(str(pasta_output / "certora_original_log.txt"), certora_log)
         save_text(run_dir / "certora_original.log", certora_log)
 

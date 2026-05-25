@@ -233,6 +233,21 @@ def _uses_restricted_environment(body: str) -> bool:
     return any(re.search(pattern, masked) for pattern in restricted_patterns)
 
 
+def extract_primary_contract_name(source: str, preferred: str = "") -> str:
+    """Return the Solidity contract name to pass to Certora."""
+    masked = _mask_comments_and_strings(source)
+    names = [
+        match.group(1)
+        for match in re.finditer(
+            r"\b(?:abstract\s+)?contract\s+([A-Za-z_][A-Za-z0-9_]*)\b",
+            masked,
+        )
+    ]
+    if preferred and preferred in names:
+        return preferred
+    return names[-1] if names else ""
+
+
 def _function_method_signature_with_body(line: str, body: str = "") -> str | None:
     signature = _function_method_signature(line)
     if not signature or " envfree;" not in signature:

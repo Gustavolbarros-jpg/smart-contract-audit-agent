@@ -31,6 +31,9 @@ Este documento registra regras oficiais do Certora/CVL e erros reais observados 
 - Rule de `tx-origin`/auth nao pode chamar funcao aleatoria. Ela deve chamar uma funcao realmente protegida por `onlyOwner`, escolhida deterministicamente pela interface do contrato.
 - A avaliacao deve ler os `certora*.log` antes de confiar em `comparison_t1.json`.
   Se houver erro bloqueante de spec, o run nao pode ser reportado como `passed`.
+- Certora precisa do nome do contrato interno, nao do nome do arquivo. Arquivos
+  como `SimpleBank_FIXED.sol` podem conter `contract SimpleBank`; o pipeline deve
+  detectar isso no source antes de chamar `certoraRun`.
 
 ## Erros Observados
 
@@ -45,6 +48,7 @@ Este documento registra regras oficiais do Certora/CVL e erros reais observados 
 | `lastReverted` enganoso | Outra chamada sobrescreveu `lastReverted` | manter chamada `@withrevert` adjacente ao assert |
 | Auth rule chama funcao publica comum | LLM escolheu alvo errado para `tx-origin` | `aplicar_auth_probe_rules` |
 | `declared envfree but depends on the environment` | methods marcou funcao dependente de ambiente como `envfree` | reconstruir methods sem `envfree` para essa funcao e bloquear o run antigo |
+| `Failed to find a contract named` | Certora recebeu nome do arquivo em vez do contrato interno | detectar `contract Name` no Solidity e passar esse nome ao `certoraRun` |
 
 ## Sobre Reentrancy
 

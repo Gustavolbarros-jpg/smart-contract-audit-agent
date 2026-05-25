@@ -58,7 +58,7 @@ git diff --check
 Resultado atual:
 
 ```text
-52 tests OK
+54 tests OK
 py_compile OK
 git diff --check OK
 ```
@@ -151,6 +151,30 @@ Observacao importante:
 - O autorepair restaurou as strings originais.
 - O patch aceito ficou restrito ao guard no `multicall`.
 
+## Validacao Manual/Scratch
+
+Snapshot completo:
+
+- `docs/evaluations/evaluation-results-20260525_002330_000739.md`
+
+Resultados adicionais:
+
+- `SimpleBank_FIXED`, `DeFiVault_FIXED` e `VulnerableVault` ainda geram
+  candidatos formais pelo Slither, mas Certora nao confirmou vulnerabilidades.
+- `SafeBankToken`, `SafeBankToken2`, `SuperSecureBank` e
+  `VulnerableBankTokenCorrected` pararam corretamente em
+  `no_actionable_candidates`.
+- `TreasuryVault` bloqueou em `certora_original` porque o Solidity esta
+  sintaticamente invalido (`}x` no final do arquivo).
+
+Correcao importante encontrada nessa rodada:
+
+- Arquivos `_FIXED` podem ter nome de arquivo diferente do contrato interno.
+- `SimpleBank_FIXED.sol` contem `contract SimpleBank`; antes disso, o pipeline
+  chamava Certora com `SimpleBank_FIXED` e gerava conclusao inconclusiva.
+- O orquestrador agora detecta o nome real do contrato no Solidity e passa esse
+  nome para `certoraRun`.
+
 ## Avaliacoes Snapshot
 
 Snapshots mais recentes:
@@ -159,6 +183,8 @@ Snapshots mais recentes:
   - `docs/evaluations/evaluation-results-20260524_232506_044465.md`
 - Benchmark + exploratory:
   - `docs/evaluations/evaluation-results-20260524_232506_055871.md`
+- Todos os contratos registrados:
+  - `docs/evaluations/evaluation-results-20260525_002330_000739.md`
 
 ## Riscos Abertos
 

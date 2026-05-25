@@ -41,12 +41,18 @@ def copy_contract(contract_path: str, run_dir: Path) -> None:
     shutil.copy(contract_path, run_dir / "input_contract.sol")
 
 
-def write_metadata(run_dir: Path, contract_path: str, model: str) -> None:
+def write_metadata(
+    run_dir: Path,
+    contract_path: str,
+    model: str,
+    internal_contract_name: str = "",
+) -> None:
     save_json(
         run_dir / "metadata.json",
         {
             "contract_path": contract_path,
             "contract_name": Path(contract_path).stem,
+            "internal_contract_name": internal_contract_name or Path(contract_path).stem,
             "model": model,
             "created_at": datetime.now().isoformat(timespec="seconds"),
         },

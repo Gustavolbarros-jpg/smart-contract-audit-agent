@@ -212,6 +212,7 @@ Current snapshots:
 
 - Core benchmark: `docs/evaluations/evaluation-results-20260524_232506_044465.md`
 - Benchmark + exploratory: `docs/evaluations/evaluation-results-20260524_232506_055871.md`
+- All registered contracts: `docs/evaluations/evaluation-results-20260525_002330_000739.md`
 
 Recent Certora/spec lesson:
 
@@ -224,6 +225,20 @@ Recent Certora/spec lesson:
 - Logs with invalid `envfree` now count as blocking spec errors.
 - Evaluation summaries scan `certora*.log` before trusting `comparison_t1.json`,
   so a spec-invalid run cannot be reported as `passed`.
+- Certora runs now use the Solidity contract name detected from source, not just
+  the file stem. This fixed `_FIXED` files such as `SimpleBank_FIXED.sol`, which
+  contains `contract SimpleBank`.
+
+Latest all-contract validation:
+
+- `SimpleBank`, `King`, `CrowdfundingVault`, `DeFiVault`, and
+  `ERC2771MulticallVulnerable`: latest benchmark runs still pass.
+- `SimpleBank_FIXED`, `DeFiVault_FIXED`, and `VulnerableVault`: Slither still
+  produces formal candidates, but Certora confirmed none.
+- `SafeBankToken`, `SafeBankToken2`, `SuperSecureBank`, and
+  `VulnerableBankTokenCorrected`: no actionable candidates.
+- `TreasuryVault`: blocked at `certora_original` because the source is invalid
+  Solidity (`}x` at the end).
 
 Older `docs/evaluation-results.md` may still exist, but new evaluations should be snapshot files.
 
@@ -237,7 +252,7 @@ python3 tests/test_certora_learning.py
 
 Latest result:
 
-- `52 tests OK`
+- `54 tests OK`
 
 Also run when editing:
 

@@ -10,7 +10,7 @@ AGENT = ROOT / "agent"
 sys.path.insert(0, str(AGENT))
 
 from core.certora_error_catalog import analyze_certora_errors, has_certora_blocking_error
-from core.contract_context import build_methods_block
+from core.contract_context import build_methods_block, extract_primary_contract_name
 from core.contract_registry import (
     BENCHMARK,
     EXPLORATORY,
@@ -1261,6 +1261,27 @@ rule smoke {
         analysis = analyze_certora_errors(log)
         ids = {item["id"] for item in analysis["matches"]}
         self.assertIn("cvl_invalid_envfree", ids)
+
+    def test_contract_name_mismatch_certora_log_is_blocking(self):
+        log = (
+            "Failed to find a contract named SimpleBank_FIXED in file "
+            "/tmp/SimpleBank_FIXED.sol. Available contracts: /tmp/SimpleBank_FIXED.sol:SimpleBank"
+        )
+        analysis = analyze_certora_errors(log)
+        ids = {item["id"] for item in analysis["matches"]}
+
+        self.assertTrue(has_certora_blocking_error(log))
+        self.assertIn("certora_contract_name_mismatch", ids)
+
+    def test_extract_primary_contract_name_handles_fixed_filename_mismatch(self):
+        source = """// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.21;
+
+contract SimpleBank {
+  address public owner;
+}
+"""
+        self.assertEqual(extract_primary_contract_name(source, "SimpleBank_FIXED"), "SimpleBank")
 
     def test_evaluation_blocks_passed_comparison_with_invalid_certora_log(self):
         with tempfile.TemporaryDirectory() as tmp:
