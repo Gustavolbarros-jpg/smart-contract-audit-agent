@@ -41,7 +41,6 @@ Fonte no codigo: `agent/core/contract_registry.py`.
 | Contrato | Motivo |
 | --- | --- |
 | `DeFiVault_FIXED.sol` | Saida corrigida/gerada. |
-| `ERC2771MulticallVulnerable_FIXED.sol` | Saida corrigida/gerada. |
 | `SimpleBank_FIXED.sol` | Saida corrigida/gerada. |
 | `SafeBankToken.sol` | Exemplo corrigido manualmente. |
 | `SafeBankToken2.sol` | Exemplo corrigido manualmente. |

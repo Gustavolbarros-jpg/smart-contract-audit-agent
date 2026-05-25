@@ -9,9 +9,8 @@ Branch de trabalho: `develop`
 - `main`, `develop` e `HEAD` estavam no commit `fda0435` no momento do alinhamento.
 - Mudancas locais anteriores foram preservadas em:
   - `stash@{0}: baseline-before-develop-align-2026-05-23`
-- Os contratos ERC2771 foram recuperados seletivamente do stash para voltarem como casos de teste:
+- O contrato ERC2771 vulneravel foi recuperado seletivamente do stash para voltar como caso de teste:
   - `smart-audt/contracts/ERC2771MulticallVulnerable.sol`
-  - `smart-audt/contracts/ERC2771MulticallVulnerable_FIXED.sol`
 
 ## Fonte Principal
 

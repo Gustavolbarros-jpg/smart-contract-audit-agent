@@ -75,12 +75,6 @@ CONTRACT_REGISTRY = [
         "Generated or corrected output; keep out of default benchmark inputs.",
     ),
     ContractEntry(
-        "ERC2771MulticallVulnerable_FIXED",
-        "smart-audt/contracts/ERC2771MulticallVulnerable_FIXED.sol",
-        MANUAL,
-        "Generated or corrected output; keep out of default benchmark inputs.",
-    ),
-    ContractEntry(
         "SimpleBank_FIXED",
         "smart-audt/contracts/SimpleBank_FIXED.sol",
         MANUAL,
