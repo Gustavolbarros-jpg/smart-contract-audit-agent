@@ -47,7 +47,12 @@ def _normalizar_chaves(obj):
         return [_normalizar_chaves(i) for i in obj]
     return obj
 
-def chamar_ia_json(system_prompt: str, user_prompt: str, schema_esperado: BaseModel) -> dict:
+def chamar_ia_json(
+    system_prompt: str,
+    user_prompt: str,
+    schema_esperado: BaseModel,
+    max_tokens: int | None = None,
+) -> dict:
     client = get_client()
     system_com_schema = (
         f"{system_prompt}\n\n"
@@ -55,15 +60,18 @@ def chamar_ia_json(system_prompt: str, user_prompt: str, schema_esperado: BaseMo
         f"The JSON must exactly match this schema:\n{schema_esperado.model_json_schema()}"
     )
     try:
-        response = client.chat.completions.create(
-            model=MODELO_LLM,
-            messages=[
+        kwargs = {
+            "model": MODELO_LLM,
+            "messages": [
                 {"role": "system", "content": system_com_schema},
                 {"role": "user", "content": user_prompt}
             ],
-            response_format={"type": "json_object"},
-            temperature=0.0
-        )
+            "response_format": {"type": "json_object"},
+            "temperature": 0.0,
+        }
+        if max_tokens:
+            kwargs["max_tokens"] = max_tokens
+        response = client.chat.completions.create(**kwargs)
         conteudo_bruto = response.choices[0].message.content
         dados_json = _normalizar_chaves(json.loads(conteudo_bruto))
         dados_validados = schema_esperado.model_validate(dados_json)
@@ -87,17 +95,20 @@ def chamar_ia_json(system_prompt: str, user_prompt: str, schema_esperado: BaseMo
         print(f"[ERRO DE API/PARSE] Falha ao consultar o Groq: {e}")
         raise
 
-def chamar_ia_texto(system_prompt: str, user_prompt: str) -> str:
+def chamar_ia_texto(system_prompt: str, user_prompt: str, max_tokens: int | None = None) -> str:
     client = get_client()
     try:
-        response = client.chat.completions.create(
-            model=MODELO_LLM,
-            messages=[
+        kwargs = {
+            "model": MODELO_LLM,
+            "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            temperature=0.0
-        )
+            "temperature": 0.0,
+        }
+        if max_tokens:
+            kwargs["max_tokens"] = max_tokens
+        response = client.chat.completions.create(**kwargs)
         return response.choices[0].message.content
     except Exception as e:
         print(f"❌ [ERRO DE API/TEXTO] Falha ao consultar o modelo: {e}")

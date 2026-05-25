@@ -29,6 +29,24 @@ def _latest_status_file(run_dir: Path, pattern: str) -> dict:
     return _read_json(matches[-1], {})
 
 
+def _latest_blocking_status(run_dir: Path) -> dict:
+    matches = sorted(run_dir.glob("*_status.json"))
+    ignored = {
+        "toolchain_status.json",
+        "certora_status.json",
+    }
+    blocked = []
+    for path in matches:
+        if path.name in ignored or path.name.startswith("patch_guard_t"):
+            continue
+        status = _read_json(path, {})
+        if status.get("status") == "blocked":
+            status = dict(status)
+            status.setdefault("stage", path.name.removesuffix("_status.json"))
+            blocked.append(status)
+    return blocked[-1] if blocked else {}
+
+
 def _blocking_certora_logs(run_dir: Path) -> list[dict]:
     blockers = []
     for log_path in sorted(run_dir.glob("certora*.log")):
@@ -70,6 +88,7 @@ def summarize_run(run_dir: Path) -> dict:
     comparison = _read_json(run_dir / "comparison_t1.json", {})
     certora_status = _read_json(run_dir / "certora_status.json", {})
     patch_guard_status = _latest_status_file(run_dir, "patch_guard_t*_status.json")
+    generic_block_status = _latest_blocking_status(run_dir)
     toolchain = _read_json(run_dir / "toolchain_status.json", {})
     certora_log_blockers = _blocking_certora_logs(run_dir)
 
@@ -81,6 +100,8 @@ def summarize_run(run_dir: Path) -> dict:
         status = f"blocked:{certora_status.get('stage', 'certora')}"
     elif patch_guard_status:
         status = f"blocked:{patch_guard_status.get('stage', 'patch_guard')}"
+    elif generic_block_status:
+        status = f"blocked:{generic_block_status.get('stage', 'pipeline')}"
     elif toolchain and not toolchain.get("ok", True):
         status = "blocked:toolchain"
     elif findings and not plan.get("selected_rules", []) and not static_findings:
@@ -108,6 +129,7 @@ def summarize_run(run_dir: Path) -> dict:
             _format_certora_blockers(certora_log_blockers)
             or certora_status.get("reason", "")
             or patch_guard_status.get("reason", "")
+            or generic_block_status.get("reason", "")
         ),
     }
 

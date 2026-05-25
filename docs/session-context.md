@@ -202,6 +202,8 @@ Current benchmark snapshot includes:
 - `CrowdfundingVault`: `4/4`
 - `DeFiVault`: `5/5`
 - `ERC2771MulticallVulnerable`: `1/1`
+- `EnterpriseTreasury300`: larger exploratory run reached Certora confirmation,
+  but stopped at LLM diagnosis because Groq hit the daily token limit.
 
 Exploratory snapshot also includes:
 
@@ -211,8 +213,8 @@ Exploratory snapshot also includes:
 Current snapshots:
 
 - Core benchmark: `docs/evaluations/evaluation-results-20260524_232506_044465.md`
-- Benchmark + exploratory: `docs/evaluations/evaluation-results-20260524_232506_055871.md`
-- All registered contracts: `docs/evaluations/evaluation-results-20260525_002330_000739.md`
+- Benchmark + exploratory: `docs/evaluations/evaluation-results-20260525_004032_486537.md`
+- All registered contracts: `docs/evaluations/evaluation-results-20260525_004125_584645.md`
 
 Recent Certora/spec lesson:
 
@@ -228,6 +230,20 @@ Recent Certora/spec lesson:
 - Certora runs now use the Solidity contract name detected from source, not just
   the file stem. This fixed `_FIXED` files such as `SimpleBank_FIXED.sol`, which
   contains `contract SimpleBank`.
+- Larger contracts exposed two CVL normalization rules:
+  - method return declarations must drop return variable names;
+  - rule-local Solidity types such as `bytes calldata` and `address payable`
+    must be normalized to CVL-compatible `bytes` and `address`.
+- Diagnosis prompts are now compacted for larger contracts by stripping large
+  evidence blobs, irrelevant Certora success noise, and using tighter snippets.
+
+Latest large-contract exploratory validation:
+
+- `EnterpriseTreasury300.sol`: 327 lines.
+- Latest run: `runs/20260525_003334_EnterpriseTreasury300`.
+- Slither normalized 26 findings.
+- Certora confirmed 8 formal findings and Slither confirmed 1 static finding.
+- Current block: `llm_initial_diagnosis` due Groq daily token limit.
 
 Latest all-contract validation:
 
@@ -252,7 +268,7 @@ python3 tests/test_certora_learning.py
 
 Latest result:
 
-- `54 tests OK`
+- `59 tests OK`
 
 Also run when editing:
 

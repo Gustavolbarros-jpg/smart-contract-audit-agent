@@ -6,22 +6,35 @@ from __future__ import annotations
 def compact_certora_log(log: str, rules: list[str], max_lines: int = 140) -> str:
     """Keep only Certora lines that matter for the selected rules."""
     rule_names = [rule for rule in rules if rule]
-    keywords = (
-        "Result for",
-        "Verified:",
-        "Violated:",
-        "Failures summary",
-        "Results for all",
-        "CRITICAL:",
-        "ERROR",
-        "FAIL",
-        "SUCCESS",
-        "SANITY",
-    )
     selected = []
 
     for line in log.splitlines():
-        if any(keyword in line for keyword in keywords) or any(rule in line for rule in rule_names):
+        stripped = line.strip()
+        rule_line = any(rule in line for rule in rule_names)
+        if (
+            not rule_line
+            and (
+                "envfreeFuncsStaticCheck" in line
+                or "SUCCESS" in line
+                or "Verified:" in line
+            )
+        ):
+            continue
+        if rule_line:
+            if (
+                stripped.startswith("Result for")
+                or stripped.startswith("Violated:")
+                or stripped.startswith("Failed on")
+                or ("|Violated" in line)
+            ):
+                selected.append(line)
+            continue
+
+        if "Failures summary" in line or "CRITICAL:" in line:
+            selected.append(line)
+            continue
+
+        if "ERROR" in line and "exitcode 100" not in line:
             selected.append(line)
 
     if not selected:
@@ -45,6 +58,50 @@ def filter_plan_by_ids(plan: dict, vuln_ids: set[str]) -> dict:
         ],
         "global_assumptions": plan.get("global_assumptions", []),
     }
+
+
+def compact_plan_for_diagnosis(plan: dict) -> dict:
+    """Keep only fields needed to explain and repair confirmed findings."""
+    selected = []
+    fields = (
+        "id",
+        "type",
+        "function",
+        "line",
+        "rule_names",
+        "repair_strategy",
+        "target_parameter",
+    )
+    for item in plan.get("selected_rules", []):
+        selected.append({key: item[key] for key in fields if key in item and item[key]})
+
+    skipped = []
+    for item in plan.get("skipped_findings", []):
+        skipped.append(
+            {
+                key: item[key]
+                for key in ("id", "type", "function", "reason")
+                if key in item and item[key]
+            }
+        )
+
+    return {
+        "selected_rules": selected,
+        "skipped_findings": skipped,
+    }
+
+
+def compact_confirmed_analyses(analyses: list[dict]) -> list[dict]:
+    """Reduce Certora/static analysis rows before sending them to the LLM."""
+    compact = []
+    fields = ("id", "type", "function", "rule", "status")
+    for item in analyses:
+        row = {key: item[key] for key in fields if key in item and item[key]}
+        evidence = item.get("evidencia", "")
+        if evidence and item.get("status") == "confirmed_static":
+            row["evidence"] = evidence[:180]
+        compact.append(row)
+    return compact
 
 
 def sanitize_diagnosis_ids(diagnosis: dict, allowed_ids: set[str]) -> dict:

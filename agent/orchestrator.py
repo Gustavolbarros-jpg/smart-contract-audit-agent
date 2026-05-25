@@ -24,7 +24,13 @@ from core.contract_context import (
     choose_auth_probe_function,
     extract_primary_contract_name,
 )
-from core.diagnosis_context import compact_certora_log, filter_plan_by_ids, sanitize_diagnosis_ids
+from core.diagnosis_context import (
+    compact_certora_log,
+    compact_confirmed_analyses,
+    compact_plan_for_diagnosis,
+    filter_plan_by_ids,
+    sanitize_diagnosis_ids,
+)
 from core.formal_candidate import build_formal_candidates
 from core.formal_plan import build_planner_input, build_spec_plan_input, sanitize_formal_plan
 from core.patch_guard import (
@@ -664,24 +670,29 @@ def executar_pipeline(contract_path: str, copy_final: bool = True):
         append_static_entries_to_plan(plano_formal, achados_static),
         ids_confirmadas,
     )
-    diagnosis_log = compact_certora_log(certora_log, rules_confirmadas)
+    diagnosis_plan_compact = compact_plan_for_diagnosis(diagnosis_plan)
+    vulns_confirmadas_compact = compact_confirmed_analyses(vulns_confirmadas)
+    diagnosis_log = compact_certora_log(certora_log, rules_confirmadas, max_lines=100)
     if achados_static:
         diagnosis_log += "\n\nSTATIC_SLITHER_FINDINGS:\n" + json.dumps(
-            static_confirmed_analyses(achados_static),
+            compact_confirmed_analyses(static_confirmed_analyses(achados_static)),
             ensure_ascii=False,
         )
-    diagnosis_contract = build_contract_brief(contract_source, vulns_confirmadas_full)
+    diagnosis_contract = build_contract_brief(contract_source, vulns_confirmadas_full, radius=2)
     save_text(run_dir / "diagnosis_t0_log_context.txt", diagnosis_log)
     save_text(run_dir / "diagnosis_t0_contract_context.txt", diagnosis_contract)
+    save_json(run_dir / "diagnosis_t0_plan_context.json", diagnosis_plan_compact)
+    save_json(run_dir / "diagnosis_t0_confirmed_context.json", vulns_confirmadas_compact)
 
     try:
         diagnostico = chamar_ia_json(
             sp.PROMPT_DIAGNOSTICO,
             f"LOG_RELEVANTE:\n{diagnosis_log}\n"
-            f"PLANO_FORMAL:\n{json.dumps(diagnosis_plan, ensure_ascii=False)}\n"
-            f"VULNS_CONFIRMADAS:\n{json.dumps(vulns_confirmadas, ensure_ascii=False)}\n"
+            f"PLANO_FORMAL:\n{json.dumps(diagnosis_plan_compact, ensure_ascii=False)}\n"
+            f"VULNS_CONFIRMADAS:\n{json.dumps(vulns_confirmadas_compact, ensure_ascii=False)}\n"
             f"CONTRATO_RESUMIDO:\n{diagnosis_contract}",
-            DiagnosticoFalhas
+            DiagnosticoFalhas,
+            max_tokens=1400,
         )
     except Exception as exc:
         registrar_bloqueio(

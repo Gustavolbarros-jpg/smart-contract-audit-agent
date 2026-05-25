@@ -113,6 +113,22 @@ def _split_params(params: str) -> list[str]:
     return [_clean_type(param) for param in params.split(",") if param.strip()]
 
 
+def _type_without_name(value: str) -> str:
+    cleaned = _clean_type(value)
+    parts = cleaned.split()
+    if len(parts) <= 1:
+        return cleaned
+
+    type_candidate = " ".join(parts[:-1])
+    if _is_cvl_primitive_type(type_candidate):
+        return type_candidate
+    return cleaned
+
+
+def _split_return_types(returns: str) -> list[str]:
+    return [_type_without_name(item) for item in returns.split(",") if item.strip()]
+
+
 def _function_method_signature(line: str) -> str | None:
     stripped = line.split("{", 1)[0].strip().rstrip(";")
     match = re.match(r"function\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]*)\)\s*(.*)", stripped)
@@ -127,7 +143,7 @@ def _function_method_signature(line: str) -> str | None:
     returns = ""
     returns_match = re.search(r"returns\s*\(([^)]*)\)", tail)
     if returns_match:
-        returns = f" returns({_clean_type(returns_match.group(1))})"
+        returns = f" returns({', '.join(_split_return_types(returns_match.group(1)))})"
 
     envfree = " envfree" if re.search(r"\b(view|pure)\b", tail) else ""
     params = ", ".join(_split_params(params))

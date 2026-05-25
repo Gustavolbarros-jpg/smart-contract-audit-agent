@@ -363,6 +363,14 @@ def corrigir_spec(spec_cvl: str) -> tuple[str, list[str]]:
                 novas_linhas[i] = nova
                 correcoes.append(f"Linha {i+1}: removido casting payable(...)")
 
+        # CORREÇÃO 1fa: CVL rules nao aceitam tipos Solidity com data location/payable.
+        if 'methods' not in linha:
+            nova = re.sub(r'\baddress\s+payable\b', 'address', novas_linhas[i])
+            nova = re.sub(r'\b(bytes|string)\s+(memory|calldata|storage)\s+', r'\1 ', nova)
+            if nova != novas_linhas[i]:
+                novas_linhas[i] = nova
+                correcoes.append(f"Linha {i+1}: tipo Solidity normalizado em rule CVL")
+
         # CORREÇÃO 1g: CVL não deve inicializar address com 0 na declaração.
         m_zero_address = re.match(r'^(\s*)address\s+(\w+)\s*=\s*0\s*;\s*$', linha)
         if m_zero_address:

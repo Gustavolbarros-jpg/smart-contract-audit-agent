@@ -35,6 +35,7 @@ Fonte no codigo: `agent/core/contract_registry.py`.
 | `TimelockVault.sol` | Caso positivo exploratorio para atualizacao critica sem autorizacao; ainda fora do benchmark principal por risco de falso positivo da heuristica. |
 | `AnotherVulnerableBank.sol` | Exemplo bancario 0.8 executavel para cobertura exploratoria. |
 | `VulnerableBankToken.sol` | Controle negativo atual: Slither acha sinais informacionais, mas nada acionavel. |
+| `EnterpriseTreasury300.sol` | Contrato exploratorio maior (327 linhas) para testar generalizacao em superficie de tesouraria/admin com multiplas classes acionaveis. |
 
 ## Manuais / Corrigidos
 

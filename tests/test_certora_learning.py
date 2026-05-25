@@ -20,6 +20,11 @@ from core.contract_registry import (
     contract_names,
     default_benchmark_contracts,
 )
+from core.diagnosis_context import (
+    compact_certora_log,
+    compact_confirmed_analyses,
+    compact_plan_for_diagnosis,
+)
 from core.evaluation import summarize_run
 from core.formal_candidate import build_formal_candidates
 from core.formal_plan import sanitize_formal_plan
@@ -258,6 +263,58 @@ rule selfdestruct_auth {
         self.assertIn("Valid shape:", context)
         self.assertNotIn("DeFiVault", context)
         self.assertNotIn("timestamp_property_example", context)
+
+    def test_diagnosis_context_compacts_large_plans(self):
+        plan = {
+            "selected_rules": [
+                {
+                    "id": "VULN_001",
+                    "type": "missing-zero-check",
+                    "function": "transferOwnership(address)",
+                    "line": "10",
+                    "rule_names": ["zero_address_reverts"],
+                    "formal_property": "zero address must revert",
+                    "cvl_strategy": "require_nonzero_address",
+                    "repair_strategy": "require_nonzero_address",
+                    "target_parameter": "newOwner",
+                    "evidence": {"large": "x" * 1000},
+                    "assumptions": ["irrelevant long field"],
+                }
+            ],
+            "global_assumptions": ["large assumption"],
+        }
+        analyses = [
+            {
+                "id": "VULN_001",
+                "type": "missing-zero-check",
+                "function": "transferOwnership(address)",
+                "rule": "zero_address_reverts",
+                "status": "confirmed_static",
+                "evidencia": "Result for zero_address_reverts: FAIL " + ("x" * 400),
+            }
+        ]
+
+        compact_plan = compact_plan_for_diagnosis(plan)
+        compact_analyses = compact_confirmed_analyses(analyses)
+
+        self.assertEqual(compact_plan["selected_rules"][0]["id"], "VULN_001")
+        self.assertNotIn("evidence", compact_plan["selected_rules"][0])
+        self.assertNotIn("global_assumptions", compact_plan)
+        self.assertLess(len(compact_analyses[0]["evidence"]), len(analyses[0]["evidencia"]))
+
+    def test_compact_certora_log_drops_unselected_success_noise(self):
+        log = """Result for envfreeFuncsStaticCheck: envfreeFuncsStaticCheck: owner(): SUCCESS
+projection(): SUCCESS
+Verified: harmless_rule
+Violated: zero_address_reverts
+Result for zero_address_reverts: zero_address_reverts: FAIL: lastReverted
+"""
+        compact = compact_certora_log(log, ["zero_address_reverts"])
+
+        self.assertIn("zero_address_reverts", compact)
+        self.assertNotIn("envfreeFuncsStaticCheck", compact)
+        self.assertNotIn("projection(): SUCCESS", compact)
+        self.assertNotIn("Verified: harmless_rule", compact)
 
     def test_formal_plan_forces_clear_auth_findings(self):
         plan = {
@@ -1232,6 +1289,24 @@ contract C {
         self.assertNotIn("function timeLeft(uint256 deadline) external returns(uint256) envfree;", methods)
         self.assertNotIn("function isOwner() external returns(bool) envfree;", methods)
 
+    def test_methods_block_removes_named_return_variables(self):
+        source = """pragma solidity ^0.8.21;
+contract C {
+  function accountOf(address user) external view returns (uint256 deposited, uint256 withdrawn, uint256 rewardDebt, bool active) {
+    user;
+    return (0, 0, 0, false);
+  }
+}
+"""
+        methods = build_methods_block(source)
+
+        self.assertIn(
+            "function accountOf(address user) external returns(uint256, uint256, uint256, bool) envfree;",
+            methods,
+        )
+        self.assertNotIn("deposited", methods)
+        self.assertNotIn("withdrawn", methods)
+
     def test_spec_validator_does_not_add_envfree_to_every_returning_method(self):
         spec = """methods {
   function createCampaign(uint256 goal, uint256 duration) external returns(uint256);
@@ -1247,6 +1322,28 @@ rule smoke {
         self.assertIn("function createCampaign(uint256 goal, uint256 duration) external returns(uint256);", fixed)
         self.assertNotIn("createCampaign(uint256 goal, uint256 duration) external returns(uint256) envfree;", fixed)
         self.assertFalse(any("envfree adicionado" in item for item in corrections))
+
+    def test_spec_validator_normalizes_solidity_types_inside_rules(self):
+        spec = """methods {
+  function notifyPartner(address target, bytes payload) external;
+  function sweepTreasury(address to, uint256 amount) external;
+}
+
+rule cvl_types {
+  env e;
+  address payable to;
+  bytes calldata payload;
+  notifyPartner@withrevert(e, to, payload);
+  assert lastReverted;
+}
+"""
+        fixed, corrections = corrigir_spec(spec)
+
+        self.assertIn("address to;", fixed)
+        self.assertIn("bytes payload;", fixed)
+        self.assertNotIn("address payable", fixed)
+        self.assertNotIn("calldata", fixed)
+        self.assertTrue(any("tipo Solidity normalizado" in item for item in corrections))
 
     def test_invalid_envfree_certora_log_is_blocking(self):
         log = (
@@ -1363,6 +1460,30 @@ contract SimpleBank {
         self.assertEqual(row["status"], "blocked:patch_guard_t0")
         self.assertEqual(row["confirmed"], 1)
         self.assertIn("escopo minimo", row["blocked_reason"])
+
+    def test_evaluation_reports_generic_pipeline_block(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp) / "20260525_003334_EnterpriseTreasury300"
+            run_dir.mkdir()
+            (run_dir / "analysis.json").write_text(
+                json.dumps({"analises": [{"id": "VULN_001", "status": "confirmed"}]}),
+                encoding="utf-8",
+            )
+            (run_dir / "llm_initial_diagnosis_status.json").write_text(
+                json.dumps(
+                    {
+                        "stage": "llm_initial_diagnosis",
+                        "status": "blocked",
+                        "reason": "Falha ao consultar a LLM",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            row = summarize_run(run_dir)
+
+        self.assertEqual(row["status"], "blocked:llm_initial_diagnosis")
+        self.assertIn("LLM", row["blocked_reason"])
 
     def test_evaluation_reports_no_actionable_candidates(self):
         with tempfile.TemporaryDirectory() as tmp:

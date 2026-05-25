@@ -69,6 +69,12 @@ CONTRACT_REGISTRY = [
         "Runnable negative/control benchmark currently producing no actionable candidates.",
     ),
     ContractEntry(
+        "EnterpriseTreasury300",
+        "smart-audt/contracts/EnterpriseTreasury300.sol",
+        EXPLORATORY,
+        "Larger Solidity 0.8 exploratory benchmark for mixed treasury/admin vulnerabilities.",
+    ),
+    ContractEntry(
         "DeFiVault_FIXED",
         "smart-audt/contracts/DeFiVault_FIXED.sol",
         MANUAL,

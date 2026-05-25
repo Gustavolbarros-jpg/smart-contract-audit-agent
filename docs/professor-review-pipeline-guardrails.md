@@ -58,7 +58,7 @@ git diff --check
 Resultado atual:
 
 ```text
-54 tests OK
+59 tests OK
 py_compile OK
 git diff --check OK
 ```
@@ -175,6 +175,40 @@ Correcao importante encontrada nessa rodada:
 - O orquestrador agora detecta o nome real do contrato no Solidity e passa esse
   nome para `certoraRun`.
 
+## Validacao Exploratoria Maior
+
+### `EnterpriseTreasury300.sol`
+
+- Tamanho: 327 linhas.
+- Grupo: `exploratory`.
+- Run principal: `runs/20260525_003334_EnterpriseTreasury300`.
+- Achados Slither normalizados: 26.
+- Candidatos formais: 8.
+- `static_confirmed`: 1.
+- Confirmadas: 9.
+- Status atual: `blocked:llm_initial_diagnosis`.
+
+Classes confirmadas:
+
+- `missing-zero-check`
+- `tx-origin`
+- `suicidal`
+- `arbitrary-send-eth`
+- `unchecked-lowlevel`
+
+Resultado importante:
+
+- A cadeia Slither -> plano -> spec -> Certora generalizou para um contrato de
+  mais de 300 linhas.
+- A spec precisou de duas novas protecoes deterministicas:
+  - remover nomes de variaveis em `returns(...)` no `methods{}`;
+  - normalizar tipos Solidity dentro de rules CVL, como `bytes calldata` e
+    `address payable`.
+- O bloqueio restante foi limite diario do Groq na etapa de diagnostico/correcao,
+  nao falha de Certora.
+- O contexto de diagnostico foi compactado para reduzir custo de token em
+  contratos maiores.
+
 ## Avaliacoes Snapshot
 
 Snapshots mais recentes:
@@ -182,9 +216,9 @@ Snapshots mais recentes:
 - Core benchmark:
   - `docs/evaluations/evaluation-results-20260524_232506_044465.md`
 - Benchmark + exploratory:
-  - `docs/evaluations/evaluation-results-20260524_232506_055871.md`
+  - `docs/evaluations/evaluation-results-20260525_004032_486537.md`
 - Todos os contratos registrados:
-  - `docs/evaluations/evaluation-results-20260525_002330_000739.md`
+  - `docs/evaluations/evaluation-results-20260525_004125_584645.md`
 
 ## Riscos Abertos
 
