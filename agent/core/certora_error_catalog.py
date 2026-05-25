@@ -83,6 +83,14 @@ CERTORA_ERROR_PATTERNS = [
         "pipeline_action": "Classify detailed errors and apply deterministic CVL repair before retrying.",
         "source": "https://docs.certora.com/en/latest/docs/cvl/overview.html",
     },
+    {
+        "id": "cvl_invalid_envfree",
+        "severity": "blocking",
+        "pattern": r"declared `envfree` but depends on the environment|Specification marks method .* as 'envfree' but the method uses",
+        "cause": "The methods{} block marked a function as envfree even though it reads restricted environment values such as msg.sender or block.timestamp.",
+        "pipeline_action": "Rebuild methods{} without envfree for environment-dependent functions and rerun Certora.",
+        "source": "https://docs.certora.com/en/latest/docs/cvl/methods.html",
+    },
 ]
 
 
@@ -99,6 +107,8 @@ def analyze_certora_errors(log: str) -> dict:
 
 
 def has_certora_blocking_error(log: str) -> bool:
+    if analyze_certora_errors(log)["has_blocking_errors"]:
+        return True
     if "Results for all:" in log or "Failures summary:" in log:
         return False
     return analyze_certora_errors(log)["has_blocking_errors"]

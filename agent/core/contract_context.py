@@ -134,6 +134,114 @@ def _function_method_signature(line: str) -> str | None:
     return f"  function {name}({params}) external{returns}{envfree};"
 
 
+def _mask_comments_and_strings(source: str) -> str:
+    out = []
+    i = 0
+    state = "code"
+    quote = ""
+
+    while i < len(source):
+        char = source[i]
+        nxt = source[i + 1] if i + 1 < len(source) else ""
+
+        if state == "code":
+            if char == "/" and nxt == "/":
+                out.extend([" ", " "])
+                i += 2
+                state = "line_comment"
+                continue
+            if char == "/" and nxt == "*":
+                out.extend([" ", " "])
+                i += 2
+                state = "block_comment"
+                continue
+            if char in ("'", '"'):
+                out.append(" ")
+                quote = char
+                i += 1
+                state = "string"
+                continue
+            out.append(char)
+            i += 1
+            continue
+
+        if state == "line_comment":
+            out.append("\n" if char == "\n" else " ")
+            if char == "\n":
+                state = "code"
+            i += 1
+            continue
+
+        if state == "block_comment":
+            if char == "*" and nxt == "/":
+                out.extend([" ", " "])
+                i += 2
+                state = "code"
+                continue
+            out.append("\n" if char == "\n" else " ")
+            i += 1
+            continue
+
+        if state == "string":
+            out.append("\n" if char == "\n" else " ")
+            if char == "\\" and i + 1 < len(source):
+                out.append("\n" if nxt == "\n" else " ")
+                i += 2
+                continue
+            if char == quote:
+                state = "code"
+            i += 1
+
+    return "".join(out)
+
+
+def _matching_brace(masked_source: str, open_index: int) -> int:
+    depth = 0
+    for index in range(open_index, len(masked_source)):
+        char = masked_source[index]
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return index
+    return len(masked_source) - 1
+
+
+def _function_bodies(source: str) -> dict[str, str]:
+    masked = _mask_comments_and_strings(source)
+    bodies = {}
+    pattern = re.compile(r"\bfunction\s+([A-Za-z_][A-Za-z0-9_]*)\s*\([^)]*\)[^{;]*{")
+
+    for match in pattern.finditer(masked):
+        name = match.group(1)
+        brace = masked.find("{", match.end() - 1)
+        end = _matching_brace(masked, brace)
+        bodies[name] = source[match.start():end + 1]
+
+    return bodies
+
+
+def _uses_restricted_environment(body: str) -> bool:
+    masked = _mask_comments_and_strings(body)
+    restricted_patterns = [
+        r"\bblock\s*\.\s*(timestamp|number|coinbase|basefee|prevrandao|difficulty|gaslimit|chainid)\b",
+        r"\bmsg\s*\.\s*(sender|value|data|sig)\b",
+        r"\btx\s*\.\s*(origin|gasprice)\b",
+        r"\bgasleft\s*\(",
+    ]
+    return any(re.search(pattern, masked) for pattern in restricted_patterns)
+
+
+def _function_method_signature_with_body(line: str, body: str = "") -> str | None:
+    signature = _function_method_signature(line)
+    if not signature or " envfree;" not in signature:
+        return signature
+    if body and _uses_restricted_environment(body):
+        return signature.replace(" envfree;", ";")
+    return signature
+
+
 def _parse_param(param: str, index: int) -> dict:
     cleaned = _clean_type(param)
     if not cleaned:
@@ -196,6 +304,7 @@ def choose_auth_probe_function(source: str) -> dict | None:
 def build_methods_block(source: str) -> str:
     """Build a deterministic CVL methods{} block from public/external Solidity API."""
     interface = _extract_interface(source)
+    function_bodies = _function_bodies(source)
     entries = []
     seen = set()
 
@@ -206,7 +315,9 @@ def build_methods_block(source: str) -> str:
             seen.add(signature)
 
     for line in interface["functions"]:
-        signature = _function_method_signature(line)
+        info = _function_info(line)
+        body = function_bodies.get(info["name"], "") if info else ""
+        signature = _function_method_signature_with_body(line, body)
         if signature and signature not in seen:
             entries.append(signature)
             seen.add(signature)

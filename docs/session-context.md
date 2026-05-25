@@ -208,8 +208,16 @@ Exploratory snapshot also includes:
 
 Current snapshots:
 
-- Core benchmark: `docs/evaluations/evaluation-results-20260524_192309_614517.md`
-- Benchmark + exploratory: `docs/evaluations/evaluation-results-20260524_192905_710283.md`
+- Core benchmark: `docs/evaluations/evaluation-results-20260524_212448_765961.md`
+- Benchmark + exploratory: `docs/evaluations/evaluation-results-20260524_212405_405911.md`
+
+Recent Certora/spec lesson:
+
+- `CrowdfundingVault` previously had invalid `envfree` annotations for
+  `createCampaign`, `timeLeft`, and `isSuccessful`.
+- The pipeline now removes `envfree` from functions that read restricted
+  environment fields such as `msg.sender` or `block.timestamp`.
+- Logs with invalid `envfree` now count as blocking spec errors.
 
 Older `docs/evaluation-results.md` may still exist, but new evaluations should be snapshot files.
 
@@ -223,7 +231,7 @@ python3 tests/test_certora_learning.py
 
 Latest result:
 
-- `48 tests OK`
+- `51 tests OK`
 
 Also run when editing:
 

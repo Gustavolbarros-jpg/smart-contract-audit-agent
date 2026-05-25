@@ -137,7 +137,8 @@ TASK: Review a generated CVL spec before Certora runs.
 
 CHECKS:
 1. Every method used by a rule exists in methods{} and in the contract interface.
-2. View/pure/getter functions are envfree and are called without env.
+2. Only pure getters or view/pure functions that do not read restricted environment values are envfree.
+   Functions that read msg.sender, msg.value, tx.origin, block.timestamp, block.number, or similar environment fields must not be envfree.
 3. methods{} entries are signatures only; no bodies and no payable modifier.
 4. No constructor, receive, or fallback in methods{}.
 5. No rules{} wrapper.
@@ -156,7 +157,8 @@ RESULT NORMALIZATION:
 - Violated / FAIL -> confirmed.
 - Verified / SUCCESS -> not_confirmed.
 - TIMEOUT / SANITY_FAIL / unknown -> inconclusive.
-- Ignore rule_not_vacuous and envfreeFuncsStaticCheck helper rules.
+- Ignore rule_not_vacuous helper rules.
+- Do not map envfreeFuncsStaticCheck to a vulnerability ID, but if it reports that a method was declared envfree while depending on the environment, treat the spec as invalid/blocking.
 
 Return only valid JSON matching the requested schema.
 """
@@ -261,7 +263,8 @@ RESULT NORMALIZATION:
 - Violated / FAIL -> confirmed: the vulnerability persists.
 - Verified / SUCCESS -> not_confirmed: the patch resolved the property.
 - TIMEOUT / SANITY_FAIL / unknown -> inconclusive.
-- Ignore rule_not_vacuous and envfreeFuncsStaticCheck helper rules.
+- Ignore rule_not_vacuous helper rules.
+- Do not map envfreeFuncsStaticCheck to a vulnerability ID, but if it reports that a method was declared envfree while depending on the environment, treat the spec as invalid/blocking.
 
 Return only valid JSON matching the requested schema.
 """

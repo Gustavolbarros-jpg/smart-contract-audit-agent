@@ -356,12 +356,6 @@ def corrigir_spec(spec_cvl: str) -> tuple[str, list[str]]:
                 novas_linhas[i] = nova
                 correcoes.append(f"Linha {i+1}: payable removido do methods{{}}")
 
-        # CORREÇÃO 1d: getters e funções com return no methods{} devem ser envfree.
-        if re.match(r'^\s*function\s+\w+', linha) and 'returns' in linha and 'envfree' not in linha:
-            if novas_linhas[i].rstrip().endswith(';'):
-                novas_linhas[i] = novas_linhas[i].rstrip()[:-1].rstrip() + ' envfree;'
-                correcoes.append(f"Linha {i+1}: envfree adicionado em função com returns no methods{{}}")
-
         # CORREÇÃO 1f: payable() casting nas rules
         if 'payable(' in linha and 'methods' not in linha:
             nova = re.sub(r'payable\(([^)]+)\)', r'\1', novas_linhas[i])

@@ -58,7 +58,7 @@ git diff --check
 Resultado atual:
 
 ```text
-48 tests OK
+51 tests OK
 py_compile OK
 git diff --check OK
 ```
@@ -91,7 +91,7 @@ Ressalva:
 ### `CrowdfundingVault.sol`
 
 - Tamanho: 173 linhas.
-- Run: `runs/20260524_210914_CrowdfundingVault`.
+- Run: `runs/20260524_212214_CrowdfundingVault`.
 - Achados Slither normalizados: 16.
 - Candidatos formais: 1.
 - `static_confirmed`: 3.
@@ -111,6 +111,18 @@ Resultado do `patch_guard`:
 
 Esse foi o melhor teste de generalizacao ate agora, porque combinou Certora
 para `tx-origin` com revalidacao estatica para `unchecked-lowlevel`.
+
+Correcao importante apos revisao do log:
+
+- A run anterior marcava `createCampaign`, `timeLeft` e `isSuccessful` como
+  `envfree`, mas essas funcoes usam `msg.sender` ou `block.timestamp`.
+- Isso fazia `envfreeFuncsStaticCheck` violar e tornava a spec invalida, mesmo
+  com a rule de auth passando.
+- A geracao de `methods{}` agora remove `envfree` de funcoes que leem ambiente
+  restrito.
+- O validador tambem parou de adicionar `envfree` automaticamente em qualquer
+  metodo com `returns`.
+- A run atual mostra `envfreeFuncsStaticCheck: Not violated`.
 
 ## ERC2771 / Multicall
 
@@ -138,9 +150,9 @@ Observacao importante:
 Snapshots mais recentes:
 
 - Core benchmark:
-  - `docs/evaluations/evaluation-results-20260524_211017_840188.md`
+  - `docs/evaluations/evaluation-results-20260524_212448_765961.md`
 - Benchmark + exploratory:
-  - `docs/evaluations/evaluation-results-20260524_211010_010326.md`
+  - `docs/evaluations/evaluation-results-20260524_212405_405911.md`
 
 ## Riscos Abertos
 
@@ -150,6 +162,8 @@ Snapshots mais recentes:
 - Reentrancia continua fora do escopo automatico por enquanto.
 - Specs Certora geradas por LLM ainda precisam dos validadores deterministas para evitar
   falso senso de verificacao.
+- Logs com `envfreeFuncsStaticCheck` violado devem bloquear a conclusao do run;
+  a rule alvo passar nao basta se a spec estiver invalida.
 
 ## Proximos Passos Recomendados
 
@@ -163,4 +177,3 @@ Snapshots mais recentes:
    - comentarios alterados.
 4. Continuar testando contratos maiores antes de promover novas classes.
 5. So fazer merge em `develop` depois de revisao manual dos professores.
-

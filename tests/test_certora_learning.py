@@ -1192,6 +1192,76 @@ contract C {
         self.assertNotIn("returns(Campaign)", methods)
         self.assertNotIn("function constant()", methods)
 
+    def test_methods_block_does_not_mark_environment_dependent_views_envfree(self):
+        source = """pragma solidity ^0.8.21;
+contract C {
+  address public owner;
+  uint256 public campaignCount;
+
+  function createCampaign(uint256 goal, uint256 duration) external returns (uint256) {
+    campaignCount++;
+    owner = msg.sender;
+    duration;
+    return campaignCount + block.timestamp;
+  }
+
+  function timeLeft(uint256 deadline) external view returns (uint256) {
+    if (block.timestamp >= deadline) {
+      return 0;
+    }
+    return deadline - block.timestamp;
+  }
+
+  function isOwner() external view returns (bool) {
+    return msg.sender == owner;
+  }
+
+  function total() external view returns (uint256) {
+    return campaignCount;
+  }
+}
+"""
+        methods = build_methods_block(source)
+
+        self.assertIn("function owner() external returns(address) envfree;", methods)
+        self.assertIn("function campaignCount() external returns(uint256) envfree;", methods)
+        self.assertIn("function createCampaign(uint256 goal, uint256 duration) external returns(uint256);", methods)
+        self.assertIn("function timeLeft(uint256 deadline) external returns(uint256);", methods)
+        self.assertIn("function isOwner() external returns(bool);", methods)
+        self.assertIn("function total() external returns(uint256) envfree;", methods)
+        self.assertNotIn("function timeLeft(uint256 deadline) external returns(uint256) envfree;", methods)
+        self.assertNotIn("function isOwner() external returns(bool) envfree;", methods)
+
+    def test_spec_validator_does_not_add_envfree_to_every_returning_method(self):
+        spec = """methods {
+  function createCampaign(uint256 goal, uint256 duration) external returns(uint256);
+  function owner() external returns(address) envfree;
+}
+
+rule smoke {
+  assert true;
+}
+"""
+        fixed, corrections = corrigir_spec(spec)
+
+        self.assertIn("function createCampaign(uint256 goal, uint256 duration) external returns(uint256);", fixed)
+        self.assertNotIn("createCampaign(uint256 goal, uint256 duration) external returns(uint256) envfree;", fixed)
+        self.assertFalse(any("envfree adicionado" in item for item in corrections))
+
+    def test_invalid_envfree_certora_log_is_blocking(self):
+        log = (
+            "Results for all:\n"
+            "Result for envfreeFuncsStaticCheck: envfreeFuncsStaticCheck: timeLeft(uint256): FAIL: "
+            "Specification marks method C.timeLeft(uint256 id) returns (uint256) as 'envfree' "
+            "but the method uses the following restricted environment properties [TIMESTAMP]\n"
+            "CRITICAL: Function timeLeft(uint256) was declared `envfree` but depends on the environment."
+        )
+
+        self.assertTrue(has_certora_blocking_error(log))
+        analysis = analyze_certora_errors(log)
+        ids = {item["id"] for item in analysis["matches"]}
+        self.assertIn("cvl_invalid_envfree", ids)
+
     def test_toolchain_constraint_matching_for_solidity_08(self):
         source = "pragma solidity ^0.8.21; contract LocalTarget {}"
         self.assertEqual(extract_solidity_constraint(source), "^0.8.21")

@@ -19,7 +19,10 @@ Este documento registra regras oficiais do Certora/CVL e erros reais observados 
 - Em CVL 2, cada entrada de `methods{}` comeca com `function` e termina com `;`.
 - `methods{}` contem assinaturas, nao corpos Solidity.
 - Nao usar `payable` em entrada de methods; `address payable` vira `address`.
-- Getters/view/pure devem ser `envfree`; chamadas `envfree` nao recebem `env`.
+- Getters simples podem ser `envfree`; funcoes `view/pure` so devem ser
+  `envfree` quando nao leem ambiente restrito como `msg.sender`, `msg.value`,
+  `tx.origin`, `block.timestamp` ou `block.number`.
+- Chamadas `envfree` nao recebem `env`.
 - Nao existe wrapper `rules { ... }`; cada `rule` e top-level.
 - Statements soltos apos `// VULN_XXX` devem ser envolvidos em `rule nome { ... }`.
 - `lastReverted` deve ser checado logo apos a chamada com `@withrevert`.
@@ -39,6 +42,7 @@ Este documento registra regras oficiais do Certora/CVL e erros reais observados 
 | `address x = 0` | Inicializacao invalida/fragil em CVL | `corrigir_spec` + `inserir_requires_zero_address` |
 | `lastReverted` enganoso | Outra chamada sobrescreveu `lastReverted` | manter chamada `@withrevert` adjacente ao assert |
 | Auth rule chama funcao publica comum | LLM escolheu alvo errado para `tx-origin` | `aplicar_auth_probe_rules` |
+| `declared envfree but depends on the environment` | methods marcou funcao dependente de ambiente como `envfree` | reconstruir methods sem `envfree` para essa funcao e bloquear o run antigo |
 
 ## Sobre Reentrancy
 
