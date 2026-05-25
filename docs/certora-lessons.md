@@ -29,6 +29,8 @@ Este documento registra regras oficiais do Certora/CVL e erros reais observados 
 - Em regra de zero address, a pre-condicao `require x == 0;` precisa existir, senao a rule prova algo diferente do que queremos.
 - Duplicar `env e` dentro da mesma rule e erro; quando a LLM mistura um teste de revert e um teste de estado, o pipeline deve remover o preambulo incorreto ou dividir a rule.
 - Rule de `tx-origin`/auth nao pode chamar funcao aleatoria. Ela deve chamar uma funcao realmente protegida por `onlyOwner`, escolhida deterministicamente pela interface do contrato.
+- A avaliacao deve ler os `certora*.log` antes de confiar em `comparison_t1.json`.
+  Se houver erro bloqueante de spec, o run nao pode ser reportado como `passed`.
 
 ## Erros Observados
 

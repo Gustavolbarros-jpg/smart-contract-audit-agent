@@ -58,7 +58,7 @@ git diff --check
 Resultado atual:
 
 ```text
-51 tests OK
+52 tests OK
 py_compile OK
 git diff --check OK
 ```
@@ -68,7 +68,7 @@ git diff --check OK
 ### `DeFiVault.sol`
 
 - Tamanho: 187 linhas.
-- Run: `runs/20260524_210746_DeFiVault`.
+- Run: `runs/20260524_232148_DeFiVault`.
 - Achados Slither normalizados: 19.
 - Candidatos formais: 5.
 - Confirmadas: 5.
@@ -84,9 +84,12 @@ Classes resolvidas:
 Ressalva:
 
 - O `patch_guard` terminou com `warning`, nao `blocked`.
-- Foram 40 avisos por mudancas fora do range alvo, principalmente comentarios e reformatacao.
+- Foram 37 avisos por mudancas fora do range alvo, principalmente comentarios e reformatacao.
 - A correcao passou em Certora/Slither, mas o resultado mostra que ainda precisamos endurecer
   a politica de minimalidade para contratos maiores.
+- A run antiga `runs/20260524_210746_DeFiVault` tinha `envfreeFuncsStaticCheck`
+  violado por marcar `calculateReward(address)` como `envfree`; a run atual
+  remove essa marcacao e mostra `envfreeFuncsStaticCheck: Not violated`.
 
 ### `CrowdfundingVault.sol`
 
@@ -123,6 +126,9 @@ Correcao importante apos revisao do log:
 - O validador tambem parou de adicionar `envfree` automaticamente em qualquer
   metodo com `returns`.
 - A run atual mostra `envfreeFuncsStaticCheck: Not violated`.
+- A avaliacao agora inspeciona `certora*.log` antes de aceitar `comparison_t1.json`;
+  se houver erro bloqueante de spec, como `cvl_invalid_envfree`, o status vira
+  `blocked:<log>` mesmo que a comparacao diga `passed`.
 
 ## ERC2771 / Multicall
 
@@ -150,9 +156,9 @@ Observacao importante:
 Snapshots mais recentes:
 
 - Core benchmark:
-  - `docs/evaluations/evaluation-results-20260524_212448_765961.md`
+  - `docs/evaluations/evaluation-results-20260524_232506_044465.md`
 - Benchmark + exploratory:
-  - `docs/evaluations/evaluation-results-20260524_212405_405911.md`
+  - `docs/evaluations/evaluation-results-20260524_232506_055871.md`
 
 ## Riscos Abertos
 

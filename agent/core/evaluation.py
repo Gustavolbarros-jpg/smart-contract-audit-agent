@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from core.certora_error_catalog import analyze_certora_errors
+
 
 def _read_json(path: Path, default):
     if not path.exists():
@@ -27,6 +29,38 @@ def _latest_status_file(run_dir: Path, pattern: str) -> dict:
     return _read_json(matches[-1], {})
 
 
+def _blocking_certora_logs(run_dir: Path) -> list[dict]:
+    blockers = []
+    for log_path in sorted(run_dir.glob("certora*.log")):
+        log = log_path.read_text(encoding="utf-8", errors="replace")
+        analysis = analyze_certora_errors(log)
+        blocking_matches = [
+            item for item in analysis["matches"]
+            if item.get("severity") == "blocking"
+        ]
+        if blocking_matches:
+            blockers.append(
+                {
+                    "log": log_path.name,
+                    "stage": log_path.stem,
+                    "matches": blocking_matches,
+                }
+            )
+    return blockers
+
+
+def _format_certora_blockers(blockers: list[dict]) -> str:
+    if not blockers:
+        return ""
+
+    notes = []
+    for blocker in blockers:
+        ids = ", ".join(item["id"] for item in blocker["matches"])
+        causes = "; ".join(item["cause"] for item in blocker["matches"])
+        notes.append(f"{blocker['log']}: {ids} - {causes}")
+    return " | ".join(notes)
+
+
 def summarize_run(run_dir: Path) -> dict:
     metadata = _read_json(run_dir / "metadata.json", {})
     findings = _read_json(run_dir / "etapa1_vulns.json", {}).get("vulnerabilidades", [])
@@ -37,8 +71,11 @@ def summarize_run(run_dir: Path) -> dict:
     certora_status = _read_json(run_dir / "certora_status.json", {})
     patch_guard_status = _latest_status_file(run_dir, "patch_guard_t*_status.json")
     toolchain = _read_json(run_dir / "toolchain_status.json", {})
+    certora_log_blockers = _blocking_certora_logs(run_dir)
 
-    if comparison:
+    if certora_log_blockers:
+        status = f"blocked:{certora_log_blockers[0]['stage']}"
+    elif comparison:
         status = "passed" if not comparison.get("persistentes") and not comparison.get("inconclusivas") else "partial"
     elif certora_status:
         status = f"blocked:{certora_status.get('stage', 'certora')}"
@@ -67,7 +104,11 @@ def summarize_run(run_dir: Path) -> dict:
         "inconclusive": len(comparison.get("inconclusivas", [])),
         "rate": comparison.get("taxa_resolucao", ""),
         "resolved_types": sorted({item.get("type", "") for item in comparison.get("resolvidas", []) if item.get("type")}),
-        "blocked_reason": certora_status.get("reason", "") or patch_guard_status.get("reason", ""),
+        "blocked_reason": (
+            _format_certora_blockers(certora_log_blockers)
+            or certora_status.get("reason", "")
+            or patch_guard_status.get("reason", "")
+        ),
     }
 
 

@@ -19,7 +19,9 @@ The user wants generalization across Solidity 0.8 contracts in this repo, not ha
 
 ## Repository State
 
-- Working branch: `develop`.
+- Working branch: `feature/pipeline-guardrails`.
+- `main` and `develop` are intentionally untouched while this branch is being
+  validated with the professors.
 - Main pipeline entrypoint: `python3 agent/main.py --contract <path>`.
 - List known contracts: `python3 agent/main.py --list-contracts`.
 - List only benchmark contracts: `python3 agent/main.py --list-benchmarks`.
@@ -208,16 +210,20 @@ Exploratory snapshot also includes:
 
 Current snapshots:
 
-- Core benchmark: `docs/evaluations/evaluation-results-20260524_212448_765961.md`
-- Benchmark + exploratory: `docs/evaluations/evaluation-results-20260524_212405_405911.md`
+- Core benchmark: `docs/evaluations/evaluation-results-20260524_232506_044465.md`
+- Benchmark + exploratory: `docs/evaluations/evaluation-results-20260524_232506_055871.md`
 
 Recent Certora/spec lesson:
 
 - `CrowdfundingVault` previously had invalid `envfree` annotations for
   `createCampaign`, `timeLeft`, and `isSuccessful`.
+- `DeFiVault` also had an old invalid `envfree` annotation for
+  `calculateReward(address)`.
 - The pipeline now removes `envfree` from functions that read restricted
   environment fields such as `msg.sender` or `block.timestamp`.
 - Logs with invalid `envfree` now count as blocking spec errors.
+- Evaluation summaries scan `certora*.log` before trusting `comparison_t1.json`,
+  so a spec-invalid run cannot be reported as `passed`.
 
 Older `docs/evaluation-results.md` may still exist, but new evaluations should be snapshot files.
 
@@ -231,7 +237,7 @@ python3 tests/test_certora_learning.py
 
 Latest result:
 
-- `51 tests OK`
+- `52 tests OK`
 
 Also run when editing:
 

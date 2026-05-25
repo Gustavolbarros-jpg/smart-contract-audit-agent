@@ -1262,6 +1262,35 @@ rule smoke {
         ids = {item["id"] for item in analysis["matches"]}
         self.assertIn("cvl_invalid_envfree", ids)
 
+    def test_evaluation_blocks_passed_comparison_with_invalid_certora_log(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp) / "20260524_212214_CrowdfundingVault"
+            run_dir.mkdir()
+            (run_dir / "comparison_t1.json").write_text(
+                json.dumps(
+                    {
+                        "resolvidas": [{"id": "VULN_001", "type": "tx-origin"}],
+                        "persistentes": [],
+                        "inconclusivas": [],
+                        "taxa_resolucao": "1/1",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (run_dir / "certora_fixed_t1.log").write_text(
+                "Results for all:\n"
+                "Result for envfreeFuncsStaticCheck: envfreeFuncsStaticCheck: timeLeft(uint256): FAIL: "
+                "Specification marks method CrowdfundingVault.timeLeft(uint256 id) returns (uint256) "
+                "as 'envfree' but the method uses the following restricted environment properties [TIMESTAMP]",
+                encoding="utf-8",
+            )
+
+            row = summarize_run(run_dir)
+
+        self.assertEqual(row["status"], "blocked:certora_fixed_t1")
+        self.assertIn("cvl_invalid_envfree", row["blocked_reason"])
+        self.assertIn("envfree", row["blocked_reason"])
+
     def test_toolchain_constraint_matching_for_solidity_08(self):
         source = "pragma solidity ^0.8.21; contract LocalTarget {}"
         self.assertEqual(extract_solidity_constraint(source), "^0.8.21")
