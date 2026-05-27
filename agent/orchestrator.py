@@ -28,6 +28,7 @@ from core.diagnosis_context import (
     compact_certora_log,
     compact_confirmed_analyses,
     compact_plan_for_diagnosis,
+    deterministic_diagnosis,
     filter_plan_by_ids,
     sanitize_diagnosis_ids,
 )
@@ -684,25 +685,41 @@ def executar_pipeline(contract_path: str, copy_final: bool = True):
     save_json(run_dir / "diagnosis_t0_plan_context.json", diagnosis_plan_compact)
     save_json(run_dir / "diagnosis_t0_confirmed_context.json", vulns_confirmadas_compact)
 
-    try:
-        diagnostico = chamar_ia_json(
-            sp.PROMPT_DIAGNOSTICO,
-            f"LOG_RELEVANTE:\n{diagnosis_log}\n"
-            f"PLANO_FORMAL:\n{json.dumps(diagnosis_plan_compact, ensure_ascii=False)}\n"
-            f"VULNS_CONFIRMADAS:\n{json.dumps(vulns_confirmadas_compact, ensure_ascii=False)}\n"
-            f"CONTRATO_RESUMIDO:\n{diagnosis_contract}",
-            DiagnosticoFalhas,
-            max_tokens=1400,
+    diagnostico = deterministic_diagnosis(
+        vulns_confirmadas,
+        vulns_confirmadas_full,
+        diagnosis_plan,
+    )
+    deterministic_ids = {item["id"] for item in diagnostico.get("falhas", [])}
+    if deterministic_ids:
+        save_json(run_dir / "diagnosis_t0_deterministic.json", diagnostico)
+        print(f"   🧠 Diagnóstico determinístico cobriu {len(deterministic_ids)} ID(s).")
+
+    if deterministic_ids != ids_confirmadas:
+        missing_ids = ids_confirmadas - deterministic_ids
+        try:
+            diagnostico_llm = chamar_ia_json(
+                sp.PROMPT_DIAGNOSTICO,
+                f"LOG_RELEVANTE:\n{diagnosis_log}\n"
+                f"PLANO_FORMAL:\n{json.dumps(diagnosis_plan_compact, ensure_ascii=False)}\n"
+                f"VULNS_CONFIRMADAS:\n{json.dumps(vulns_confirmadas_compact, ensure_ascii=False)}\n"
+                f"CONTRATO_RESUMIDO:\n{diagnosis_contract}",
+                DiagnosticoFalhas,
+                max_tokens=1400,
+            )
+        except Exception as exc:
+            registrar_bloqueio(
+                pasta_output,
+                run_dir,
+                "llm_initial_diagnosis",
+                "Falha ao consultar a LLM para diagnosticar vulnerabilidades confirmadas",
+                str(exc),
+            )
+            return
+        diagnostico["falhas"].extend(
+            item for item in diagnostico_llm.get("falhas", [])
+            if item.get("id") in missing_ids
         )
-    except Exception as exc:
-        registrar_bloqueio(
-            pasta_output,
-            run_dir,
-            "llm_initial_diagnosis",
-            "Falha ao consultar a LLM para diagnosticar vulnerabilidades confirmadas",
-            str(exc),
-        )
-        return
 
     diagnostico = sanitize_diagnosis_ids(diagnostico, ids_confirmadas)
     if not diagnostico.get("falhas"):

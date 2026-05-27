@@ -24,6 +24,7 @@ from core.diagnosis_context import (
     compact_certora_log,
     compact_confirmed_analyses,
     compact_plan_for_diagnosis,
+    deterministic_diagnosis,
 )
 from core.evaluation import summarize_run
 from core.formal_candidate import build_formal_candidates
@@ -315,6 +316,65 @@ Result for zero_address_reverts: zero_address_reverts: FAIL: lastReverted
         self.assertNotIn("envfreeFuncsStaticCheck", compact)
         self.assertNotIn("projection(): SUCCESS", compact)
         self.assertNotIn("Verified: harmless_rule", compact)
+
+    def test_deterministic_diagnosis_covers_known_repair_classes(self):
+        confirmed = [
+            {
+                "id": "VULN_001",
+                "type": "missing-zero-check",
+                "function": "transferOwnership(address)",
+                "rule": "zero_address_reverts",
+                "status": "confirmed",
+            },
+            {
+                "id": "VULN_002",
+                "type": "tx-origin",
+                "function": "modifier/function",
+                "rule": "auth_reverts_when_msg_sender_not_owner",
+                "status": "confirmed",
+            },
+            {
+                "id": "VULN_003",
+                "type": "unchecked-lowlevel",
+                "function": "notifyPartner",
+                "rule": "slither:unchecked-lowlevel",
+                "status": "confirmed_static",
+            },
+        ]
+        selected = [
+            {
+                "id": "VULN_001",
+                "type": "missing-zero-check",
+                "line": "42-43",
+                "description": "newOwner lacks zero check",
+                "target_parameter": "newOwner",
+            },
+            {
+                "id": "VULN_002",
+                "type": "tx-origin",
+                "description": "tx.origin in onlyOwner",
+            },
+            {
+                "id": "VULN_003",
+                "type": "unchecked-lowlevel",
+                "description": "target.call(payload) return ignored",
+            },
+        ]
+        plan = {
+            "selected_rules": [
+                {"id": "VULN_001", "target_parameter": "newOwner"},
+                {"id": "VULN_002"},
+            ]
+        }
+
+        diagnosis = deterministic_diagnosis(confirmed, selected, plan)
+        by_id = {item["id"]: item for item in diagnosis["falhas"]}
+
+        self.assertEqual(set(by_id), {"VULN_001", "VULN_002", "VULN_003"})
+        self.assertEqual(by_id["VULN_001"]["linha"], 42)
+        self.assertIn("newOwner != address(0)", by_id["VULN_001"]["correcao_necessaria"])
+        self.assertIn("msg.sender", by_id["VULN_002"]["correcao_necessaria"])
+        self.assertIn("success boolean", by_id["VULN_003"]["correcao_necessaria"])
 
     def test_formal_plan_forces_clear_auth_findings(self):
         plan = {

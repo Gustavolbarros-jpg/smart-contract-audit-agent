@@ -58,7 +58,7 @@ git diff --check
 Resultado atual:
 
 ```text
-59 tests OK
+60 tests OK
 py_compile OK
 git diff --check OK
 ```
@@ -208,6 +208,9 @@ Resultado importante:
   nao falha de Certora.
 - O contexto de diagnostico foi compactado para reduzir custo de token em
   contratos maiores.
+- O diagnostico para classes conhecidas agora e gerado deterministicamente.
+  No `EnterpriseTreasury300`, isso cobre todos os 9 IDs confirmados e remove
+  uma chamada LLM inteira antes da etapa de patch.
 
 ## Avaliacoes Snapshot
 

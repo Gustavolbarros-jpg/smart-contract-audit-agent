@@ -236,6 +236,10 @@ Recent Certora/spec lesson:
     must be normalized to CVL-compatible `bytes` and `address`.
 - Diagnosis prompts are now compacted for larger contracts by stripping large
   evidence blobs, irrelevant Certora success noise, and using tighter snippets.
+- Diagnosis for known repair classes is now deterministic. This avoids one LLM
+  call when all confirmed findings are known classes such as
+  `missing-zero-check`, `tx-origin`, `suicidal`, `arbitrary-send-eth`,
+  `unchecked-lowlevel`, or `erc2771-multicall-context`.
 
 Latest large-contract exploratory validation:
 
@@ -244,6 +248,9 @@ Latest large-contract exploratory validation:
 - Slither normalized 26 findings.
 - Certora confirmed 8 formal findings and Slither confirmed 1 static finding.
 - Current block: `llm_initial_diagnosis` due Groq daily token limit.
+- Offline validation after the latest code change shows deterministic diagnosis
+  covers all 9 confirmed IDs for this run; the next retry should skip the LLM
+  diagnosis call and proceed directly to patch generation.
 
 Latest all-contract validation:
 
@@ -268,7 +275,7 @@ python3 tests/test_certora_learning.py
 
 Latest result:
 
-- `59 tests OK`
+- `60 tests OK`
 
 Also run when editing:
 
