@@ -740,12 +740,17 @@ def executar_pipeline(contract_path: str, copy_final: bool = True):
     for f in diagnostico.get("falhas", []):
         print(f"   → {f['id']}: {f['motivo']} (linha {f.get('linha', '?')})")
 
-    fix_bruto = chamar_ia_texto(
-        sp.PROMPT_ETAPA5_CORRIGIR,
+    patch_prompt = (
         f"CONTRATO:\n{contract_source}\n\n"
         f"DIAGNÓSTICO:\n{json.dumps(diagnostico, indent=2, ensure_ascii=False)}\n\n"
         f"VULNS CONFIRMADAS:\n{json.dumps(vulns_confirmadas, indent=2, ensure_ascii=False)}\n\n"
         f"LOG CERTORA RELEVANTE:\n{diagnosis_log}"
+    )
+    save_text(run_dir / "patch_t0_prompt_context.txt", patch_prompt)
+
+    fix_bruto = chamar_ia_texto(
+        sp.PROMPT_ETAPA5_CORRIGIR,
+        patch_prompt,
     )
     if not fix_bruto.strip():
         registrar_bloqueio(

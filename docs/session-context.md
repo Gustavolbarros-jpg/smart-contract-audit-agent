@@ -30,6 +30,7 @@ The user wants generalization across Solidity 0.8 contracts in this repo, not ha
 - Evaluation with exploratory contracts: `python3 agent/evaluate.py --include-exploratory`.
 - Evaluation snapshots are now written to `docs/evaluations/evaluation-results-YYYYMMDD_HHMMSS.md`.
 - `--output <path>` can still be used to force a specific evaluation output path.
+- Human-readable progress summary: `docs/project-progress-and-next-steps.md`.
 
 Do not overwrite historical reports by default. Create new Markdown reports/snapshots when documenting new experiments.
 
@@ -61,6 +62,9 @@ Current intended flow:
 9. Certora is run for suitable formal properties.
 10. Static-confirmed findings are validated by rerunning Slither/static normalization after the fix.
 11. The LLM diagnoses confirmed findings and patches the Solidity code.
+    - For known classes, diagnosis is deterministic and skips one LLM call.
+    - Patch generation still receives the complete Solidity contract.
+    - The patch prompt context is saved as `patch_t0_prompt_context.txt` in the run directory.
 12. `agent/core/patch_guard.py` checks that the patch is minimal before final validation:
    - blocks modified original string literals;
    - blocks public/external signature changes;

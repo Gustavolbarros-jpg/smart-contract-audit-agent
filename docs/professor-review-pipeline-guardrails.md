@@ -12,6 +12,10 @@ O foco foi reduzir decisoes livres da LLM, preservar rastreabilidade dos
 achados e impedir que a correcao automatica altere codigo fora do escopo da
 vulnerabilidade confirmada.
 
+Resumo cronologico completo:
+
+- `docs/project-progress-and-next-steps.md`
+
 ## O Que Mudou
 
 - Catalogo deterministico de vulnerabilidades em `agent/core/vulnerability_catalog.py`.
@@ -211,6 +215,8 @@ Resultado importante:
 - O diagnostico para classes conhecidas agora e gerado deterministicamente.
   No `EnterpriseTreasury300`, isso cobre todos os 9 IDs confirmados e remove
   uma chamada LLM inteira antes da etapa de patch.
+- A etapa de patch continua recebendo o contrato completo por seguranca, e o
+  contexto enviado e preservado em `patch_t0_prompt_context.txt` dentro do run.
 
 ## Avaliacoes Snapshot
 
