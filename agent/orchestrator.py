@@ -458,9 +458,11 @@ def _format_failure_history(history: list[dict]) -> str:
 
 
 def _extract_fix_snippet(original: str, fixed: str, vuln: dict) -> str:
-    """Extract added lines from the diff for a specific vulnerability's function."""
+    """Extract the key require() fix line added for a specific vulnerability."""
     import difflib
+
     function_name = vuln.get("function", "")
+    vuln_type = vuln.get("type", "")
     fn_name = re.match(r"([A-Za-z_][A-Za-z0-9_]*)\s*\(", function_name or "")
     if not fn_name:
         return ""
@@ -470,20 +472,42 @@ def _extract_fix_snippet(original: str, fixed: str, vuln: dict) -> str:
     fixed_lines = fixed.splitlines()
     matcher = difflib.SequenceMatcher(None, orig_lines, fixed_lines)
 
-    added = []
+    candidates = []
     for tag, i1, i2, j1, j2 in matcher.get_opcodes():
-        if tag in ("insert", "replace"):
-            chunk = fixed_lines[j1:j2]
-            context_start = max(0, j1 - 5)
-            context = "\n".join(fixed_lines[context_start:j2])
-            if name in context:
-                added.extend(
-                    line.strip()
-                    for line in chunk
-                    if line.strip() and not line.strip().startswith("//")
-                )
+        if tag not in ("insert", "replace"):
+            continue
+        chunk = fixed_lines[j1:j2]
+        context_start = max(0, j1 - 5)
+        context = "\n".join(fixed_lines[context_start:j2])
+        if name not in context:
+            continue
+        for line in chunk:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("//"):
+                continue
+            # Only keep require() guards relevant to the vuln class
+            if not stripped.startswith("require("):
+                continue
+            # Exclude low-level-call success checks — those are ETH transfer mechanics
+            if re.search(r"require\(\s*(success|sent)\b", stripped):
+                continue
+            candidates.append(stripped)
 
-    return "; ".join(added[:3]) if added else ""
+    # Prefer the first guard that matches the vuln type pattern
+    _VULN_PATTERNS: dict[str, str] = {
+        "missing-zero-check": r"address\(0\)",
+        "tx-origin": r"msg\.sender",
+        "arbitrary-send-eth": r"msg\.sender|owner",
+        "suicidal": r"msg\.sender|owner",
+        "unchecked-lowlevel": r"success|sent",
+    }
+    pattern = _VULN_PATTERNS.get(vuln_type, "")
+    if pattern:
+        for c in candidates:
+            if re.search(pattern, c):
+                return c
+
+    return candidates[0] if candidates else ""
 
 
 def executar_pipeline(contract_path: str, copy_final: bool = True):
