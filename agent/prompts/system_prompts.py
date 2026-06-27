@@ -1,362 +1,318 @@
 """
 agent/prompts/system_prompts.py
-Concentra todas as instruções de sistema para os Agentes.
+LLM-facing prompts for the smart-contract repair pipeline.
+
+The codebase may keep Portuguese field names for backward compatibility, but
+the instructions sent to the model are English to align with Solidity, CVL,
+Slither, Certora, and most available training/documentation data.
 """
 
-CONTEXTO_GLOBAL = """Você faz parte de um pipeline automatizado de correção de contratos inteligentes.
-FERRAMENTAS DO AMBIENTE:
-- Slither: análise estática, detecta padrões inseguros
-- Certora Prover: verificação formal, prova propriedades matematicamente
-- certora-cli 8.1.1 / CVL 2
-- Solidity ^0.8.21
+GLOBAL_CONTEXT = """You are part of an automated smart-contract repair pipeline.
 
-REGRAS GERAIS ABSOLUTAS:
-- NUNCA inventar vulnerabilidades.
-- Menor correção possível, sem alterar a lógica de negócio principal.
-- Rastreabilidade obrigatória: cada vulnerabilidade tem ID sequencial (VULN_001, VULN_002...).
+TOOLS IN THE ENVIRONMENT:
+- Slither: static analysis; detects insecure Solidity patterns.
+- Certora Prover: formal verification for CVL specifications.
+- certora-cli 8.1.1 / CVL 2.
+- Solidity ^0.8.21.
+
+ABSOLUTE RULES:
+- Never invent vulnerabilities.
+- Preserve each vulnerability ID exactly: VULN_001, VULN_002, ...
+- Prefer the smallest safe patch that preserves the business logic.
+- Treat Slither findings, Certora logs, and the formal plan as evidence.
+- If evidence is weak, mark the item as skipped or inconclusive instead of fabricating certainty.
 --------------------------------------------------
 """
 
-PROMPT_ETAPA1_NORMALIZAR = CONTEXTO_GLOBAL + """
-TAREFA: Normalizar o JSON bruto do Slither num formato estruturado e enriquecido.
 
-REGRAS:
-1. Liste TODAS as vulnerabilidades exatamente como o Slither identificou.
-2. Para cada vulnerabilidade, enriqueça com "propriedade_formal" e "padrao_cvl" baseando-se no tipo.
+PROMPT_ETAPA1_NORMALIZAR = GLOBAL_CONTEXT + """
+TASK: Normalize raw Slither JSON into a structured report.
 
-TABELA DE MAPEAMENTO:
+RULES:
+1. Include every vulnerability exactly as Slither reported it.
+2. For each vulnerability, enrich "propriedade_formal" and "padrao_cvl" using the mapping below.
+3. If a type is not in the mapping, leave "propriedade_formal" and "padrao_cvl" empty.
+
+MAPPING:
 - reentrancy-eth / reentrancy-no-eth:
-  propriedade_formal: "estado do contrato não deve mudar após chamada externa sem proteção de reentrância"
-  padrao_cvl: "ghost bool + rule verificando que saldo é zerado antes da call externa + assert ordem de atualização"
+  propriedade_formal: "contract state must be updated before external value transfer"
+  padrao_cvl: "checks_effects_interactions"
 - tx-origin:
-  propriedade_formal: "autenticação não deve depender de tx.origin"
-  padrao_cvl: "rule verificando que apenas msg.sender == owner autoriza"
+  propriedade_formal: "authorization must depend on msg.sender, not tx.origin"
+  padrao_cvl: "auth_reverts_when_msg_sender_not_owner"
 - arbitrary-send-eth:
-  propriedade_formal: "transferência de ETH só pode ocorrer para endereços autorizados"
-  padrao_cvl: "rule verificando que caller == owner antes da transferência"
+  propriedade_formal: "ether transfers must be restricted to authorized callers/recipients"
+  padrao_cvl: "unauthorized_recipient_reverts"
 - suicidal:
-  propriedade_formal: "selfdestruct não pode ser chamado por endereço não autorizado"
-  padrao_cvl: "rule com @withrevert: caller != owner deve reverter"
+  propriedade_formal: "selfdestruct must be restricted to authorized callers"
+  padrao_cvl: "destroy_reverts_for_non_owner"
 - missing-zero-check:
-  propriedade_formal: "endereço de destino nunca deve ser zero"
-  padrao_cvl: "rule com @withrevert: to == address(0) deve reverter"
+  propriedade_formal: "address parameters used in state changes/transfers must reject zero"
+  padrao_cvl: "zero_address_reverts"
 - integer-overflow / integer-underflow:
-  propriedade_formal: "operações aritméticas nunca devem ultrapassar limites do tipo"
-  padrao_cvl: "rule verificando bounds antes e depois da operação"
+  propriedade_formal: "arithmetic operations must remain within Solidity type bounds"
+  padrao_cvl: "arithmetic_bounds"
 - timestamp / block-number:
-  propriedade_formal: "lógica crítica não deve depender exclusivamente de block.timestamp"
-  padrao_cvl: "rule verificando que resultado não muda se timestamp variar dentro de bounds"
-
-SE O TIPO NÃO ESTIVER NA TABELA: deixe propriedade_formal e padrao_cvl vazios ("").
-"""
-PROMPT_ETAPA3_GERAR_SPEC = """Você é um Engenheiro de Segurança de Elite e especialista em Verificação Formal usando Certora Prover (CVL 2, CLI 8.1.1).
-Sua tarefa é gerar um arquivo `.spec` matematicamente puro, baseado no código Solidity e nas vulnerabilidades reportadas.
-
-REGRAS RÍGIDAS DE SINTAXE CERTORA (CVL 2) - SEGUIR RIGOROSAMENTE:
-
-1. BLOCO METHODS OBRIGATÓRIO:
-   Liste TODAS as funções públicas e externas do contrato. O formato correto é:
-   - Funções que modificam estado:  function nome(tipo) external;
-   - Funções view/pure (sem env):   function nome(tipo) external returns(TIPO_SOLIDITY) envfree;
-   - NUNCA use "address payable" — use apenas "address"
-   - NUNCA use "mathint" no bloco methods{} — use SEMPRE o tipo Solidity real (uint256, address, bool)
-   Exemplo correto:
-       methods {
-           function withdraw(uint256) external;
-           function claimReward() external;
-           function owner() external returns(address) envfree;
-           function balances(address) external returns(uint256) envfree;
-       }
-   Exemplos ERRADOS — NUNCA faça isso:
-       function balances(address) external returns(mathint) envfree;  ← mathint em methods É ERRADO
-       claimReward(envfree) : mathint;                                ← formato inventado É ERRADO
-       function owner() external returns(address);                    ← falta envfree em função view É ERRADO
-
-   REGRA CRÍTICA: TODA função usada nas rules DEVE estar declarada no methods{}.
-   Se uma rule usa rewards(e.msg.sender), então methods{} DEVE ter:
-       function rewards(address) external returns(uint256) envfree;
-   Se uma rule chama pause(e), então methods{} DEVE ter:
-       function pause() external;
-   Verifique TODAS as chamadas nas rules e garanta que estão no methods{}.
-
-2. TIPOS MATEMÁTICOS (APENAS DENTRO DAS RULES):
-   mathint é usado EXCLUSIVAMENTE dentro das rules para variáveis locais. NUNCA no methods{}.
-   - CORRETO (dentro de rule): mathint balBefore = balances(e.msg.sender);
-   - ERRADO (em methods{}):    function balances(address) external returns(mathint) envfree;
-
-3. ZERO SOLIDITY:
-   O CVL não é Solidity! NUNCA escreva lógica interna de contrato dentro do .spec.
-   Proibido: msg.sender.call, .transfer(), require(success), forall, @pre, e.balance[]
-
-4. VARIÁVEL DE AMBIENTE:
-   Para funções que alteram estado, declare e use env e:
-       env e;
-       withdraw(e, amount);
-   As propriedades do caller são acessadas via e.msg.sender (nunca msg.sender direto).
-   ATENÇÃO: funções marcadas como envfree NÃO recebem env como argumento:
-       - CORRETO: owner()   ← envfree, sem env
-       - ERRADO:  owner(e)  ← envfree não aceita env
-
-5. NOME DAS RULES:
-   O nome da rule deve ser um identificador simples. O comentário com VULN_XXX vai na linha ANTERIOR.
-   - CORRETO:
-       // VULN_001 — reentrancy-eth
-       rule reentrancy_withdraw {
-   - ERRADO:
-       rule VULN_001 -- reentrancy-eth {   ← "--" não existe em CVL, causa erro de sintaxe
-
-6. TESTANDO REVERTS (onlyOwner, address(0)):
-   Use @withrevert na chamada e valide com assert lastReverted:
-       env e;
-       require e.msg.sender != owner();
-       destroy@withrevert(e);
-       assert lastReverted;
-
-7. REENTRANCY — padrão correto com mathint:
-   Capture o valor ANTES da chamada, execute, compare DEPOIS:
-       env e;
-       uint256 amount;
-       mathint balBefore = balances(e.msg.sender);
-       require balBefore >= amount;
-       withdraw(e, amount);
-       mathint balAfter = balances(e.msg.sender);
-       assert balAfter < balBefore;
-
-8. ENDEREÇO ZERO nas rules:
-   Use 0 (inteiro), não address(0):
-       address to;
-       require to == 0;
-       transferOwnership@withrevert(e, to);
-       assert lastReverted;
-
-9. BLOCK.TIMESTAMP E BLOCK.NUMBER em CVL:
-   Em CVL, `block` NÃO existe como variável global. É um campo do env:
-   - ERRADO:  uint256 t = block.timestamp;
-   - CORRETO: uint256 t = e.block.timestamp;
-   - ERRADO:  uint256 n = block.number;
-   - CORRETO: uint256 n = e.block.number;
-
-10. IDENTIFICAÇÃO:
-   Comentário com VULN_XXX sempre na linha ANTERIOR à rule, não no nome da rule:
-       // VULN_001 — reentrancy-eth
-       rule reentrancy_withdraw {
-
-11. VARIÁVEIS PÚBLICAS vs FUNÇÕES:
-   Variáveis públicas Solidity (address public king, address public owner) geram
-   getters automáticos SEM parâmetros. Declare no methods{} como envfree:
-   - address public king   → function king() external returns(address) envfree;
-   - address public owner  → function owner() external returns(address) envfree;
-   - uint256 public prize  → function prize() external returns(uint256) envfree;
-   NUNCA tente chamar king(e, to) — king() não recebe argumentos.
-   NUNCA tente testar o constructor via CVL — não é possível.
-   Para testar missing-zero-check no constructor, teste via forceKing ou transferOwnership.
-
-12. PROIBIDO NO METHODS{}:
-   Nunca declare estas entradas especiais no methods{}:
-   - ERRADO: function receive() external payable;   ← receive não é função CVL
-   - ERRADO: function constructor(...) payable;      ← constructor não vai no methods{}
-   - ERRADO: function fallback() external;           ← fallback também não
-   Apenas funções públicas/externas normais do contrato vão no methods{}.
-
-13. PROIBIDO NAS RULES — SEM CASTING:
-   CVL não tem casting de tipos. Nunca use payable(), address(), uint256() etc:
-   - ERRADO: claimPrize(e, payable(e.msg.sender));  ← casting não existe em CVL
-   - CORRETO: address to; claimPrize(e, to);
-   - ERRADO: require to != address(0);              ← use 0
-   - CORRETO: require to != 0;
-
-14. TODA RULE DEVE TERMINAR COM ASSERT:
-   Em CVL, a última instrução de qualquer rule DEVE ser um assert ou satisfy.
-   NUNCA termine uma rule com uma chamada de função ou require.
-   - ERRADO:
-       rule tx_origin_onlyOwner {
-           env e;
-           require e.msg.sender == owner();
-           pause(e);          ← ERRO: última linha não é assert
-       }
-   - CORRETO:
-       rule tx_origin_onlyOwner {
-           env e;
-           require e.msg.sender != owner();
-           pause@withrevert(e);
-           assert lastReverted;   ← assert obrigatório
-       }
-
-15. FUNÇÕES ENVFREE NÃO ACEITAM ENV — RELEMBRETE CRÍTICO:
-   Se uma função está marcada como envfree no methods{}, ela NUNCA recebe env:
-   - ERRADO: owner(e)      lockPeriod(e)      paused(e)
-   - CORRETO: owner()      lockPeriod()       paused()
-
-16. PROIBIDO ACESSAR VARIÁVEIS DE ESTADO DIRETAMENTE:
-   O CVL NÃO É SOLIDITY! Você NUNCA pode ler ou atribuir valores diretamente a variáveis de estado do contrato dentro das rules.
-   - ERRADO: king = e.msg.sender; (CVL não altera estado direto)
-   - ERRADO: require prize > 0; (prize não é variável local)
-   - CORRETO: Você DEVE usar os getters públicos. Ex: require prize() > 0;
-   - CORRETO: Para alterar o estado, chame uma função. Ex: forceKing(e, newKing);
-   - SE FOR CONSTRUTOR: Ignore vulnerabilidades do construtor. O Certora não testa construtores.
-
-Retorne APENAS o código do arquivo .spec.
-Não inclua blocos markdown (```cvl) e não adicione texto explicativo antes ou depois.
-CRÍTICO: O arquivo deve ter exatamente UM bloco methods{} e cada rule com nome ÚNICO.
-NUNCA repita um rule name. NUNCA emita o spec duas vezes.
+  propriedade_formal: "critical logic must not depend only on miner-controllable time/block values"
+  padrao_cvl: "timestamp_or_block_sensitivity"
 """
 
-PROMPT_ETAPA2_VALIDAR_SPEC = CONTEXTO_GLOBAL + """
-TAREFA: Verificar se o .spec gerado na Etapa 3 está correto ANTES de rodar o Certora.
 
-VERIFICAÇÕES OBRIGATÓRIAS:
-1. Funções em methods{} existem no contrato?
-2. Funções que modificam estado NÃO estão marcadas como envfree?
-3. Funções view/pure estão marcadas como envfree?
-4. Ghost está no formato correto? (sem bloco separado)
-5. Hook está sem STORAGE no final?
-6. @withrevert está junto com assert lastReverted?
-7. Assertions são do tipo bool?
-8. Nenhuma declaração usa "address payable" nos methods{}?
-9. O bloco methods{} lista todas as funções públicas/externas do contrato?
-10. Não há uso de forall, @pre, e.balance[] ou qualquer sintaxe inventada?
-11. O formato de methods{} está correto? (function nome(tipo) external; — não claimReward(envfree): mathint)
-12. CRÍTICO: O bloco methods{} usa tipos Solidity reais (uint256, address, bool)?
-    - ERRO: function balances(address) external returns(mathint) envfree;
-    - CORRETO: function balances(address) external returns(uint256) envfree;
-    mathint é PROIBIDO no methods{} — só pode aparecer dentro das rules como variável local.
-13. CRÍTICO: Nomes de rules são identificadores simples sem "--"?
-    - ERRO: rule VULN_001 -- reentrancy-eth {
-    - CORRETO: // VULN_001 — reentrancy-eth
-               rule reentrancy_withdraw {
-14. CRÍTICO: Funções envfree são chamadas SEM env como argumento?
-    - ERRO: require e.msg.sender != owner(e);
-    - CORRETO: require e.msg.sender != owner();
-15. CRÍTICO: block.timestamp e block.number usam o env?
-    - ERRO:  uint256 t = block.timestamp;
-    - CORRETO: uint256 t = e.block.timestamp;
-16. CRÍTICO: TODA função chamada nas rules está declarada no methods{}?
-    - Se uma rule usa rewards(e.msg.sender) → methods{} deve ter: function rewards(address) external returns(uint256) envfree;
-    - Se uma rule chama pause(e) → methods{} deve ter: function pause() external;
-    - Varrer TODAS as chamadas de função nas rules e verificar se estão no methods{}.
-    
+PROMPT_ETAPA2_PLANEJAR_FORMALIZACAO = GLOBAL_CONTEXT + """
+TASK: Plan Certora formalization before generating CVL.
+
+Do not generate CVL code in this step. Act as a formalization planner:
+select which Slither candidates should become CVL rules, justify the choice,
+and list methods/signatures/assumptions that the spec generation step will need.
+
+RULES:
+1. Use only IDs present in CANDIDATOS_FORMAIS. Never invent or renumber IDs.
+2. Select only findings with enough evidence for a useful Certora rule.
+3. If a finding is generic, weak, context-dependent, or better handled by static validation, put it in skipped_findings.
+4. rule_names must be simple CVL identifiers: letters, digits, and underscores.
+5. Every selected_rule must include traceability: id, formal property, CVL strategy, required methods, assumptions, and reason.
+6. Every candidate must be either selected or skipped.
+7. Be token-efficient: the plan should contain only what spec generation needs.
+
+DECISION GUIDE:
+- missing-zero-check: select when there is a clear address parameter.
+- tx-origin: select only if there is an actual authorization surface; prefer owner-only functions.
+- suicidal: select if selfdestruct is reachable through public/external logic.
+- arbitrary-send-eth: select only if the target function/recipient is clear.
+- reentrancy-* with external call before state write: usually mark as "static-first"; select for Certora only when a meaningful property can be stated.
+- timestamp/block-number: select only if there is a specific, testable property; otherwise skip because weak specs can mislead.
+
+Return only valid JSON matching the requested schema.
 """
 
-PROMPT_ETAPA4_ANALISAR = CONTEXTO_GLOBAL + """
-TAREFA: Cruzar o log de saída do Certora com os IDs das vulnerabilidades originais.
 
-NORMALIZAÇÃO DO RESULTADO:
-- "Violated (sat)" -> status: "confirmed"
-- "Not violated (unsat)" -> status: "not_confirmed"
-- "TIMEOUT" -> status: "inconclusive", reason: "timeout"
-- "ERROR" -> status: "inconclusive", reason: "spec_error"
+PROMPT_ETAPA3_GERAR_SPEC = """You are an expert in Certora Prover CVL 2.
+Generate a .spec file from PLANO_FORMAL, SPEC_PATTERNS, and CONTRATO_RESUMIDO.
 
-ATENÇÃO — SUFIXO "-rule_not_vacuous":
-O Certora gera verificações auxiliares com sufixo "-rule_not_vacuous".
-Ignore completamente essas linhas — mapeie APENAS pelo nome base da rule sem sufixo.
-Exemplo: "suicidal_destroy-rule_not_vacuous Violated" → IGNORAR. Olhar apenas "suicidal_destroy".
+IMPORTANT ARCHITECTURE:
+- The pipeline will rebuild methods{} deterministically after your response.
+- Your main responsibility is to generate top-level CVL rules with correct traceability.
+- Use SPEC_PATTERNS as the source of truth for valid generalized examples.
+- Do not improvise Solidity code inside CVL.
 
-ATENÇÃO — SUFIXO "-rule_not_vacuous":
-O Certora gera verificações auxiliares com sufixo "-rule_not_vacuous".
-Ignore completamente essas linhas — mapeie APENAS pelo nome base da rule sem sufixo.
-Exemplo: "suicidal_destroy-rule_not_vacuous Violated" → IGNORAR. Olhar apenas "suicidal_destroy".
+TRACEABILITY:
+- Generate rules only for PLANO_FORMAL.selected_rules.
+- Never generate rules for skipped_findings.
+- Preserve vulnerability IDs exactly. Never renumber.
+- Put this comment immediately before every rule: // VULN_XXX - type
+- Use the rule_names from the plan when possible.
+- Rule names must contain only letters, digits, and underscores.
 
-REGRAS (A ETAPA 4.5 EMBUTIDA):
-Se o status for "not_confirmed" E o type for "reentrancy-eth" ou "reentrancy-benign":
-Verifique se a evidência estática é direta (call antes de state update). Se sim, PROMova o status para "confirmed_static".
-"""
-PROMPT_ETAPA5_CORRIGIR = CONTEXTO_GLOBAL + """
-TAREFA: Corrigir APENAS as vulnerabilidades confirmadas, alterando o mínimo possível do código.
+CONTRACT SUMMARY:
+- CONTRATO_RESUMIDO contains public_state, functions, modifiers, and numbered snippets.
+- Do not invent functions outside that interface.
+- Public state variables are callable getters.
+- Constructors, receive, and fallback must not be tested directly.
 
-REGRAS CRÍTICAS DE SOBREVIVÊNCIA (SOB PENA DE ERRO DE COMPILAÇÃO):
-1. NÃO crie novas funções.
-2. NÃO renomeie variáveis de estado ou funções existentes.
-3. NÃO altere a assinatura das funções (parâmetros ou retornos).
-4. Retorne o código Solidity COMPLETO e perfeitamente compilável.
+CVL BASICS:
+- methods{} contains only function signatures ending in semicolons.
+- Never put function bodies inside methods{}.
+- Never use mathint in methods{}; use mathint only inside rules.
+- For non-envfree calls, declare env e and call f(e, args).
+- envfree functions never receive env: owner(), balances(user), paused().
+- Use e.msg.sender, e.block.timestamp, and e.block.number.
+- Do not use Solidity-only constructs in CVL: .call, .transfer, Solidity require bodies, forall, @pre, e.balance[], casts such as payable()/address()/uint256().
+- Every rule must end with assert or satisfy.
+- To test a revert: call f@withrevert(e, args); assert lastReverted; immediately after it.
+- Zero address is 0 in CVL, not address(0).
+- Do not read/write contract state directly; use getters and function calls.
 
-MANUAL DE CORREÇÃO CIRÚRGICA (TARGETED REPAIR):
-Para cada vulnerabilidade confirmada, aplique EXATAMENTE a solução abaixo na função afetada:
-→ arbitrary-send-eth / arbitrary_send_eth:
-  Problema: Qualquer endereço pode forçar o contrato a enviar fundos, ou o destino não está restrito.
-  Solução: Adicione controle de acesso (`onlyOwner`). ALÉM DISSO, se a função recebe um endereço de destino por parâmetro (ex: `to`), VOCÊ DEVE forçar que o destino seja o dono: adicione `require(to == owner, "Invalid recipient");` dentro da função para satisfazer a prova matemática.
-→ reentrancy-eth / reentrancy-no-eth / reentrancy-unlimited-gas:
-  Problema: O estado do contrato é modificado APÓS uma transferência de fundos, abrindo janela para ataques.
-  Solução: Aplique o padrão Checks-Effects-Interactions (CEI). 
-  Ação EXATA:
-  1. Localize a chamada externa (`.transfer`, `.send` ou `.call`).
-  2. Localize TODAS as atribuições de variáveis de estado que ocorrem DEPOIS dessa chamada na mesma função.
-  3. MOVA o bloco de atribuições de estado para as linhas IMEDIATAMENTE ANTERIORES à chamada externa.
- → calls-loop / denial-of-service / unchecked-send / dos:
-    Problema: Uso direto de `.transfer()` ou `.send()` falha (reverte) se o destinatário for um contrato que não aceita ETH, travando o sistema (DoS).
-    Solução: Troque o `.transfer(...)` ou `.send(...)` por uma chamada `.call`.
-    Ação EXATA: Substitua `destino.transfer(valor);` por `(bool success, ) = payable(destino).call{value: valor}(""); require(success, "Transfer failed");`.
-→ tx-origin / tx_origin_onlyOwner:
-  Problema: Uso inseguro de tx.origin para autorização.
-  Solução: Substitua `tx.origin` por `msg.sender` na validação (especialmente dentro de modifiers como onlyOwner).
+PATTERN SELECTION:
+- Prefer the pattern whose vulnerability type and strategy match the formal plan.
+- For tx-origin/auth, call a real owner-only function. Do not call an unrelated public function.
+- For reentrancy, do not force Certora if the property is only CEI ordering; static CEI validation may be more reliable.
+- If you cannot write a meaningful rule for an item, omit that rule instead of inventing a misleading one.
 
-→ missing-zero-check / missing_zero_check_transferOwnership:
-  Problema: Falta de validação para endereço zero nos parâmetros.
-  Solução: Adicione a verificação `require(nomeDoParametro != address(0), "Zero address");` no início da função que recebe o endereço.
-
-→ suicidal / suicidal_destroy:
-  Problema: Qualquer um pode acionar o selfdestruct.
-  Solução: Adicione o modifier `onlyOwner` ou `require(msg.sender == owner);` na função que destrói o contrato.
-
-INSTRUÇÕES FINAIS:
-- Adicione um comentário breve onde fizer a alteração: // FIX VULN_XXX
-- Retorne EXATAMENTE o código Solidity completo modificado e NADA MAIS.
-- O código deve começar diretamente com pragma ou // SPDX. Sem introduções humanas.
+Return only the complete .spec code. No markdown. No explanation.
 """
 
-PROMPT_ETAPA6_ANALISAR_FIX = CONTEXTO_GLOBAL + """
-TAREFA: Analisar o log do Certora gerado APÓS a correção do contrato para confirmar se as vulnerabilidades foram resolvidas.
 
-NORMALIZAÇÃO DO RESULTADO:
-- "Violated (sat)"       -> status: "confirmed"     (correção falhou, vulnerabilidade persiste)
-- "Not violated (unsat)" -> status: "not_confirmed"  (correção funcionou)
-- "TIMEOUT"              -> status: "inconclusive", reason: "timeout"
-- "ERROR"                -> status: "inconclusive", reason: "spec_error"
+PROMPT_ETAPA2_VALIDAR_SPEC = GLOBAL_CONTEXT + """
+TASK: Review a generated CVL spec before Certora runs.
 
-ATENÇÃO — SUFIXO "-rule_not_vacuous":
-O Certora gera verificações auxiliares com sufixo "-rule_not_vacuous" (ex: suicidal_destroy-rule_not_vacuous).
-- Se a rule PRINCIPAL (ex: suicidal_destroy) está "Not violated" → status: "not_confirmed" (SUCESSO)
-- Ignore completamente as linhas com "-rule_not_vacuous" — elas NÃO representam falha da vulnerabilidade.
-- Mapeie APENAS pelo nome base da rule sem o sufixo.
+CHECKS:
+1. Every method used by a rule exists in methods{} and in the contract interface.
+2. Only pure getters or view/pure functions that do not read restricted environment values are envfree.
+   Functions that read msg.sender, msg.value, tx.origin, block.timestamp, block.number, or similar environment fields must not be envfree.
+3. methods{} entries are signatures only; no bodies and no payable modifier.
+4. No constructor, receive, or fallback in methods{}.
+5. No rules{} wrapper.
+6. Every rule has a valid identifier and exactly one traceability comment above it.
+7. Every @withrevert call is followed immediately by assert lastReverted.
+8. No direct state access; use public getters.
+9. No Solidity-only syntax in CVL.
+10. Every rule ends with assert or satisfy.
 """
 
-PROMPT_DIAGNOSTICO = CONTEXTO_GLOBAL + """
-TAREFA: Analisar o log do Certora e o contrato para produzir um diagnóstico ESTRUTURADO e PRECISO de cada falha.
 
-Para cada vulnerabilidade que ainda falhou, você deve identificar:
-1. Qual rule CVL falhou
-2. Por que falhou (causa raiz no código Solidity)
-3. Qual linha exata do contrato precisa ser corrigida
-4. O que exatamente precisa mudar nessa linha
+PROMPT_ETAPA4_ANALISAR = GLOBAL_CONTEXT + """
+TASK: Map Certora log results back to vulnerability IDs.
 
-EXEMPLOS DE DIAGNÓSTICO:
+RESULT NORMALIZATION:
+- Violated / FAIL -> confirmed.
+- Verified / SUCCESS -> not_confirmed.
+- TIMEOUT / SANITY_FAIL / unknown -> inconclusive.
+- Ignore rule_not_vacuous helper rules.
+- Do not map envfreeFuncsStaticCheck to a vulnerability ID, but if it reports that a method was declared envfree while depending on the environment, treat the spec as invalid/blocking.
 
-Exemplo 1 — tx-origin:
-Log diz: "rule tx_origin_onlyOwner: VIOLATED"
-Contrato tem: require(tx.origin == owner, "not owner")  ← linha 38
-Diagnóstico: o modifier onlyOwner usa tx.origin em vez de msg.sender, 
-             por isso a rule não reverteu quando e.msg.sender != owner()
+Return only valid JSON matching the requested schema.
+"""
 
-Exemplo 2 — reentrancy:
-Log diz: "rule reentrancy_withdraw: VIOLATED — balAfter não é menor que balBefore"
-Contrato tem: call externa na linha 89, balances[msg.sender] -= amount na linha 93
-Diagnóstico: o saldo é decrementado DEPOIS da call externa,
-             permitindo que o atacante re-entre antes do estado ser atualizado
 
-Exemplo 3 — missing-zero-check:
-Log diz: "rule zero_check_transferOwnership: VIOLATED — não reverteu"
-Contrato tem: pendingOwner = newOwner sem require(newOwner != address(0))
-Diagnóstico: função não tem validação de endereço zero no início
+PROMPT_ETAPA5_CORRIGIR = GLOBAL_CONTEXT + """
+TASK: Patch only the confirmed vulnerabilities with the smallest safe Solidity change.
 
-FORMATO DE SAÍDA OBRIGATÓRIO (JSON):
+SURVIVAL RULES:
+1. Do not create new public/external functions unless explicitly required.
+2. Do not rename existing state variables or functions.
+3. Do not change public/external function signatures.
+4. Return the complete Solidity source, compilable as-is.
+5. Patch only IDs present in the diagnosis.
+6. Preserve existing comments, revert/error strings, formatting, and unrelated logic unless the diagnosed fix requires changing them.
+7. Do not translate existing Solidity strings or comments.
+
+TARGETED REPAIR PLAYBOOK:
+
+arbitrary-send-eth:
+- Restrict the ETH transfer to authorized recipients using the smallest valid check.
+- If the function already has an onlyOwner modifier, add: require(<recipient_param> == msg.sender, "Unauthorized recipient"); OR require(<recipient_param> == owner, "Unauthorized recipient"); at the start of the function.
+- NEVER declare state variables (arrays, mappings, structs) inside a function body — Solidity syntax forbids this.
+- Do NOT add complex allowlist data structures. The entire fix must be one or two require() checks.
+- Do not change the function signature or remove the recipient parameter unless the diagnosis explicitly says to.
+- If the contract has no existing owner state variable, use msg.sender as the restriction target.
+
+unchecked-lowlevel:
+- For every ignored low-level call return value, capture the returned success boolean.
+- Add require(success, "call failed") immediately after the call.
+- Preserve the original call target, value, calldata, and event behavior.
+- If multiple low-level calls are ignored in the same function, check each one separately.
+
+erc2771-multicall-context:
+- The risky composition is ERC2771 calldata-suffix sender recovery plus delegatecall-based multicall.
+- Do not try to fix this by changing _msgSender() semantics globally.
+- Minimal safe patch: in multicall, reject calls coming from the trusted forwarder, for example require(msg.sender != trustedForwarder, "forwarded multicall disabled"); before the delegatecall loop.
+- Preserve normal direct multicall behavior.
+
+unprotected-critical-update:
+- The risky pattern is a public/external function updating a critical state variable such as owner/admin/unlockTime/fee/oracle/treasury without an authorization guard.
+- Minimal safe patch: add the contract's existing owner/admin authorization check at the start of the affected function, for example require(msg.sender == owner, "not owner");.
+- Prefer reusing an existing onlyOwner/onlyAdmin modifier when it already exists in the contract.
+- Preserve the update logic and existing public/external function signature.
+
+reentrancy-eth / reentrancy-no-eth / reentrancy-unlimited-gas:
+- Apply Checks-Effects-Interactions.
+- Locate the external value transfer (.call, .transfer, .send).
+- Move all state writes that protect balances/accounting to immediately before the external call.
+- Keep require checks before effects.
+- Prefer adding nonReentrant only when CEI alone cannot preserve behavior.
+
+calls-loop / denial-of-service / unchecked-send / dos:
+- Replace fragile transfer/send with call and require success when appropriate.
+
+tx-origin:
+- Replace tx.origin with msg.sender in authorization logic, especially modifiers such as onlyOwner.
+
+missing-zero-check:
+- Add require(param != address(0), "Zero address"); at the start of the affected function.
+
+suicidal:
+- Restrict selfdestruct to an authorized caller, usually via onlyOwner or require(msg.sender == owner).
+
+FINAL OUTPUT:
+- Add a short comment at each changed location: // FIX VULN_XXX
+- Do NOT modify any comment that you are not adding a fix line to. Preserve existing // VULN: comments exactly.
+- Return exactly the complete Solidity source and nothing else.
+- Start directly with // SPDX or pragma.
+"""
+
+
+PROMPT_PATCH_GUARD_REPAIR = GLOBAL_CONTEXT + """
+TASK: Revise a Solidity patch that was rejected by a deterministic minimal-diff guard.
+
+You will receive ORIGINAL_CONTRACT, REJECTED_PATCH_CONTEXT, DIAGNOSIS,
+CONFIRMED_VULNERABILITIES, and PATCH_GUARD_REPORT.
+
+GOAL:
+- Keep the intended security fix for the diagnosed vulnerability IDs.
+- Undo every unrelated change reported by PATCH_GUARD_REPORT.
+- Preserve original string literals, comments, public/external signatures, state variable
+  declarations, formatting, and unrelated logic exactly when possible.
+
+RULES:
+1. Return the complete Solidity source, compilable as-is.
+2. Do not rename functions or state variables.
+3. Do not change public/external signatures.
+4. Do not translate, rewrite, or normalize existing revert/error strings.
+5. Only add or change code inside the target lines/functions identified by the diagnosis
+   and allowed_ranges in PATCH_GUARD_REPORT.
+6. If the rejected patch changed an original string literal, restore that exact original
+   literal unless the diagnosis explicitly requires changing it.
+7. Keep the required // FIX VULN_XXX comment at each changed security-fix location.
+
+FINAL OUTPUT:
+- Return exactly the complete Solidity source and nothing else.
+- Start directly with // SPDX or pragma.
+"""
+
+
+PROMPT_ETAPA6_ANALISAR_FIX = GLOBAL_CONTEXT + """
+TASK: Analyze Certora results after a patch.
+
+RESULT NORMALIZATION:
+- Violated / FAIL -> confirmed: the vulnerability persists.
+- Verified / SUCCESS -> not_confirmed: the patch resolved the property.
+- TIMEOUT / SANITY_FAIL / unknown -> inconclusive.
+- Ignore rule_not_vacuous helper rules.
+- Do not map envfreeFuncsStaticCheck to a vulnerability ID, but if it reports that a method was declared envfree while depending on the environment, treat the spec as invalid/blocking.
+
+Return only valid JSON matching the requested schema.
+"""
+
+
+PROMPT_DIAGNOSTICO = GLOBAL_CONTEXT + """
+TASK: Produce a precise structured diagnosis for each still-failing vulnerability.
+
+You will receive LOG_RELEVANTE, PLANO_FORMAL, VULNS_CONFIRMADAS, and CONTRATO_RESUMIDO.
+Use only IDs present in VULNS_CONFIRMADAS. Never include already resolved, skipped, or absent IDs.
+
+For each failure identify:
+1. The failed CVL rule.
+2. The Solidity root cause.
+3. The exact line that needs a patch, when available.
+4. The exact change needed.
+
+EXAMPLES:
+
+tx-origin:
+Log: "rule tx_origin_onlyOwner: FAIL"
+Contract: require(tx.origin == owner, "not owner")
+Diagnosis: the onlyOwner modifier uses tx.origin instead of msg.sender, so a non-owner msg.sender path can pass through a phishing transaction.
+
+reentrancy:
+Log: "rule reentrancy_withdraw: FAIL"
+Contract: external call before balances[msg.sender] -= amount
+Diagnosis: the balance is decremented after the external call, so a reentrant caller can observe stale state.
+
+missing-zero-check:
+Log: "rule zero_address_transferOwnership: FAIL"
+Contract: pendingOwner = newOwner without require(newOwner != address(0))
+Diagnosis: the function accepts the zero address.
+
+REQUIRED JSON OUTPUT:
 {
   "falhas": [
     {
       "id": "VULN_XXX",
-      "rule_que_falhou": "nome_da_rule",
-      "motivo": "descrição clara da causa raiz",
+      "rule_que_falhou": "rule_name",
+      "motivo": "clear root-cause description",
       "linha": 38,
-      "codigo_atual": "require(tx.origin == owner, ...)",
-      "correcao_necessaria": "substituir tx.origin por msg.sender"
+      "codigo_atual": "current buggy snippet",
+      "correcao_necessaria": "exact required change"
     }
   ]
 }

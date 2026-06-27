@@ -129,21 +129,37 @@ pip install -r requirements.txt
 ## Running the Pipeline
 
 ```bash
-cd agent/
 export GROQ_API_KEY="your_key"
 export CERTORAKEY="your_key"
 
-python3 orchestrator.py
+python3 agent/main.py --list-contracts --max-lines 45
+python3 agent/main.py --list-benchmarks
+python3 agent/main.py --contract smart-audt/contracts/SimpleBank.sol
 ```
+
+By default, the CLI keeps validated fixes in `agent/agent_outputs/` and run
+artifacts in `runs/`. To copy the final fixed contract back into
+`smart-audt/contracts/`, opt in explicitly:
+
+```bash
+python3 agent/main.py --contract smart-audt/contracts/SimpleBank.sol --copy-final
+```
+
+Contract groups are documented in `docs/benchmark-contracts.md`. The default
+evaluation suite uses the `benchmark` group; exploratory, manual/corrected, and
+scratch contracts are kept separate so generated `_FIXED` files are not used as
+default audit inputs.
 
 The pipeline will:
 
 1. **Stage 1** — Run Slither on `DeFiVault.sol` and normalize output to `etapa1_vulns.json`
-2. **Stage 3** — Load the validated CVL spec from `TesteCertora/specs/DeFiVault.spec`
-3. **Certora (original)** — Verify original contract and save log
-4. **Stage 4** — Analyze Certora log; classify each vulnerability as `confirmed`, `confirmed_static`, `not_confirmed`, or `inconclusive`
-5. **Stage 5** — Generate structured diagnosis and corrected contract `DeFiVault_FIXED.sol`
-6. **Stage 6 (loop, up to 3x)** — Re-run Certora on corrected contract; compare results; re-diagnose if violations persist
+2. **Stage 2** — Select only formalizable or static-confirmed findings
+3. **Stage 3** — Generate and deterministically repair CVL specs when Certora is suitable
+4. **Certora/static validation** — Verify original contract or static-confirmed evidence
+5. **Stage 4** — Classify each vulnerability as `confirmed`, `confirmed_static`, `not_confirmed`, or `inconclusive`
+6. **Stage 5** — Generate structured diagnosis and a corrected contract
+7. **Patch guard** — Reject or repair unrelated LLM edits before validation
+8. **Stage 6 (loop, up to 3x)** — Re-run Certora/static validation; compare results; re-diagnose if violations persist
 
 Expected final output:
 
@@ -229,9 +245,9 @@ DeFiVault.sol
 
 ## Related Work
 
-This pipeline is developed in the context of the research on gas optimization correctness by Villarim et al.:
+This pipeline is developed in the context of the research on gas optimization correctness by Gustavo.:
 
-> Manoel Felipe Araújo Villarim, Juliano Manabu Iyoda, Márcio Lopes Cornélio, Alexandre Cabral Mota.
+> Gustavo Ferreira  Juliano Manabu Iyoda, Márcio Lopes Cornélio, Alexandre Cabral Mota.
 > *"Ensuring Gas Optimisation Correctness by Behavioral Equivalence"*
 > CIn — UFPE.
 
