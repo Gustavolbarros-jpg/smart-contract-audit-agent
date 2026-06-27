@@ -26,9 +26,12 @@ from core.diagnosis_context import (
     compact_plan_for_diagnosis,
     deterministic_diagnosis,
 )
+from core.deterministic_patch import apply_deterministic_patches
+from core.deterministic_spec import build_deterministic_spec
 from core.evaluation import summarize_run
 from core.formal_candidate import build_formal_candidates
 from core.formal_plan import sanitize_formal_plan
+from core.import_context import has_imports, packages_path, solc_remappings
 from core.patch_guard import (
     analyze_patch,
     compact_patch_guard_report,
@@ -54,6 +57,7 @@ from tools.spec_validator import (
     remover_prefixo_revert_duplicado,
     remover_rules_vazias,
     remover_wrapper_rules,
+    substituir_hex_vazio_em_calls,
     substituir_methods_block,
     validar_spec,
 )
@@ -554,6 +558,152 @@ contract T {
         ]
         self.assertEqual(findings, [])
 
+    def test_low_level_success_returned_to_caller_stays_non_actionable(self):
+        source = """// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.21;
+
+contract T {
+  function transferOrFallback(address payable to) external {
+    if (!_safeTransferETH(to, 1)) {
+      return;
+    }
+  }
+
+  function _safeTransferETH(address payable to, uint256 value) internal returns (bool) {
+    (bool success, ) = to.call{value: value}("");
+    return success;
+  }
+}
+"""
+        report = normalize_contract_source(source)
+        findings = [
+            item for item in report["vulnerabilidades"]
+            if item["type"] == "unchecked-lowlevel"
+        ]
+        self.assertEqual(findings, [])
+
+    def test_internal_selfdestruct_does_not_create_fake_destroy_finding(self):
+        source = """// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.21;
+
+contract T {
+  function cancel() external {
+    _end();
+  }
+
+  function _end() internal {
+    selfdestruct(payable(msg.sender));
+  }
+}
+"""
+        report = normalize_contract_source(source)
+        findings = [
+            item for item in report["vulnerabilidades"]
+            if item["type"] == "suicidal"
+        ]
+        self.assertEqual(findings, [])
+
+    def test_guarded_selfdestruct_does_not_create_suicidal_fallback(self):
+        source = """// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.21;
+
+contract T {
+  address public owner;
+
+  modifier onlyOwner() {
+    require(msg.sender == owner, "not owner");
+    _;
+  }
+
+  function destroy() external onlyOwner {
+    selfdestruct(payable(owner));
+  }
+}
+"""
+        report = normalize_contract_source(source)
+        findings = [
+            item for item in report["vulnerabilidades"]
+            if item["type"] == "suicidal"
+        ]
+        self.assertEqual(findings, [])
+
+    def test_deterministic_patch_inserts_missing_zero_checks(self):
+        source = """pragma solidity ^0.8.21;
+contract T {
+  address public vault;
+
+  function setVaultAddress(address newVault) public {
+    vault = newVault;
+  }
+}
+"""
+        fixed, patches = apply_deterministic_patches(
+            source,
+            [
+                {
+                    "id": "VULN_001",
+                    "type": "missing-zero-check",
+                    "function": "setVaultAddress(address)",
+                    "target_parameter": "newVault",
+                }
+            ],
+        )
+
+        self.assertIn('require(newVault != address(0), "Zero address"); // FIX VULN_001', fixed)
+        self.assertIn("vault = newVault;", fixed)
+        self.assertEqual([item["id"] for item in patches], ["VULN_001"])
+
+    def test_deterministic_patch_can_infer_zero_check_parameter_from_elements(self):
+        source = """pragma solidity ^0.8.21;
+contract T {
+  address public weth;
+
+  function setWethAddress(address _newWethAddress) public {
+    weth = _newWethAddress;
+  }
+}
+"""
+        fixed, patches = apply_deterministic_patches(
+            source,
+            [
+                {
+                    "id": "VULN_002",
+                    "type": "missing-zero-check",
+                    "function": "setWethAddress(address)",
+                    "elements": [
+                        {"name": "_newWethAddress", "type": "variable", "line": "5"},
+                    ],
+                }
+            ],
+        )
+
+        self.assertIn('require(_newWethAddress != address(0), "Zero address"); // FIX VULN_002', fixed)
+        self.assertEqual([item["target_parameter"] for item in patches], ["_newWethAddress"])
+
+    def test_deterministic_patch_expands_one_line_functions(self):
+        source = """pragma solidity ^0.8.21;
+contract T {
+  address public gov;
+  function setGov(address _gov) public onlyGov { gov = _gov; }
+}
+"""
+        fixed, patches = apply_deterministic_patches(
+            source,
+            [
+                {
+                    "id": "VULN_003",
+                    "type": "missing-zero-check",
+                    "function": "setGov(address)",
+                    "target_parameter": "_gov",
+                }
+            ],
+        )
+
+        self.assertIn("function setGov(address _gov) public onlyGov {\n", fixed)
+        self.assertIn('    require(_gov != address(0), "Zero address"); // FIX VULN_003', fixed)
+        self.assertIn("    gov = _gov;\n", fixed)
+        self.assertEqual([item["id"] for item in patches], ["VULN_003"])
+
     def test_ignored_low_level_call_fallback_is_static_confirmed(self):
         source = """// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.21;
@@ -839,6 +989,35 @@ contract T {
         self.assertEqual(len(arbitrary), 1)
         self.assertEqual(arbitrary[0]["function"], "sweep(address)")
         self.assertEqual(arbitrary[0]["target_parameter"], "to")
+
+    def test_arbitrary_send_fallback_ignores_erc20_transfer_parameter(self):
+        source = """// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.21;
+
+interface IERC20 {
+  function transfer(address to, uint256 amount) external returns (bool);
+}
+
+contract T {
+  function forwardERC20s(IERC20 token, uint256 amount) external {
+    token.transfer(msg.sender, amount);
+  }
+}
+"""
+        with tempfile.NamedTemporaryFile("w", suffix=".sol", delete=False) as handle:
+            handle.write(source)
+            path = handle.name
+
+        try:
+            report = normalize_slither_json({"results": {"detectors": []}}, path)
+        finally:
+            Path(path).unlink(missing_ok=True)
+
+        arbitrary = [
+            item for item in report["vulnerabilidades"]
+            if item["type"] == "arbitrary-send-eth"
+        ]
+        self.assertEqual(arbitrary, [])
 
     def test_erc2771_multicall_fallback_detects_unguarded_delegatecall(self):
         source = """// SPDX-License-Identifier: MIT
@@ -1367,6 +1546,98 @@ contract C {
         self.assertNotIn("deposited", methods)
         self.assertNotIn("withdrawn", methods)
 
+    def test_methods_block_maps_contract_interface_params_to_address(self):
+        source = """pragma solidity ^0.8.21;
+interface IERC20 {}
+contract C {
+  function forwardERC20s(IERC20 token, uint256 amount) external {}
+}
+"""
+        methods = build_methods_block(source)
+
+        self.assertIn("function forwardERC20s(address token, uint256 amount) external;", methods)
+        self.assertNotIn("IERC20", methods)
+
+    def test_methods_block_maps_named_interface_return_to_address(self):
+        source = """pragma solidity ^0.8.21;
+interface IEscrow {}
+contract C {
+  function predictEscrow(address user) public view returns (IEscrow predicted) {
+    user;
+  }
+}
+"""
+        methods = build_methods_block(source)
+
+        self.assertIn("function predictEscrow(address user) external returns(address) envfree;", methods)
+        self.assertNotIn("IEscrow predicted", methods)
+
+    def test_methods_block_ignores_top_level_interface_methods(self):
+        source = """pragma solidity ^0.8.21;
+interface IERC20 {
+  function transfer(address to, uint256 amount) external returns (bool);
+}
+contract C {
+  address public owner;
+  function setOwner(address newOwner) external {
+    owner = newOwner;
+  }
+}
+"""
+        methods = build_methods_block(source)
+
+        self.assertIn("function owner() external returns(address) envfree;", methods)
+        self.assertIn("function setOwner(address newOwner) external;", methods)
+        self.assertNotIn("transfer(address", methods)
+
+    def test_deterministic_spec_generates_zero_address_rules(self):
+        methods = """methods {
+  function setGov(address _gov) external;
+  function setPauseGuardian(address _pauseGuardian) external;
+}"""
+        spec = build_deterministic_spec(
+            methods,
+            [
+                {
+                    "id": "VULN_001",
+                    "type": "missing-zero-check",
+                    "function": "setGov(address)",
+                    "rule_names": ["zero_address_reverts_setGov"],
+                },
+                {
+                    "id": "VULN_002",
+                    "type": "missing-zero-check",
+                    "function": "setPauseGuardian(address)",
+                    "rule_names": ["zero_address_reverts_setPauseGuardian"],
+                },
+            ],
+        )
+
+        self.assertIsNotNone(spec)
+        self.assertIn("rule zero_address_reverts_setGov", spec)
+        self.assertIn("setGov@withrevert(e, x);", spec)
+        self.assertIn("setPauseGuardian@withrevert(e, x);", spec)
+
+    def test_solc_remappings_reads_foundry_remappings(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "src").mkdir()
+            (root / "lib" / "solmate" / "src").mkdir(parents=True)
+            (root / "remappings.txt").write_text(
+                "solmate/=lib/solmate/src/\ncore/=./src/\n",
+                encoding="utf-8",
+            )
+            contract = root / "src" / "T.sol"
+            contract.write_text(
+                'pragma solidity ^0.8.19;\nimport {ERC20} from "solmate/tokens/ERC20.sol";\n',
+                encoding="utf-8",
+            )
+
+            remaps = solc_remappings(contract)
+
+        self.assertTrue(any(item.startswith("solmate/=") for item in remaps))
+        self.assertFalse(any(item.startswith("core/=") for item in remaps))
+
     def test_spec_validator_does_not_add_envfree_to_every_returning_method(self):
         spec = """methods {
   function createCampaign(uint256 goal, uint256 duration) external returns(uint256);
@@ -1404,6 +1675,44 @@ rule cvl_types {
         self.assertNotIn("address payable", fixed)
         self.assertNotIn("calldata", fixed)
         self.assertTrue(any("tipo Solidity normalizado" in item for item in corrections))
+
+    def test_spec_validator_replaces_empty_hex_bytes_argument(self):
+        spec = """methods {
+  function notifyPartner(address target, bytes payload) external;
+}
+
+rule notifyPartnerZeroAddressCheck {
+  env e;
+  address target;
+  require target == 0;
+  notifyPartner@withrevert(e, target, 0x);
+  assert lastReverted;
+}
+"""
+        fixed, corrections = substituir_hex_vazio_em_calls(spec)
+
+        self.assertIn("bytes payload;", fixed)
+        self.assertIn("notifyPartner@withrevert(e, target, payload);", fixed)
+        self.assertNotIn(", 0x)", fixed)
+        self.assertTrue(any("0x substituido" in item for item in corrections))
+
+    def test_import_context_detects_node_package_remapping(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            contract = root / "contracts" / "C.sol"
+            package = root / "node_modules" / "@openzeppelin"
+            (root / "contracts").mkdir()
+            package.mkdir(parents=True)
+            contract.write_text(
+                "pragma solidity ^0.8.0;\n"
+                "import '@openzeppelin/contracts/access/Ownable.sol';\n"
+                "contract C {}\n",
+                encoding="utf-8",
+            )
+
+            self.assertTrue(has_imports(contract.read_text(encoding="utf-8")))
+            self.assertEqual(packages_path(contract), root / "node_modules")
+            self.assertEqual(solc_remappings(contract), [f"@openzeppelin={package}"])
 
     def test_invalid_envfree_certora_log_is_blocking(self):
         log = (
@@ -1608,6 +1917,132 @@ contract SimpleBank {
         self.assertIn(EXPLORATORY, groups)
         self.assertIn(MANUAL, groups)
         self.assertIn(SCRATCH, groups)
+
+
+_COUNTEREXAMPLE_SAMPLE_LOG = """
+Results for all:
+*---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*
+|Rule name                               |Verified     |Time (sec)|Description                                                 |Local vars                                        |
+|----------------------------------------|-------------|----------|------------------------------------------------------------|--------------------------------------------------|
+|zero_address_reverts                    |Not violated |0         |                                                            |no local variables                                |
+|                                        |(unsat)      |          |                                                            |                                                  |
+|unauthorized_recipient_reverts          |Violated     |2         |Assert message: lastReverted                                |King=10001                                        |
+|                                        |(sat)        |          |                                                            |e.block.basefee=0                                 |
+|                                        |             |          |                                                            |e.block.timestamp=0                               |
+|                                        |             |          |                                                            |e.msg.sender=King                                 |
+|                                        |             |          |                                                            |e.msg.value=0                                     |
+|                                        |             |          |                                                            |to=0x2712                                         |
+*---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*
+"""
+
+
+class TestCertoraCounterexample(unittest.TestCase):
+    def setUp(self):
+        from core.certora_counterexample import (
+            extract_counterexamples,
+            format_counterexample_for_prompt,
+        )
+        self.extract = extract_counterexamples
+        self.format = format_counterexample_for_prompt
+
+    def test_extracts_violated_rule_vars(self):
+        result = self.extract(_COUNTEREXAMPLE_SAMPLE_LOG)
+        self.assertIn("unauthorized_recipient_reverts", result)
+        cex = result["unauthorized_recipient_reverts"]
+        self.assertIn("e.msg.sender", cex)
+        self.assertEqual(cex["e.msg.sender"], "King")
+        self.assertIn("to", cex)
+        self.assertEqual(cex["to"], "0x2712")
+        self.assertIn("_assert_message", cex)
+        self.assertEqual(cex["_assert_message"], "lastReverted")
+
+    def test_excludes_noise_vars(self):
+        result = self.extract(_COUNTEREXAMPLE_SAMPLE_LOG)
+        cex = result.get("unauthorized_recipient_reverts", {})
+        self.assertNotIn("e.block.basefee", cex)
+        self.assertNotIn("e.block.timestamp", cex)
+
+    def test_excludes_not_violated_rules(self):
+        result = self.extract(_COUNTEREXAMPLE_SAMPLE_LOG)
+        self.assertNotIn("zero_address_reverts", result)
+
+    def test_format_counterexample_for_prompt(self):
+        counterexamples = self.extract(_COUNTEREXAMPLE_SAMPLE_LOG)
+        text = self.format(counterexamples, ["unauthorized_recipient_reverts"])
+        self.assertIn("CERTORA COUNTEREXAMPLES", text)
+        self.assertIn("unauthorized_recipient_reverts", text)
+        self.assertIn("REVERT", text)
+        self.assertIn("to", text)
+        self.assertIn("0x2712", text)
+
+    def test_format_empty_counterexamples(self):
+        text = self.format({}, ["some_rule"])
+        self.assertEqual(text, "")
+
+    def test_format_uses_all_counterexamples_when_no_match(self):
+        counterexamples = self.extract(_COUNTEREXAMPLE_SAMPLE_LOG)
+        text = self.format(counterexamples, ["nonexistent_rule"])
+        self.assertIn("unauthorized_recipient_reverts", text)
+
+
+class TestFixLibrary(unittest.TestCase):
+    def test_save_and_load_pattern(self):
+        import tempfile
+        from unittest.mock import patch
+        from core.fix_library import save_pattern, get_examples_for_prompt, LIBRARY_PATH
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp) / "fix_library.json"
+            with patch("core.fix_library.LIBRARY_PATH", tmp_path):
+                from core import fix_library
+                orig_path = fix_library.LIBRARY_PATH
+                fix_library.LIBRARY_PATH = tmp_path
+
+                save_pattern(
+                    vuln_type="arbitrary-send-eth",
+                    repair_strategy="restrict_recipient",
+                    function_signature="function claim(address payable to) external onlyOwner",
+                    fix_snippet='require(to == msg.sender, "Unauthorized");',
+                    contract_name="TestContract",
+                    run_id="20260627_test",
+                )
+                result = get_examples_for_prompt(["arbitrary-send-eth"])
+                fix_library.LIBRARY_PATH = orig_path
+
+        self.assertIn("arbitrary-send-eth", result)
+        self.assertIn("require(to == msg.sender", result)
+
+    def test_get_examples_empty_library(self):
+        import tempfile
+        from core import fix_library
+
+        orig_path = fix_library.LIBRARY_PATH
+        with tempfile.TemporaryDirectory() as tmp:
+            fix_library.LIBRARY_PATH = Path(tmp) / "nonexistent.json"
+            result = fix_library.get_examples_for_prompt(["missing-zero-check"])
+            fix_library.LIBRARY_PATH = orig_path
+
+        self.assertEqual(result, "")
+
+    def test_no_duplicate_patterns(self):
+        import tempfile
+        from core import fix_library
+
+        with tempfile.TemporaryDirectory() as tmp:
+            fix_library.LIBRARY_PATH = Path(tmp) / "lib.json"
+            for _ in range(3):
+                fix_library.save_pattern(
+                    vuln_type="tx-origin",
+                    repair_strategy="replace_tx_origin",
+                    function_signature="modifier onlyOwner()",
+                    fix_snippet='require(msg.sender == owner, "not owner");',
+                    contract_name="Foo",
+                    run_id="run1",
+                )
+            lib = fix_library.load_library()
+            fix_library.LIBRARY_PATH = Path("/home/gflb/TesteCertora/runs/fix_library.json")
+
+        self.assertEqual(len(lib["patterns"]), 1)
 
 
 if __name__ == "__main__":

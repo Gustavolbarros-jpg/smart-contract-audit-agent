@@ -42,6 +42,8 @@ from core.patch_guard import (
     compact_patch_guard_report,
     repair_obvious_patch_guard_issues,
 )
+from core.certora_counterexample import extract_counterexamples, format_counterexample_for_prompt
+from core.fix_library import get_examples_for_prompt, save_pattern
 from core.run_store import copy_contract, create_run_dir, save_json, save_text, write_metadata
 from core.slither_normalizer import normalize_slither_json
 from core.spec_patterns import build_spec_pattern_context
@@ -444,6 +446,46 @@ def imprimir_comparacao(comparacao: dict):
     print("─" * 60)
 
 
+def _format_failure_history(history: list[dict]) -> str:
+    if not history:
+        return ""
+    lines = ["PREVIOUS ATTEMPT HISTORY:"]
+    for h in history:
+        lines.append(f"Attempt {h['attempt']}: IDs {h['failing_ids']} still failed.")
+        for s in h.get("diagnosis_summary", []):
+            lines.append(f"  Diagnosis was: {s}")
+    return "\n".join(lines)
+
+
+def _extract_fix_snippet(original: str, fixed: str, vuln: dict) -> str:
+    """Extract added lines from the diff for a specific vulnerability's function."""
+    import difflib
+    function_name = vuln.get("function", "")
+    fn_name = re.match(r"([A-Za-z_][A-Za-z0-9_]*)\s*\(", function_name or "")
+    if not fn_name:
+        return ""
+    name = fn_name.group(1)
+
+    orig_lines = original.splitlines()
+    fixed_lines = fixed.splitlines()
+    matcher = difflib.SequenceMatcher(None, orig_lines, fixed_lines)
+
+    added = []
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        if tag in ("insert", "replace"):
+            chunk = fixed_lines[j1:j2]
+            context_start = max(0, j1 - 5)
+            context = "\n".join(fixed_lines[context_start:j2])
+            if name in context:
+                added.extend(
+                    line.strip()
+                    for line in chunk
+                    if line.strip() and not line.strip().startswith("//")
+                )
+
+    return "; ".join(added[:3]) if added else ""
+
+
 def executar_pipeline(contract_path: str, copy_final: bool = True):
     print("\n" + "=" * 60)
     print("🚀 INICIANDO AUDIT AGENT PIPELINE (SELF-HEALING MODE)")
@@ -807,8 +849,11 @@ def executar_pipeline(contract_path: str, copy_final: bool = True):
                 f"({len(deterministic_patches)} patch(es) já aplicado(s)); "
                 f"IDs restantes: {sorted(ids_restantes)}"
             )
+        vuln_types_restantes = [v.get("type", "") for v in vulns_restantes]
+        library_examples = get_examples_for_prompt(vuln_types_restantes)
         patch_prompt = (
-            f"CONTRATO:\n{contrato_para_llm}\n\n"
+            (f"FIX PATTERN EXAMPLES:\n{library_examples}\n\n" if library_examples else "")
+            + f"CONTRATO:\n{contrato_para_llm}\n\n"
             f"DIAGNÓSTICO:\n{json.dumps(diagnostico_restante, indent=2, ensure_ascii=False)}\n\n"
             f"VULNS CONFIRMADAS:\n{json.dumps(vulns_restantes, indent=2, ensure_ascii=False)}\n\n"
             f"LOG CERTORA RELEVANTE:\n{diagnosis_log}"
@@ -848,6 +893,7 @@ def executar_pipeline(contract_path: str, copy_final: bool = True):
         return
 
     # ── ETAPA 6: Loop de Validação Formal ────────────────────────
+    failure_history: list[dict] = []
     tentativa = 1
     while tentativa <= MAX_TENTATIVAS_CORRECAO:
         print(f"\n▶️  ETAPA 6 [Tentativa {tentativa}/{MAX_TENTATIVAS_CORRECAO}]: Validando com Certora...")
@@ -909,6 +955,26 @@ def executar_pipeline(contract_path: str, copy_final: bool = True):
                 print(f"✅ Contrato validado copiado para: {destino_final}")
             else:
                 print(f"✅ Contrato validado mantido em: {caminho_fix_temp}")
+            with open(str(caminho_fix_temp), "r", encoding="utf-8") as _fh:
+                codigo_fix_final = _fh.read()
+            saved_count = 0
+            for vuln in vulns_confirmadas:
+                vuln_type = vuln.get("type", "")
+                if not vuln_type:
+                    continue
+                fix_snippet = _extract_fix_snippet(contract_source, codigo_fix_final, vuln)
+                if fix_snippet:
+                    save_pattern(
+                        vuln_type=vuln_type,
+                        repair_strategy=vuln.get("repair_strategy", ""),
+                        function_signature=vuln.get("function", ""),
+                        fix_snippet=fix_snippet,
+                        contract_name=nome_contrato,
+                        run_id=run_dir.name,
+                    )
+                    saved_count += 1
+            if saved_count:
+                print(f"   📚 {saved_count} padrão(ões) salvo(s) na biblioteca de fixes.")
             break
 
         if tentativa == MAX_TENTATIVAS_CORRECAO:
@@ -922,6 +988,15 @@ def executar_pipeline(contract_path: str, copy_final: bool = True):
 
         todas_falhas = falhas_persistentes + falhas_inconclusivas
         print(f"\n   ⚠️  {len(todas_falhas)} falha(s) — diagnosticando...")
+
+        # Extract counterexamples from Certora output for failing rules
+        counterexamples = extract_counterexamples(certora_fix_log)
+        rules_falhas_names = [v.get("rule", "") for v in todas_falhas]
+        counterexample_text = format_counterexample_for_prompt(counterexamples, rules_falhas_names)
+        if counterexamples:
+            save_json(run_dir / f"counterexamples_t{tentativa}.json", counterexamples)
+            if counterexample_text:
+                print(f"   🔬 Contraexemplo Certora extraído para {len(counterexamples)} regra(s).")
 
         with open(caminho_fix_temp, "r", encoding="utf-8") as fc:
             codigo_fix_atual = fc.read()
@@ -940,13 +1015,22 @@ def executar_pipeline(contract_path: str, copy_final: bool = True):
         save_text(run_dir / f"diagnosis_t{tentativa}_log_context.txt", diagnosis_fix_log)
         save_text(run_dir / f"diagnosis_t{tentativa}_contract_context.txt", diagnosis_fix_contract)
 
+        history_text = _format_failure_history(failure_history)
+        diagnosis_fix_input = (
+            f"LOG_RELEVANTE:\n{diagnosis_fix_log}\n"
+            f"PLANO_FORMAL:\n{json.dumps(diagnosis_fix_plan, ensure_ascii=False)}\n"
+            f"VULNS_CONFIRMADAS:\n{json.dumps(vulns_falhas_full)}\n"
+            f"CONTRATO_RESUMIDO:\n{diagnosis_fix_contract}"
+        )
+        if counterexample_text:
+            diagnosis_fix_input = counterexample_text + "\n\n" + diagnosis_fix_input
+        if history_text:
+            diagnosis_fix_input = history_text + "\n\n" + diagnosis_fix_input
+
         try:
             diagnostico_fix = chamar_ia_json(
                 sp.PROMPT_DIAGNOSTICO,
-                f"LOG_RELEVANTE:\n{diagnosis_fix_log}\n"
-                f"PLANO_FORMAL:\n{json.dumps(diagnosis_fix_plan, ensure_ascii=False)}\n"
-                f"VULNS_CONFIRMADAS:\n{json.dumps(vulns_falhas_full)}\n"
-                f"CONTRATO_RESUMIDO:\n{diagnosis_fix_contract}",
+                diagnosis_fix_input,
                 DiagnosticoFalhas
             )
         except Exception as exc:
@@ -977,13 +1061,32 @@ def executar_pipeline(contract_path: str, copy_final: bool = True):
         for fd in diagnostico_fix.get("falhas", []):
             print(f"   → {fd['id']}: {fd['motivo']} (linha {fd.get('linha', '?')})")
 
-        re_fix_bruto = chamar_ia_texto(
-            sp.PROMPT_ETAPA5_CORRIGIR,
+        # Record this attempt in history before re-fixing
+        failure_history.append({
+            "attempt": tentativa,
+            "failing_ids": ids_falhas,
+            "counterexamples": counterexamples,
+            "diagnosis_summary": [
+                f"{f['id']}: {f['motivo']}"
+                for f in diagnostico_fix.get("falhas", [])
+            ],
+        })
+
+        re_fix_input = (
             f"[TENTATIVA {tentativa}]\n\n"
             f"DIAGNÓSTICO:\n{json.dumps(diagnostico_fix, indent=2, ensure_ascii=False)}\n\n"
             f"CONTRATO ATUAL:\n{codigo_fix_atual}\n\n"
             f"LOG CERTORA RELEVANTE:\n{diagnosis_fix_log}\n\n"
             f"Corrija APENAS o que o diagnóstico indica."
+        )
+        if counterexample_text:
+            re_fix_input = counterexample_text + "\n\n" + re_fix_input
+        if history_text:
+            re_fix_input = history_text + "\n\n" + re_fix_input
+
+        re_fix_bruto = chamar_ia_texto(
+            sp.PROMPT_ETAPA5_CORRIGIR,
+            re_fix_input,
         )
         codigo_fix = limpar_strings_solidity(limpar_codigo_solidity(re_fix_bruto))
         if not codigo_fix.strip():
