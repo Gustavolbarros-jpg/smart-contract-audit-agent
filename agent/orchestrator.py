@@ -32,8 +32,11 @@ from core.diagnosis_context import (
     filter_plan_by_ids,
     sanitize_diagnosis_ids,
 )
+from core.deterministic_patch import apply_deterministic_patches
+from core.deterministic_spec import build_deterministic_spec
 from core.formal_candidate import build_formal_candidates
 from core.formal_plan import build_planner_input, build_spec_plan_input, sanitize_formal_plan
+from core.import_context import has_imports
 from core.patch_guard import (
     analyze_patch,
     compact_patch_guard_report,
@@ -64,6 +67,7 @@ from tools.spec_validator import (
     remover_rules_vazias,
     remover_wrapper_rules,
     remover_prefixo_revert_duplicado,
+    substituir_hex_vazio_em_calls,
     substituir_methods_block,
 )
 from llm.client import MODELO_LLM, chamar_ia_json, chamar_ia_texto
@@ -200,14 +204,27 @@ def revisar_patch_rejeitado_por_guard(
                 return True, codigo_atual, ultimo_guard
 
         print(f"   🔁 Patch guard bloqueou {label}; pedindo revisão mínima à LLM...")
+        guard_report = compact_patch_guard_report(ultimo_guard)
+        repair_findings = [
+            {
+                "id": item.get("id"),
+                "type": item.get("type"),
+                "function": item.get("function"),
+                "line": item.get("line"),
+                "target_parameter": item.get("target_parameter"),
+                "repair_strategy": item.get("repair_strategy"),
+            }
+            for item in vulns_confirmadas_full
+        ]
         prompt_input = (
             f"ORIGINAL_CONTRACT:\n{contract_source}\n\n"
-            f"REJECTED_PATCH:\n{codigo_atual}\n\n"
+            f"REJECTED_PATCH_CONTEXT:\n"
+            f"{json.dumps(guard_report.get('relevant_hunks', []), indent=2, ensure_ascii=False)}\n\n"
             f"DIAGNOSIS:\n{json.dumps(diagnostico, indent=2, ensure_ascii=False)}\n\n"
             f"CONFIRMED_VULNERABILITIES:\n"
-            f"{json.dumps(vulns_confirmadas_full, indent=2, ensure_ascii=False)}\n\n"
+            f"{json.dumps(repair_findings, indent=2, ensure_ascii=False)}\n\n"
             f"PATCH_GUARD_REPORT:\n"
-            f"{json.dumps(compact_patch_guard_report(ultimo_guard), indent=2, ensure_ascii=False)}"
+            f"{json.dumps(guard_report, indent=2, ensure_ascii=False)}"
         )
         save_text(run_dir / f"patch_guard_repair_prompt_{label}.txt", prompt_input)
 
@@ -321,6 +338,12 @@ def preparar_spec(
         print(f"   🔧 Auto-correções no spec ({len(correcoes)}):")
         for c in correcoes:
             print(f"      → {c}")
+
+    spec_corrigido, hex_vazio = substituir_hex_vazio_em_calls(spec_corrigido)
+    if hex_vazio:
+        print(f"   🔧 Argumentos bytes corrigidos ({len(hex_vazio)}):")
+        for h in hex_vazio:
+            print(f"      → {h}")
 
     spec_corrigido, zero_requires = inserir_requires_zero_address(spec_corrigido)
     if zero_requires:
@@ -556,24 +579,6 @@ def executar_pipeline(contract_path: str, copy_final: bool = True):
         save_text(run_dir / "methods.cvl", methods_block)
         save_json(run_dir / "auth_probe.json", auth_probe or {})
 
-        try:
-            spec_gerado = chamar_ia_json(
-                sp.PROMPT_ETAPA3_GERAR_SPEC,
-                f"PLANO_FORMAL:\n{json.dumps(plano_spec, ensure_ascii=False)}\n"
-                f"SPEC_PATTERNS:\n{spec_patterns}\n"
-                f"CONTRATO_RESUMIDO:\n{contrato_resumido}",
-                CodigoGerado
-            )
-        except Exception as exc:
-            registrar_bloqueio(
-                pasta_output,
-                run_dir,
-                "llm_spec_generation",
-                "Falha ao consultar a LLM para gerar spec CVL",
-                str(exc),
-            )
-            return
-
         rule_name_by_id = {
             item["id"]: item["rule_names"][0]
             for item in plano_formal["selected_rules"]
@@ -583,8 +588,40 @@ def executar_pipeline(contract_path: str, copy_final: bool = True):
             item["id"]: item
             for item in plano_formal["selected_rules"]
         }
+        deterministic_spec = build_deterministic_spec(methods_block, plano_formal["selected_rules"])
+        if deterministic_spec:
+            print("   🧱 Spec determinística aplicada para padrão mecânico conhecido.")
+            save_text(run_dir / "llm_spec_generation_status.json", json.dumps(
+                {
+                    "status": "skipped",
+                    "reason": "deterministic_spec_covered_all_selected_rules",
+                },
+                indent=2,
+                ensure_ascii=False,
+            ))
+            spec_codigo = deterministic_spec
+        else:
+            try:
+                spec_gerado = chamar_ia_json(
+                    sp.PROMPT_ETAPA3_GERAR_SPEC,
+                    f"PLANO_FORMAL:\n{json.dumps(plano_spec, ensure_ascii=False)}\n"
+                    f"SPEC_PATTERNS:\n{spec_patterns}\n"
+                    f"CONTRATO_RESUMIDO:\n{contrato_resumido}",
+                    CodigoGerado
+                )
+            except Exception as exc:
+                registrar_bloqueio(
+                    pasta_output,
+                    run_dir,
+                    "llm_spec_generation",
+                    "Falha ao consultar a LLM para gerar spec CVL",
+                    str(exc),
+                )
+                return
+            spec_codigo = spec_gerado["codigo"]
+
         spec_corrigido = preparar_spec(
-            spec_gerado["codigo"],
+            spec_codigo,
             str(caminho_spec),
             methods_block,
             rule_name_by_id,
@@ -740,30 +777,63 @@ def executar_pipeline(contract_path: str, copy_final: bool = True):
     for f in diagnostico.get("falhas", []):
         print(f"   → {f['id']}: {f['motivo']} (linha {f.get('linha', '?')})")
 
-    patch_prompt = (
-        f"CONTRATO:\n{contract_source}\n\n"
-        f"DIAGNÓSTICO:\n{json.dumps(diagnostico, indent=2, ensure_ascii=False)}\n\n"
-        f"VULNS CONFIRMADAS:\n{json.dumps(vulns_confirmadas, indent=2, ensure_ascii=False)}\n\n"
-        f"LOG CERTORA RELEVANTE:\n{diagnosis_log}"
+    deterministic_fix, deterministic_patches = apply_deterministic_patches(
+        contract_source,
+        vulns_confirmadas_full,
     )
-    save_text(run_dir / "patch_t0_prompt_context.txt", patch_prompt)
+    deterministic_patch_ids = {item["id"] for item in deterministic_patches}
+    if deterministic_patches:
+        save_json(run_dir / "deterministic_patch_t0.json", {"patches": deterministic_patches})
+        print(f"   🛠️  Patch determinístico cobriu {len(deterministic_patches)} ID(s).")
 
-    fix_bruto = chamar_ia_texto(
-        sp.PROMPT_ETAPA5_CORRIGIR,
-        patch_prompt,
-    )
-    if not fix_bruto.strip():
-        registrar_bloqueio(
-            pasta_output,
-            run_dir,
-            "llm_initial_fix",
-            "A LLM não retornou código Solidity para a primeira correção",
+    if deterministic_patch_ids == ids_confirmadas:
+        codigo_fix = deterministic_fix
+        save_text(run_dir / "patch_t0_prompt_context.txt", "PATCH_SKIPPED: deterministic patch covered all confirmed IDs.")
+    else:
+        # When deterministic patches are partial, feed the already-patched contract and
+        # only the remaining IDs to the LLM so it does not re-patch the wrong locations.
+        contrato_para_llm = deterministic_fix if deterministic_patches else contract_source
+        ids_restantes = ids_confirmadas - deterministic_patch_ids
+        vulns_restantes = [v for v in vulns_confirmadas if v["id"] in ids_restantes]
+        diagnostico_restante = {
+            "falhas": [
+                f for f in diagnostico.get("falhas", [])
+                if f.get("id") in ids_restantes
+            ]
+        }
+        if deterministic_patches:
+            print(
+                f"   ♻️  Alimentando LLM com contrato parcialmente corrigido "
+                f"({len(deterministic_patches)} patch(es) já aplicado(s)); "
+                f"IDs restantes: {sorted(ids_restantes)}"
+            )
+        patch_prompt = (
+            f"CONTRATO:\n{contrato_para_llm}\n\n"
+            f"DIAGNÓSTICO:\n{json.dumps(diagnostico_restante, indent=2, ensure_ascii=False)}\n\n"
+            f"VULNS CONFIRMADAS:\n{json.dumps(vulns_restantes, indent=2, ensure_ascii=False)}\n\n"
+            f"LOG CERTORA RELEVANTE:\n{diagnosis_log}"
         )
-        return
+        save_text(run_dir / "patch_t0_prompt_context.txt", patch_prompt)
 
-    codigo_fix = limpar_strings_solidity(limpar_codigo_solidity(fix_bruto))
+        fix_bruto = chamar_ia_texto(
+            sp.PROMPT_ETAPA5_CORRIGIR,
+            patch_prompt,
+        )
+        if not fix_bruto.strip():
+            registrar_bloqueio(
+                pasta_output,
+                run_dir,
+                "llm_initial_fix",
+                "A LLM não retornou código Solidity para a primeira correção",
+            )
+            return
 
-    caminho_fix_temp = pasta_output / f"{nome_contrato}_FIXED.sol"
+        codigo_fix = limpar_strings_solidity(limpar_codigo_solidity(fix_bruto))
+
+    if has_imports(contract_source):
+        caminho_fix_temp = Path(contract_path).parent / f"{nome_contrato}_AGENT_FIXED.sol"
+    else:
+        caminho_fix_temp = pasta_output / f"{nome_contrato}_FIXED.sol"
     patch_guard_ok, codigo_fix, _ = revisar_patch_rejeitado_por_guard(
         pasta_output,
         run_dir,

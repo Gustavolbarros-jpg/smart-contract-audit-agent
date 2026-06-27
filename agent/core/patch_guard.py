@@ -519,6 +519,15 @@ def _build_allowed_ranges(
             add_for_line(line, finding_id)
         for name in _function_names_from_finding(finding):
             add_for_function(name, finding_id)
+        if finding.get("type") == "tx-origin":
+            for block in _tx_origin_modifier_blocks(source, blocks):
+                ranges.append(
+                    {
+                        "start": block["start_line"],
+                        "end": block["end_line"],
+                        "reason": f"{finding_id}: modifier {block['name']} uses tx.origin",
+                    }
+                )
 
     for failure in _diagnosis_failures(diagnosis):
         failure_id = failure.get("id", "diagnosis")
@@ -529,6 +538,24 @@ def _build_allowed_ranges(
             add_for_line(int(line), failure_id)
 
     return _merge_ranges(ranges)
+
+
+def _tx_origin_modifier_blocks(
+    source: str,
+    blocks: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Return modifier blocks whose body contains a tx.origin reference."""
+    lines = source.splitlines()
+    result = []
+    for block in blocks:
+        if block.get("kind") != "modifier":
+            continue
+        start = block["start_line"] - 1
+        end = block["end_line"]
+        snippet = "\n".join(lines[start:end])
+        if "tx.origin" in snippet:
+            result.append(block)
+    return result
 
 
 def _block_containing_line(blocks: list[dict[str, Any]], line: int) -> dict[str, Any] | None:

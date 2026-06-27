@@ -179,9 +179,12 @@ SURVIVAL RULES:
 TARGETED REPAIR PLAYBOOK:
 
 arbitrary-send-eth:
-- Restrict the function with owner authorization.
-- If the function receives a recipient parameter, validate it and ensure the transfer policy matches the property.
-- Do not silently change business logic beyond the required authorization/recipient checks.
+- Restrict the ETH transfer to authorized recipients using the smallest valid check.
+- If the function already has an onlyOwner modifier, add: require(<recipient_param> == msg.sender, "Unauthorized recipient"); OR require(<recipient_param> == owner, "Unauthorized recipient"); at the start of the function.
+- NEVER declare state variables (arrays, mappings, structs) inside a function body — Solidity syntax forbids this.
+- Do NOT add complex allowlist data structures. The entire fix must be one or two require() checks.
+- Do not change the function signature or remove the recipient parameter unless the diagnosis explicitly says to.
+- If the contract has no existing owner state variable, use msg.sender as the restriction target.
 
 unchecked-lowlevel:
 - For every ignored low-level call return value, capture the returned success boolean.
@@ -222,6 +225,7 @@ suicidal:
 
 FINAL OUTPUT:
 - Add a short comment at each changed location: // FIX VULN_XXX
+- Do NOT modify any comment that you are not adding a fix line to. Preserve existing // VULN: comments exactly.
 - Return exactly the complete Solidity source and nothing else.
 - Start directly with // SPDX or pragma.
 """
@@ -230,8 +234,8 @@ FINAL OUTPUT:
 PROMPT_PATCH_GUARD_REPAIR = GLOBAL_CONTEXT + """
 TASK: Revise a Solidity patch that was rejected by a deterministic minimal-diff guard.
 
-You will receive ORIGINAL_CONTRACT, REJECTED_PATCH, DIAGNOSIS, CONFIRMED_VULNERABILITIES,
-and PATCH_GUARD_REPORT.
+You will receive ORIGINAL_CONTRACT, REJECTED_PATCH_CONTEXT, DIAGNOSIS,
+CONFIRMED_VULNERABILITIES, and PATCH_GUARD_REPORT.
 
 GOAL:
 - Keep the intended security fix for the diagnosed vulnerability IDs.
