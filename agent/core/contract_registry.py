@@ -75,6 +75,18 @@ CONTRACT_REGISTRY = [
         "Larger Solidity 0.8 exploratory benchmark for mixed treasury/admin vulnerabilities.",
     ),
     ContractEntry(
+        "VulnerableOverflow",
+        "smart-audt/contracts/VulnerableOverflow.sol",
+        EXPLORATORY,
+        "Exploratory positive case for integer-overflow/underflow inside unchecked blocks.",
+    ),
+    ContractEntry(
+        "VulnerableSuicidal",
+        "smart-audt/contracts/VulnerableSuicidal.sol",
+        EXPLORATORY,
+        "Exploratory positive case for selfdestruct without an access restriction.",
+    ),
+    ContractEntry(
         "DeFiVault_FIXED",
         "smart-audt/contracts/DeFiVault_FIXED.sol",
         MANUAL,

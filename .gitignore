@@ -31,3 +31,11 @@ agent_outputs/
 runs/
 .DS_Store
 smart-audt/certora-env/
+
+# ========================
+# ARTIGOS E CONTRATOS DE TERCEIROS (peso / licenca)
+# ========================
+# PDFs da ACM (~50MB, atras de paywall — nao redistribuir)
+docs/referencias/*.pdf
+# Projetos de auditoria de terceiros (~305MB com lib/ e node_modules)
+smart-audt/contracts/real/

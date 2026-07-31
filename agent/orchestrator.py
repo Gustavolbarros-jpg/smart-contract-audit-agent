@@ -37,6 +37,7 @@ from core.deterministic_spec import build_deterministic_spec
 from core.formal_candidate import build_formal_candidates
 from core.formal_plan import build_planner_input, build_spec_plan_input, sanitize_formal_plan
 from core.import_context import has_imports
+from core.perspectives import build_perspective_guidance
 from core.patch_guard import (
     analyze_patch,
     compact_patch_guard_report,
@@ -800,13 +801,25 @@ def executar_pipeline(contract_path: str, copy_final: bool = True):
 
     if deterministic_ids != ids_confirmadas:
         missing_ids = ids_confirmadas - deterministic_ids
+        # Only the findings the deterministic hints did not cover reach the LLM, so the
+        # perspectives are built for exactly those.
+        perspectivas = build_perspective_guidance(
+            [vuln for vuln in vulns_confirmadas_full if vuln["id"] in missing_ids]
+        )
+        save_text(run_dir / "diagnosis_t0_perspectives.txt", perspectivas)
+        diagnosis_input = (
+            f"LOG_RELEVANTE:\n{diagnosis_log}\n"
+            f"PLANO_FORMAL:\n{json.dumps(diagnosis_plan_compact, ensure_ascii=False)}\n"
+            f"VULNS_CONFIRMADAS:\n{json.dumps(vulns_confirmadas_compact, ensure_ascii=False)}\n"
+            f"CONTRATO_RESUMIDO:\n{diagnosis_contract}"
+        )
+        if perspectivas:
+            diagnosis_input = perspectivas + "\n\n" + diagnosis_input
+
         try:
             diagnostico_llm = chamar_ia_json(
                 sp.PROMPT_DIAGNOSTICO,
-                f"LOG_RELEVANTE:\n{diagnosis_log}\n"
-                f"PLANO_FORMAL:\n{json.dumps(diagnosis_plan_compact, ensure_ascii=False)}\n"
-                f"VULNS_CONFIRMADAS:\n{json.dumps(vulns_confirmadas_compact, ensure_ascii=False)}\n"
-                f"CONTRATO_RESUMIDO:\n{diagnosis_contract}",
+                diagnosis_input,
                 DiagnosticoFalhas,
                 max_tokens=1400,
             )
@@ -1040,12 +1053,16 @@ def executar_pipeline(contract_path: str, copy_final: bool = True):
         save_text(run_dir / f"diagnosis_t{tentativa}_contract_context.txt", diagnosis_fix_contract)
 
         history_text = _format_failure_history(failure_history)
+        perspectivas_fix = build_perspective_guidance(vulns_falhas_contexto)
+        save_text(run_dir / f"diagnosis_t{tentativa}_perspectives.txt", perspectivas_fix)
         diagnosis_fix_input = (
             f"LOG_RELEVANTE:\n{diagnosis_fix_log}\n"
             f"PLANO_FORMAL:\n{json.dumps(diagnosis_fix_plan, ensure_ascii=False)}\n"
             f"VULNS_CONFIRMADAS:\n{json.dumps(vulns_falhas_full)}\n"
             f"CONTRATO_RESUMIDO:\n{diagnosis_fix_contract}"
         )
+        if perspectivas_fix:
+            diagnosis_fix_input = perspectivas_fix + "\n\n" + diagnosis_fix_input
         if counterexample_text:
             diagnosis_fix_input = counterexample_text + "\n\n" + diagnosis_fix_input
         if history_text:
