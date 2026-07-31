@@ -140,6 +140,10 @@ def _recipient_from_transfer_line(line: str) -> str:
     return ""
 
 
+def _is_eth_recipient_param(param: dict) -> bool:
+    return param.get("type", "").strip() in {"address", "address payable"}
+
+
 def _find_arbitrary_send_fallbacks(source: str, start_index: int) -> list[dict]:
     findings = []
     idx = start_index
@@ -160,6 +164,7 @@ def _find_arbitrary_send_fallbacks(source: str, start_index: int) -> list[dict]:
                 "name": name,
                 "params": params,
                 "param_names": {param["name"] for param in params},
+                "params_by_name": {param["name"]: param for param in params},
                 "start_line": line_no,
             }
             depth = line.count("{") - line.count("}")
@@ -168,7 +173,11 @@ def _find_arbitrary_send_fallbacks(source: str, start_index: int) -> list[dict]:
             continue
 
         recipient = _recipient_from_transfer_line(line)
-        if recipient and recipient in current["param_names"]:
+        if (
+            recipient
+            and recipient in current["param_names"]
+            and _is_eth_recipient_param(current["params_by_name"].get(recipient, {}))
+        ):
             entry = get_catalog_entry("arbitrary-send-eth")
             param_types = ",".join(param["type"] for param in current["params"])
             signature = f"{current['name']}({param_types})"
@@ -342,6 +351,7 @@ def _success_var_checked(lines: list[str], start_index: int, success_var: str) -
         (re.compile(rf"\bif\s*\(\s*{escaped}\s*==\s*false\s*\)"), "if_false_success"),
         (re.compile(rf"\bif\s*\(\s*false\s*==\s*{escaped}\s*\)"), "if_false_success"),
         (re.compile(rf"\bif\s*\(\s*{escaped}\s*\)"), "if_success"),
+        (re.compile(rf"\breturn\s+{escaped}\s*;"), "return_success"),
     ]
     for offset, line in enumerate(lines[start_index:], start=start_index):
         if re.search(rf"\b{escaped}\s*=", line):
@@ -435,6 +445,87 @@ def _find_unchecked_lowlevel_fallbacks(source: str, start_index: int) -> list[di
             }
         )
         idx += 1
+
+    return findings
+
+
+def _is_selfdestruct_authorized(signature_tail: str, body: str) -> bool:
+    if re.search(r"\bonly(Owner|Admin|Gov|Governance|Operator|Guardian)\b", signature_tail):
+        return True
+    auth_names = "owner|admin|governor|governance|gov|operator|guardian"
+    return bool(
+        re.search(rf"\bmsg\.sender\s*==\s*({auth_names})\b", body)
+        or re.search(rf"\b({auth_names})\s*==\s*msg\.sender\b", body)
+    )
+
+
+def _find_selfdestruct_fallbacks(source: str, start_index: int) -> list[dict]:
+    findings = []
+    idx = start_index
+    lines = source.splitlines()
+    current = None
+    depth = 0
+    body_lines: list[str] = []
+
+    for line_no, line in enumerate(lines, start=1):
+        if current is None:
+            parsed = _parse_function_signature(line)
+            if not parsed:
+                continue
+            name, params = parsed
+            tail = line.split(")", 1)[-1]
+            if not re.search(r"\b(public|external)\b", tail):
+                continue
+            current = {
+                "name": name,
+                "params": params,
+                "signature_tail": tail,
+                "start_line": line_no,
+            }
+            depth = line.count("{") - line.count("}")
+            body_lines = [line]
+            if depth <= 0 and "{" not in line:
+                current = None
+                body_lines = []
+            continue
+
+        body_lines.append(line)
+        depth += line.count("{") - line.count("}")
+        if depth > 0:
+            continue
+
+        body = "\n".join(body_lines)
+        if "selfdestruct" in body and not _is_selfdestruct_authorized(current["signature_tail"], body):
+            entry = get_catalog_entry("suicidal")
+            param_types = ",".join(param["type"] for param in current["params"])
+            signature = f"{current['name']}({param_types})"
+            findings.append(
+                {
+                    "id": f"VULN_{idx:03d}",
+                    "type": "suicidal",
+                    "category": entry["category"],
+                    "description": f"{signature} reaches selfdestruct without an obvious msg.sender authorization guard.",
+                    "function": signature,
+                    "line": str(current["start_line"]),
+                    "impact": "high",
+                    "confidence": "medium",
+                    "elements": [
+                        {"name": current["name"], "type": "function", "line": str(current["start_line"])},
+                        {"name": "selfdestruct", "type": "node", "line": str(line_no)},
+                    ],
+                    "external_calls": ["selfdestruct"],
+                    "state_writes_after_calls": [],
+                    "target_parameter": "",
+                    "formalizable": entry["formalizable"],
+                    "propriedade_formal": entry["property"],
+                    "padrao_cvl": entry["cvl_pattern"],
+                    "repair_strategy": entry["repair_strategy"],
+                    "source": "manual_fallback",
+                }
+            )
+            idx += 1
+        current = None
+        body_lines = []
 
     return findings
 
@@ -809,7 +900,8 @@ def _fallback_findings(contract_path: str, existing_types: set[str], start_index
     if "tx.origin" in source and "tx-origin" not in existing_types:
         add("tx-origin", "modifier/function", "Contract source uses tx.origin.", "medium", "high")
     if "selfdestruct" in source and "suicidal" not in existing_types:
-        add("suicidal", "destroy", "Contract source uses selfdestruct.", "high", "high")
+        findings.extend(_find_selfdestruct_fallbacks(source, idx))
+        idx = start_index + len(findings)
     if ".transfer(" in source and "arbitrary-send-eth" not in existing_types:
         findings.extend(_find_arbitrary_send_fallbacks(source, idx))
         idx = start_index + len(findings)
