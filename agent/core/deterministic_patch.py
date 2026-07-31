@@ -5,6 +5,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from core.solidity_source import mask_comments_and_strings, matching_brace
+
 
 def apply_deterministic_patches(
     source: str,
@@ -54,13 +56,18 @@ def _variable_element_name(finding: dict[str, Any]) -> str:
 
 
 def _insert_zero_check(source: str, function_name: str, parameter: str, vuln_id: str) -> tuple[str, bool]:
-    match = re.search(rf"\bfunction\s+{re.escape(function_name)}\s*\([^)]*\)[^{{;]*{{", source, re.DOTALL)
+    # Located on masked source so a "function foo(" written in a comment cannot match
+    # and a brace inside a string literal cannot close the body early. A truncated body
+    # made an existing guard invisible and the patch inserted a duplicate require.
+    masked = mask_comments_and_strings(source)
+    match = re.search(rf"\bfunction\s+{re.escape(function_name)}\s*\([^)]*\)[^{{;]*{{", masked, re.DOTALL)
     if not match:
         return source, False
 
-    brace_index = source.find("{", match.end() - 1)
-    end_index = _matching_brace(source, brace_index)
-    body = source[brace_index:end_index + 1]
+    brace_index = masked.find("{", match.end() - 1)
+    end_index = matching_brace(masked, brace_index)
+    # Masked body as well, so a commented-out check does not count as present.
+    body = masked[brace_index:end_index + 1]
     escaped = re.escape(parameter)
     if re.search(rf"\b{escaped}\s*!=\s*address\s*\(\s*0\s*\)", body):
         return source, False
@@ -89,14 +96,3 @@ def _insert_zero_check(source: str, function_name: str, parameter: str, vuln_id:
     return source[:line_end] + insertion + source[line_end:], True
 
 
-def _matching_brace(source: str, open_index: int) -> int:
-    depth = 0
-    for index in range(open_index, len(source)):
-        char = source[index]
-        if char == "{":
-            depth += 1
-        elif char == "}":
-            depth -= 1
-            if depth == 0:
-                return index
-    return len(source) - 1
