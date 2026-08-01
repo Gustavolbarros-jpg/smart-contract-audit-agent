@@ -26,6 +26,14 @@ DETERMINISTIC_REPAIR_HINTS = {
         "motivo": "Low-level call return value is ignored.",
         "correcao": "Capture the success boolean from the low-level call and require(success, \"call failed\").",
     },
+    "unchecked-transfer": {
+        "motivo": "ERC20 transfer/transferFrom return value is ignored, so a token that signals failure by returning false is treated as success.",
+        "correcao": "Wrap the call in require(...), as in require(token.transfer(to, amount), \"transfer failed\"); keep the existing arguments unchanged.",
+    },
+    "unchecked-send": {
+        "motivo": "The boolean returned by send() is ignored, so a failed transfer goes unnoticed.",
+        "correcao": "Capture the boolean and require it, as in bool sent = to.send(amount); require(sent, \"send failed\");",
+    },
     "erc2771-multicall-context": {
         "motivo": "ERC2771 forwarded calls can reach delegatecall-based multicall and preserve spoofed calldata context.",
         "correcao": "Reject multicall when msg.sender is the trusted forwarder.",
