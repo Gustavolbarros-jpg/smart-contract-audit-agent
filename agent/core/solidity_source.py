@@ -10,6 +10,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from core import treesitter_source
+
 
 DEFINITION_RE = re.compile(
     r"\b(function\s+([A-Za-z_][A-Za-z0-9_]*)|modifier\s+([A-Za-z_][A-Za-z0-9_]*)"
@@ -141,10 +143,22 @@ def _enclosing_contract(masked_source: str, offset: int) -> str:
 def parse_definitions(source: str) -> list[Definition]:
     """Parse every definition that has a body, with 1-based line numbers.
 
-    Unlike a single regex over the whole header, the parameter list is matched by
-    balancing parentheses, so nested types (tuples, function types, arrays) do not
-    truncate the match. Declarations without a body (interfaces, ``abstract``) are
-    skipped since there is nothing to expand into.
+    Uses the tree-sitter backend when installed, since a real parse distinguishes
+    overloads and is unaffected by signature layout. Falls back to the regex scanner
+    below otherwise, so the dependency stays optional.
+    """
+    parsed = treesitter_source.parse_definitions(source)
+    if parsed is not None:
+        return [Definition(**item) for item in parsed]
+    return _parse_definitions_regex(source)
+
+
+def _parse_definitions_regex(source: str) -> list[Definition]:
+    """Regex fallback used when tree-sitter is unavailable.
+
+    The parameter list is matched by balancing parentheses, so nested types (tuples,
+    function types, arrays) do not truncate the match. Declarations without a body
+    (interfaces, ``abstract``) are skipped since there is nothing to expand into.
     """
     masked = mask_comments_and_strings(source)
     definitions: list[Definition] = []
