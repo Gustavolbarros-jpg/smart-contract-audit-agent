@@ -660,6 +660,80 @@ def _declared_vars(rule_lines: list[str]) -> set[str]:
     return declared
 
 
+def _safe_payload_var(used: set[str]) -> str:
+    if "payload" not in used:
+        used.add("payload")
+        return "payload"
+    suffix = 1
+    while f"payload{suffix}" in used:
+        suffix += 1
+    name = f"payload{suffix}"
+    used.add(name)
+    return name
+
+
+def substituir_hex_vazio_em_calls(spec_cvl: str) -> tuple[str, list[str]]:
+    """Replace invalid bare 0x call arguments with a declared bytes variable."""
+    linhas = spec_cvl.split('\n')
+    novas = []
+    correcoes = []
+    i = 0
+
+    while i < len(linhas):
+        linha = linhas[i]
+        rule_match = re.match(r"\s*rule\s+([A-Za-z_][A-Za-z0-9_]*)", linha)
+        if not rule_match:
+            novas.append(linha)
+            i += 1
+            continue
+
+        rule_name = rule_match.group(1)
+        block = [linha]
+        depth = linha.count('{') - linha.count('}')
+        j = i + 1
+        while j < len(linhas) and depth > 0:
+            block.append(linhas[j])
+            depth += linhas[j].count('{') - linhas[j].count('}')
+            j += 1
+
+        used = _declared_vars(block)
+        payload_var = ""
+        updated = []
+        changed = False
+        declaration_inserted = False
+
+        for line in block:
+            match = _call_match(line.strip())
+            if not match:
+                updated.append(line)
+                continue
+
+            args = [arg.strip() for arg in match.group(4).split(",")]
+            if "0x" not in args:
+                updated.append(line)
+                continue
+
+            if not payload_var:
+                payload_var = _safe_payload_var(used)
+            args = [payload_var if arg == "0x" else arg for arg in args]
+            if not declaration_inserted and payload_var not in _declared_vars(updated):
+                indent = match.group(1) or "  "
+                updated.append(f"{indent}bytes {payload_var};")
+                declaration_inserted = True
+            updated.append(
+                f"{match.group(1)}{match.group(2)}{match.group(3) or ''}"
+                f"({', '.join(args)});"
+            )
+            changed = True
+
+        if changed:
+            correcoes.append(f"Rule '{rule_name}': argumento bytes 0x substituido por variavel")
+        novas.extend(updated)
+        i = j
+
+    return '\n'.join(novas), correcoes
+
+
 def _zero_address_var(rule_lines: list[str]) -> str:
     for line in rule_lines:
         match = re.search(r"\brequire\s+([A-Za-z_][A-Za-z0-9_]*)\s*==\s*0\s*;", line)

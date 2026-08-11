@@ -280,6 +280,15 @@ TASK: Produce a precise structured diagnosis for each still-failing vulnerabilit
 You will receive LOG_RELEVANTE, PLANO_FORMAL, VULNS_CONFIRMADAS, and CONTRATO_RESUMIDO.
 Use only IDs present in VULNS_CONFIRMADAS. Never include already resolved, skipped, or absent IDs.
 
+An ANALYSIS_PERSPECTIVES section may precede them, listing per finding which aspects of
+the code to examine. Work through the listed perspectives for that finding before
+concluding, and ground the diagnosis in what they reveal. They direct the analysis; they
+do not restrict it — report a root cause you find outside them.
+
+CONTRATO_RESUMIDO may contain a CALL_CONTEXT section with the bodies of called functions
+and applied modifiers. A guard satisfying the property may live there rather than in the
+function that failed; check it before reporting a check as missing.
+
 For each failure identify:
 1. The failed CVL rule.
 2. The Solidity root cause.

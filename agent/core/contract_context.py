@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import re
 
+from core.call_expansion import build_call_context
+
 
 def _parse_line_range(value: str) -> tuple[int, int] | None:
     numbers = [int(match) for match in re.findall(r"\d+", value or "")]
@@ -35,6 +37,7 @@ def _extract_interface(source: str) -> dict:
     public_state = []
     functions = []
     modifiers = []
+    source = _primary_contract_source(source)
 
     for line in source.splitlines():
         stripped = line.strip()
@@ -65,6 +68,24 @@ def _extract_interface(source: str) -> dict:
     }
 
 
+def _primary_contract_source(source: str) -> str:
+    masked = _mask_comments_and_strings(source)
+    contract_name = extract_primary_contract_name(source)
+    if not contract_name:
+        return source
+
+    pattern = re.compile(rf"\b(?:abstract\s+)?contract\s+{re.escape(contract_name)}\b[^{{]*{{")
+    match = None
+    for candidate in pattern.finditer(masked):
+        match = candidate
+    if not match:
+        return source
+
+    brace = masked.find("{", match.end() - 1)
+    end = _matching_brace(masked, brace)
+    return source[match.start():end + 1]
+
+
 def _clean_type(value: str) -> str:
     value = value.strip()
     value = value.replace("address payable", "address")
@@ -78,6 +99,15 @@ def _is_cvl_primitive_type(value: str) -> bool:
         re.match(r"^(address|bool|string|bytes\d*|uint\d*|int\d*)$", value)
         or re.match(r"^bytes$", value)
     )
+
+
+def _type_for_cvl(value: str) -> str:
+    cleaned = _clean_type(value)
+    if _is_cvl_primitive_type(cleaned):
+        return cleaned
+    if re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", cleaned):
+        return "address"
+    return cleaned
 
 
 def _state_getter_signature(line: str) -> str | None:
@@ -110,7 +140,16 @@ def _state_getter_signature(line: str) -> str | None:
 def _split_params(params: str) -> list[str]:
     if not params.strip():
         return []
-    return [_clean_type(param) for param in params.split(",") if param.strip()]
+    normalized = []
+    for param in (item.strip() for item in params.split(",") if item.strip()):
+        cleaned = _clean_type(param)
+        parts = cleaned.split()
+        if len(parts) <= 1:
+            normalized.append(_type_for_cvl(cleaned))
+            continue
+        type_part = _type_for_cvl(" ".join(parts[:-1]))
+        normalized.append(f"{type_part} {parts[-1]}")
+    return normalized
 
 
 def _type_without_name(value: str) -> str:
@@ -120,13 +159,13 @@ def _type_without_name(value: str) -> str:
         return cleaned
 
     type_candidate = " ".join(parts[:-1])
-    if _is_cvl_primitive_type(type_candidate):
+    if _is_cvl_primitive_type(type_candidate) or re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", type_candidate):
         return type_candidate
     return cleaned
 
 
 def _split_return_types(returns: str) -> list[str]:
-    return [_type_without_name(item) for item in returns.split(",") if item.strip()]
+    return [_type_for_cvl(_type_without_name(item)) for item in returns.split(",") if item.strip()]
 
 
 def _function_method_signature(line: str) -> str | None:
@@ -365,8 +404,18 @@ def _token_ranges(source: str, tokens: list[str], radius: int) -> list[tuple[int
     return ranges
 
 
-def build_contract_brief(source: str, selected_vulnerabilities: list[dict], radius: int = 8) -> str:
-    """Return interface plus relevant numbered snippets instead of the full contract."""
+def build_contract_brief(
+    source: str,
+    selected_vulnerabilities: list[dict],
+    radius: int = 8,
+    include_call_context: bool = True,
+) -> str:
+    """Return interface, call-graph context and relevant numbered snippets.
+
+    The line window (``radius``) slices by proximity in the file; ``CALL_CONTEXT``
+    slices by proximity in the call graph, so a guard living in a callee or in an
+    applied modifier reaches the model even when it is far away in the source.
+    """
     lines = source.splitlines()
     interface = _extract_interface(source)
     ranges: list[tuple[int, int]] = []
@@ -388,17 +437,26 @@ def build_contract_brief(source: str, selected_vulnerabilities: list[dict], radi
     for start, end in _merge_ranges(ranges):
         snippets.append(_numbered_snippet(lines, start, end))
 
-    return "\n".join(
+    call_context = (
+        build_call_context(source, selected_vulnerabilities) if include_call_context else ""
+    )
+
+    sections = [
+        "CONTRACT_INTERFACE",
+        "public_state:",
+        "\n".join(f"- {item}" for item in interface["public_state"]) or "- none detected",
+        "functions:",
+        "\n".join(f"- {item}" for item in interface["functions"]) or "- none detected",
+        "modifiers:",
+        "\n".join(f"- {item}" for item in interface["modifiers"]) or "- none detected",
+        "",
+    ]
+    if call_context:
+        sections.extend([call_context, ""])
+    sections.extend(
         [
-            "CONTRACT_INTERFACE",
-            "public_state:",
-            "\n".join(f"- {item}" for item in interface["public_state"]) or "- none detected",
-            "functions:",
-            "\n".join(f"- {item}" for item in interface["functions"]) or "- none detected",
-            "modifiers:",
-            "\n".join(f"- {item}" for item in interface["modifiers"]) or "- none detected",
-            "",
             "RELEVANT_SNIPPETS",
             "\n\n".join(snippets) or "No line snippets available.",
         ]
     )
+    return "\n".join(sections)

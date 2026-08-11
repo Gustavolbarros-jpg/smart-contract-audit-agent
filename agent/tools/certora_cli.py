@@ -5,6 +5,8 @@ Ferramenta para executar a Verificação Formal via Certora Prover.
 import subprocess
 import os
 
+from core.import_context import packages_path, solc_remappings
+
 
 def run_certora(
     contract_path: str,
@@ -38,6 +40,11 @@ def run_certora(
         "--solc_allow_path", "..",
         "--msg", "Agent Verification"
     ]
+    package_dir = packages_path(contract_path)
+    if package_dir:
+        cmd.extend(["--packages_path", str(package_dir)])
+    for remap in solc_remappings(contract_path):
+        cmd.extend(["--packages", remap])
 
     try:
         print(f"🔬 [Certora] Iniciando Prover para {file_name} ({contract_name}) com {os.path.basename(spec_path)}...")
