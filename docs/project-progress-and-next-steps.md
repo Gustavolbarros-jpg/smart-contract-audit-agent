@@ -117,12 +117,62 @@ estado, funcoes auxiliares, strings, comentarios e invariantes locais.
 - `CrowdfundingVault` foi validado com 173 linhas.
 - Foi criado `EnterpriseTreasury300.sol` com 327 linhas para stress
   controlado.
-- No `EnterpriseTreasury300`, o pipeline chegou ate Certora e confirmou:
-  - 8 achados formais;
-  - 1 achado static-confirmed;
-  - 9 confirmacoes no total.
-- O bloqueio nesse contrato foi limite diario do Groq na etapa de diagnostico,
-  nao falha de Slither/Certora.
+- No `EnterpriseTreasury300`, o pipeline agora completou o ciclo inteiro:
+  - 26 achados Slither;
+  - 9 selecionados;
+  - 9 confirmados;
+  - 9 resolvidos apos patch/revalidacao.
+- Run aprovado: `runs/20260527_095632_EnterpriseTreasury300`.
+- Reteste documentado em
+  `docs/retests/enterprise-treasury300-retest-20260527.md`.
+
+### Contratos Reais
+
+- Solmate `WETH.sol` foi usado como teste real negativo:
+  - imports compilados com Slither;
+  - 0 candidatos acionaveis;
+  - pipeline parou sem LLM/Certora/patch;
+  - run: `runs/20260527_102842_WETH`.
+- Code4rena Forgotten Runes foi usado como teste real maior:
+  - alvo:
+    `smart-audt/contracts/real/runes/contracts/ForgottenRunesWarriorsMinter.sol`;
+  - run: `runs/20260527_105459_ForgottenRunesWarriorsMinter`;
+  - 71 achados Slither normalizados;
+  - 2 candidatos formalizados e confirmados pelo Certora;
+  - 2/2 resolvidos por patch deterministico minimo;
+  - `patch_guard`: 2 hunks, 0 erros, 0 avisos.
+- Code4rena Inverse `Market.sol` foi usado como teste real maior:
+  - alvo: `smart-audt/contracts/real/inverse/src/Market.sol`;
+  - tamanho: 621 linhas;
+  - run: `runs/20260528_093346_Market`;
+  - 63 achados Slither normalizados;
+  - 3 candidatos formalizados e confirmados pelo Certora;
+  - 3/3 resolvidos por spec, diagnostico e patch deterministicos;
+  - `patch_guard`: 3 hunks, 0 erros, 0 avisos.
+- Code4rena Escher `FixedPrice.sol` foi usado como triagem negativa de
+  `selfdestruct`:
+  - run corrigido: `runs/20260528_093456_FixedPrice`;
+  - resultado: 0 candidatos;
+  - evita criar finding falso `destroy` para `selfdestruct` interno.
+- Code4rena Caviar `PrivatePool.sol` foi usado como teste real na faixa
+  700-1200 linhas:
+  - alvo: `smart-audt/contracts/real/caviar/src/PrivatePool.sol`;
+  - tamanho: 794 linhas;
+  - run: `runs/20260528_101335_PrivatePool`;
+  - resultado: 0 candidatos acionaveis;
+  - validou compilacao de repo Foundry com `remappings.txt`.
+- Code4rena Astaria foi avaliado como candidato grande:
+  - `PublicVault.sol`: 725 linhas;
+  - `AstariaRouter.sol`: 803 linhas;
+  - `LienToken.sol`: 919 linhas;
+  - bloqueado porque `AstariaXYZ/astaria-gpl` nao clonou sem autenticacao.
+- Relatorios:
+  - `docs/retests/real-code-solmate-weth-20260527.md`;
+  - `docs/retests/real-code-forgotten-runes-20260527.md`;
+  - `docs/retests/real-code-inverse-market-20260528.md`;
+  - `docs/retests/real-code-escher-selfdestruct-triage-20260528.md`;
+  - `docs/retests/real-code-caviar-privatepool-20260528.md`;
+  - `docs/retests/real-code-astaria-dependency-blocker-20260528.md`.
 
 ### Economia De LLM
 
@@ -132,6 +182,13 @@ estado, funcoes auxiliares, strings, comentarios e invariantes locais.
 - O diagnostico de classes conhecidas agora e deterministico.
 - No `EnterpriseTreasury300`, isso cobre todos os 9 IDs confirmados e remove
   uma chamada LLM inteira.
+- No Forgotten Runes, `missing-zero-check` foi corrigido por patch
+  deterministico, evitando pedir para a LLM reescrever um contrato real grande.
+- No Inverse `Market.sol`, a spec CVL de `missing-zero-check` tambem foi gerada
+  deterministicamente, removendo uma chamada LLM de spec para esse padrao
+  mecanico.
+- O pipeline agora le `remappings.txt` de Foundry para resolver imports em
+  repos reais como Caviar.
 - A etapa de patch continua recebendo o contrato completo por seguranca.
 
 ## Validacoes Atuais
@@ -140,14 +197,14 @@ Comandos usados:
 
 ```bash
 python3 tests/test_certora_learning.py
-python3 -m py_compile agent/main.py agent/evaluate.py agent/orchestrator.py agent/core/*.py agent/tools/spec_validator.py agent/prompts/system_prompts.py agent/llm/client.py
+python3 -m py_compile agent/main.py agent/evaluate.py agent/orchestrator.py agent/core/*.py agent/tools/*.py agent/prompts/system_prompts.py agent/llm/client.py
 git diff --check
 ```
 
 Resultado atual esperado:
 
 ```text
-60 tests OK
+83 tests OK
 py_compile OK
 git diff --check OK
 ```
@@ -158,6 +215,8 @@ Snapshots importantes:
   - `docs/evaluations/evaluation-results-20260524_232506_044465.md`
 - Benchmark + exploratory:
   - `docs/evaluations/evaluation-results-20260525_004032_486537.md`
+- Benchmark + exploratory apos reteste do contrato maior:
+  - `docs/evaluations/evaluation-results-20260527_100012_638925.md`
 - Todos os contratos registrados:
   - `docs/evaluations/evaluation-results-20260525_004125_584645.md`
 
@@ -165,13 +224,17 @@ Snapshots importantes:
 
 ### Antes De Rodar Mais Contratos Reais
 
-- Reexecutar `EnterpriseTreasury300` depois do reset/renovacao do limite Groq.
-- Confirmar que a etapa pula o diagnostico LLM e vai direto para patch.
-- Verificar se o patch gerado no contrato de 327 linhas:
-  - compila;
-  - passa no patch guard;
-  - remove as confirmacoes do Certora/Slither;
-  - nao altera logica fora do escopo.
+- Corrigir os falsos warnings do patch guard observados no
+  `EnterpriseTreasury300`.
+- Associar achados `tx-origin` a linhas de modifier quando o check de auth fica
+  centralizado fora da funcao vulneravel.
+- Continuar restringindo `suicidal` a casos em que a propriedade seja realmente
+  autorizacao de `selfdestruct`; Escher mostrou que nem todo `selfdestruct`
+  real corresponde a essa classe.
+- Rodar `git diff --check` depois das atualizacoes finais.
+- Ja existem resultados reais positivos no Forgotten Runes e no Inverse
+  `Market.sol`; o proximo contrato real deve mirar outra classe vulneravel sem
+  especializar a regra para um contrato especifico.
 
 ### Patch E Minimalidade
 
@@ -198,10 +261,16 @@ Snapshots importantes:
 
 ### Proximos Experimentos
 
-- So depois de passar o contrato de 327 linhas ate patch/revalidacao, testar um
-  contrato existente de fora.
-- Comecar por um contrato real pequeno/medio e compilavel em Solidity 0.8.
-- Nao puxar um repo inteiro antes de resolver imports/remappings/dependencias.
+- Testar outro contrato real Solidity 0.8 com uma classe diferente de
+  `missing-zero-check`.
+- Revisar a classe `tx-origin`: Inverse `BorrowController.sol` mostrou que
+  `tx.origin` em funcao de politica/allowlist nao e a mesma coisa que
+  autorizacao `owner()` simples.
+- Priorizar classes que o Slither identifica com boa evidencia e que o Certora
+  consegue confirmar sem modelagem excessiva.
+- Evitar reentrancia por enquanto.
+- Continuar usando contratos reais pequenos/medios antes de subir para repos
+  inteiros.
 
 ## Decisao Atual
 

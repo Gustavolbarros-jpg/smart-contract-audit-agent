@@ -206,8 +206,7 @@ Current benchmark snapshot includes:
 - `CrowdfundingVault`: `4/4`
 - `DeFiVault`: `5/5`
 - `ERC2771MulticallVulnerable`: `1/1`
-- `EnterpriseTreasury300`: larger exploratory run reached Certora confirmation,
-  but stopped at LLM diagnosis because Groq hit the daily token limit.
+- `EnterpriseTreasury300`: `9/9` after the 2026-05-27 retest.
 
 Exploratory snapshot also includes:
 
@@ -218,6 +217,7 @@ Current snapshots:
 
 - Core benchmark: `docs/evaluations/evaluation-results-20260524_232506_044465.md`
 - Benchmark + exploratory: `docs/evaluations/evaluation-results-20260525_004032_486537.md`
+- Benchmark + exploratory latest retest: `docs/evaluations/evaluation-results-20260527_100012_638925.md`
 - All registered contracts: `docs/evaluations/evaluation-results-20260525_004125_584645.md`
 
 Recent Certora/spec lesson:
@@ -238,6 +238,9 @@ Recent Certora/spec lesson:
   - method return declarations must drop return variable names;
   - rule-local Solidity types such as `bytes calldata` and `address payable`
     must be normalized to CVL-compatible `bytes` and `address`.
+- The latest large-contract retest exposed one more CVL normalization rule:
+  bare `0x` is invalid as a `bytes` call argument and must become a declared
+  `bytes` variable.
 - Diagnosis prompts are now compacted for larger contracts by stripping large
   evidence blobs, irrelevant Certora success noise, and using tighter snippets.
 - Diagnosis for known repair classes is now deterministic. This avoids one LLM
@@ -248,13 +251,97 @@ Recent Certora/spec lesson:
 Latest large-contract exploratory validation:
 
 - `EnterpriseTreasury300.sol`: 327 lines.
-- Latest run: `runs/20260525_003334_EnterpriseTreasury300`.
+- Latest run: `runs/20260527_095632_EnterpriseTreasury300`.
 - Slither normalized 26 findings.
 - Certora confirmed 8 formal findings and Slither confirmed 1 static finding.
-- Current block: `llm_initial_diagnosis` due Groq daily token limit.
-- Offline validation after the latest code change shows deterministic diagnosis
-  covers all 9 confirmed IDs for this run; the next retry should skip the LLM
-  diagnosis call and proceed directly to patch generation.
+- Deterministic diagnosis covered all 9 confirmed IDs, skipping the LLM
+  diagnosis call.
+- The first LLM patch was blocked by `patch_guard`; the minimal retry passed
+  with 2 warnings and 0 errors.
+- Final comparison resolved 9/9 with no persistent or inconclusive failures.
+- Retest doc: `docs/retests/enterprise-treasury300-retest-20260527.md`.
+
+Latest real-code validation:
+
+- Downloaded Solmate `WETH.sol` plus `ERC20.sol` and `SafeTransferLib.sol`
+  into `smart-audt/contracts/real/solmate/src`.
+- Latest run: `runs/20260527_102842_WETH`.
+- Result: `no_actionable_candidates`.
+- The pipeline compiled the real imported code through Slither, normalized to
+  zero actionable findings, and did not call LLM/Certora or generate a patch.
+- Retest doc: `docs/retests/real-code-solmate-weth-20260527.md`.
+
+Latest larger real-code validation:
+
+- Downloaded Code4rena Forgotten Runes source into
+  `smart-audt/contracts/real/runes`.
+- Target:
+  `smart-audt/contracts/real/runes/contracts/ForgottenRunesWarriorsMinter.sol`.
+- Latest run: `runs/20260527_105459_ForgottenRunesWarriorsMinter`.
+- Slither normalized 71 findings.
+- Certora confirmed 2 findings:
+  - `VULN_015`: `missing-zero-check` in `setVaultAddress(address)`;
+  - `VULN_016`: `missing-zero-check` in `setWethAddress(address)`.
+- Deterministic patch inserted only the two missing zero-address checks.
+- Patch guard approved 2 hunks with 0 errors and 0 warnings.
+- Final comparison resolved 2/2 in the first validation attempt.
+- Retest doc: `docs/retests/real-code-forgotten-runes-20260527.md`.
+
+Latest largest real-code validation:
+
+- Downloaded Code4rena Inverse source into
+  `smart-audt/contracts/real/inverse`.
+- Target: `smart-audt/contracts/real/inverse/src/Market.sol`.
+- Size: 621 lines.
+- Latest run: `runs/20260528_093346_Market`.
+- Slither normalized 63 findings.
+- The formal filter selected 3 `missing-zero-check` candidates.
+- CVL spec generation was deterministic for this mechanical pattern, skipping
+  the LLM spec call.
+- Certora confirmed 3 findings:
+  - `VULN_020`: `setPauseGuardian(address)`;
+  - `VULN_023`: `setGov(address)`;
+  - `VULN_026`: `setLender(address)`.
+- Deterministic patch expanded one-line functions and inserted only the three
+  missing zero-address checks.
+- Patch guard approved 3 hunks with 0 errors and 0 warnings.
+- Final comparison resolved 3/3 in the first validation attempt.
+- Retest doc: `docs/retests/real-code-inverse-market-20260528.md`.
+
+Latest real-code negative triage:
+
+- Downloaded Code4rena Escher source into
+  `smart-audt/contracts/real/escher`.
+- Target: `smart-audt/contracts/real/escher/src/minters/FixedPrice.sol`.
+- Latest run after normalizer fix: `runs/20260528_093456_FixedPrice`.
+- Result: 0 findings, 0 formal candidates, 0 static-confirmed.
+- This prevents an internal `selfdestruct` from being converted into a fake
+  `destroy` authorization finding.
+- Triage doc: `docs/retests/real-code-escher-selfdestruct-triage-20260528.md`.
+
+Latest 700-1200 line real-code validation:
+
+- Downloaded Code4rena Caviar source into
+  `smart-audt/contracts/real/caviar`.
+- Target: `smart-audt/contracts/real/caviar/src/PrivatePool.sol`.
+- Size: 794 lines.
+- Latest run: `runs/20260528_101335_PrivatePool`.
+- Result: 0 normalized actionable findings, 0 formal candidates,
+  0 static-confirmed.
+- The pipeline compiled a real Foundry repo using `remappings.txt` and stopped
+  before LLM/Certora/patch.
+- Retest doc: `docs/retests/real-code-caviar-privatepool-20260528.md`.
+
+Latest blocked large-code candidate:
+
+- Downloaded Code4rena Astaria source into
+  `smart-audt/contracts/real/astaria`.
+- Good size candidates exist:
+  `PublicVault.sol` 725 lines, `AstariaRouter.sol` 803 lines,
+  `LienToken.sol` 919 lines.
+- Blocker: required submodule `AstariaXYZ/astaria-gpl` could not be cloned
+  without authentication in this environment.
+- Blocker doc: `docs/retests/real-code-astaria-dependency-blocker-20260528.md`.
 
 Latest all-contract validation:
 
@@ -279,7 +366,7 @@ python3 tests/test_certora_learning.py
 
 Latest result:
 
-- `60 tests OK`
+- `83 tests OK`
 
 Also run when editing:
 
@@ -302,6 +389,9 @@ git diff --check
 - `agent/core/formal_plan.py`: formal plan sanitization.
 - `agent/core/spec_patterns.py`: general CVL examples.
 - `agent/core/contract_context.py`: deterministic contract interface summary and methods block.
+- `agent/core/import_context.py`: Solidity remapping/packages discovery.
+- `agent/core/deterministic_patch.py`: deterministic patches for mechanical repair classes.
+- `agent/core/deterministic_spec.py`: deterministic CVL for mechanical property classes.
 - `agent/tools/spec_validator.py`: deterministic CVL repair.
 - `agent/evaluate.py`: creates evaluation snapshot reports from the registry-backed default suite.
 - `tests/test_certora_learning.py`: regression tests for the pipeline rules.
