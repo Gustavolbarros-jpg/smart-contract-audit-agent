@@ -21,9 +21,19 @@ def _slug(value: str) -> str:
 def create_run_dir(contract_path: str, root: str = "../runs") -> Path:
     contract_name = Path(contract_path).stem
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    run_dir = Path(root) / f"{timestamp}_{_slug(contract_name)}"
-    run_dir.mkdir(parents=True, exist_ok=False)
-    return run_dir
+    base_name = f"{timestamp}_{_slug(contract_name)}"
+
+    # Second-granularity timestamps collide when two pipeline runs start in the same
+    # second (e.g. a mutant sweep where each failure moves to the next mutant almost
+    # instantly). Fall back to a numeric suffix instead of crashing on FileExistsError.
+    suffix = 0
+    while True:
+        candidate = Path(root) / (base_name if suffix == 0 else f"{base_name}_{suffix + 1}")
+        try:
+            candidate.mkdir(parents=True, exist_ok=False)
+            return candidate
+        except FileExistsError:
+            suffix += 1
 
 
 def save_json(path: Path, data) -> None:

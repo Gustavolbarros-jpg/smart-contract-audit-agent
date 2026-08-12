@@ -123,14 +123,28 @@ def classify_fix(
     snippet: str,
     library_entries: list[dict],
     adapted_threshold: float = 0.9,
+    vuln_type: str = "",
 ) -> Verdict:
     """Compare a produced fix against stored fixes.
 
     ``library_entries`` are ``fix_library`` patterns; only ``fix_snippet`` and
     ``vuln_type`` are read, so a raw list of library dicts can be passed directly.
+
+    ``vuln_type``, when given, restricts comparison to entries of that same class —
+    matching how the pipeline itself retrieves few-shot examples (exact ``vuln_type``
+    match in ``fix_library.get_examples_for_prompt``). Without it, a structurally
+    generic guard (e.g. a single ``require(a == b, "msg")``) can score high against
+    an unrelated class purely because most one-line require guards share a shape;
+    that reads as "adapted" when the class itself has no stored fix at all, which is
+    exactly the novel case this module exists to surface. Omit it only to preserve
+    the previous type-blind behavior (existing tests rely on this default).
     """
     if not snippet.strip():
         return Verdict(NOVEL, 0.0)
+
+    entries = library_entries
+    if vuln_type:
+        entries = [e for e in library_entries if str(e.get("vuln_type") or "") == vuln_type]
 
     normalized = normalize_snippet(snippet)
     form = structural_form(snippet)
@@ -139,7 +153,7 @@ def classify_fix(
     best_snippet = ""
     best_type = ""
 
-    for entry in library_entries:
+    for entry in entries:
         stored = str(entry.get("fix_snippet") or "")
         if not stored.strip():
             continue

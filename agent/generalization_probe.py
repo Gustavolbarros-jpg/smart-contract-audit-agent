@@ -32,7 +32,9 @@ AGENT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = AGENT_DIR.parent
 sys.path.insert(0, str(AGENT_DIR))
 
+from core.contract_context import extract_primary_contract_name
 from core.generalization import classify_fix, report
+from core.import_context import has_imports
 from core.mutation import OPERATORS, mutate, summarize
 
 
@@ -41,6 +43,21 @@ def _library_patterns() -> list[dict]:
     if not path.is_file():
         return []
     return json.loads(path.read_text(encoding="utf-8")).get("patterns", [])
+
+
+def _expected_fix_path(mutant_source: str, target: Path) -> Path:
+    """Where executar_pipeline(..., copy_final=False) actually writes a success.
+
+    Mirrors orchestrator.py's own caminho_fix_temp choice: with imports, next to the
+    mutant file; without, under agent_outputs/ (relative to cwd, same as the pipeline
+    itself resolves it). The probe's target file is never touched under
+    copy_final=False, so reading it back for a diff — the previous approach — silently
+    misreports every success as "no patch produced".
+    """
+    primary_name = extract_primary_contract_name(mutant_source, target.stem) or target.stem
+    if has_imports(mutant_source):
+        return target.parent / f"{primary_name}_AGENT_FIXED.sol"
+    return Path("agent_outputs") / f"{primary_name}_FIXED.sol"
 
 
 def _extract_fix_lines(original: str, fixed: str) -> str:
@@ -72,11 +89,18 @@ def run_probe(contract: Path, operators: tuple[str, ...], limit: int, dry_run: b
     verdicts = []
     repaired = failed = 0
 
+    probe_tmp_root = REPO_ROOT / "runs" / "_probe_tmp"
+    probe_tmp_root.mkdir(parents=True, exist_ok=True)
+
     for index, mutation in enumerate(mutations, start=1):
         print(f"\n=== [{index}/{len(mutations)}] {mutation.label}: {mutation.description}")
-        with tempfile.TemporaryDirectory() as workdir:
+        with tempfile.TemporaryDirectory(dir=probe_tmp_root) as workdir:
             target = Path(workdir) / contract.name
             target.write_text(mutation.source, encoding="utf-8")
+
+            fix_path = _expected_fix_path(mutation.source, target)
+            fix_path.unlink(missing_ok=True)  # drop a previous mutant's leftover before running
+
             try:
                 executar_pipeline(str(target), copy_final=False)
             except Exception as exc:  # a failing mutant is data, not a crash
@@ -84,15 +108,18 @@ def run_probe(contract: Path, operators: tuple[str, ...], limit: int, dry_run: b
                 print(f"    pipeline falhou: {type(exc).__name__}: {str(exc)[:160]}")
                 continue
 
-            produced = target.read_text(encoding="utf-8")
+            if not fix_path.is_file():
+                failed += 1
+                print("    nenhum patch produzido")
+                continue
 
-        if produced == mutation.source:
-            failed += 1
-            print("    nenhum patch produzido")
-            continue
+            produced = fix_path.read_text(encoding="utf-8")
+            fix_path.unlink()
 
         repaired += 1
-        verdict = classify_fix(_extract_fix_lines(mutation.source, produced), library)
+        verdict = classify_fix(
+            _extract_fix_lines(mutation.source, produced), library, vuln_type=mutation.expected_class
+        )
         verdicts.append(verdict)
         print(f"    corrigido -> {verdict.kind} (sim={verdict.similarity})")
 

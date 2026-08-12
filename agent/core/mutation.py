@@ -62,7 +62,18 @@ _VISIBILITY_SWAPS = (
     ("private", "public", "private function became publicly callable"),
 )
 
-OPERATORS = ("AOR", "BOR", "UOR", "EED", "MD", "PKR", "FVR")
+OPERATORS = ("AOR", "BOR", "UOR", "EED", "MD", "PKR", "FVR", "FXR")
+
+# Lines tagged "// FIX" mark a guard the pipeline itself installed to close one of
+# the six classes vulnerability_catalog.py marks formalizable=True. mutate_fxr below
+# reverts exactly those guards, unlike the other operators which are blind syntactic
+# mutations and, on this benchmark, never land inside a formalizable class: Slither's
+# detectors are pattern-based, not diff-based, so flipping an unrelated operator or
+# dropping an event does not itself produce a tx-origin/zero-check/arbitrary-send
+# finding for build_formal_candidates to hand the LLM planner.
+_FIX_TX_ORIGIN = re.compile(r"require\(\s*msg\.sender\s*==\s*owner")
+_FIX_ZERO_CHECK = re.compile(r"require\(\s*\S+\s*!=\s*address\(0\)")
+_FIX_RECIPIENT_RESTRICTION = re.compile(r"require\(\s*to\s*==\s*owner")
 
 
 def _line_of(source: str, offset: int) -> int:
@@ -294,6 +305,63 @@ def mutate_fvr(source: str, limit: int = 3) -> list[Mutation]:
     return mutations
 
 
+def mutate_fxr(source: str, limit: int = 3) -> list[Mutation]:
+    """Fix Reversion — undoes a guard tagged ``// FIX``, restoring a formalizable defect.
+
+    Targets exactly the three catalog classes this benchmark's ``// FIX`` comments mark:
+    tx-origin (``msg.sender`` reverted to ``tx.origin`` in an owner check),
+    missing-zero-check and arbitrary-send-eth (the guarding ``require`` deleted outright).
+    """
+    mutations: list[Mutation] = []
+    offset = 0
+
+    for line in source.splitlines(keepends=True):
+        if len(mutations) >= limit:
+            break
+        if "// FIX" not in line:
+            offset += len(line)
+            continue
+
+        tx_origin_match = _FIX_TX_ORIGIN.search(line)
+        if tx_origin_match:
+            token_pos = offset + line.index("msg.sender", tx_origin_match.start())
+            mutated_source = _replace_at(source, token_pos, token_pos + len("msg.sender"), "tx.origin")
+            mutations.append(
+                Mutation(
+                    operator="FXR",
+                    description="msg.sender reverted to tx.origin in an owner check",
+                    line=_line_of(source, token_pos),
+                    original=_line_text(source, token_pos),
+                    mutated=_line_text(mutated_source, token_pos),
+                    expected_class="tx-origin",
+                    source=mutated_source,
+                )
+            )
+            offset += len(line)
+            continue
+
+        zero_check_match = _FIX_ZERO_CHECK.search(line)
+        recipient_match = _FIX_RECIPIENT_RESTRICTION.search(line)
+        if zero_check_match or recipient_match:
+            expected_class = "missing-zero-check" if zero_check_match else "arbitrary-send-eth"
+            mutated_source = _replace_at(source, offset, offset + len(line), "")
+            mutations.append(
+                Mutation(
+                    operator="FXR",
+                    description=f"removed a previously-installed guard ({expected_class})",
+                    line=_line_of(source, offset),
+                    original=line.strip(),
+                    mutated="",
+                    expected_class=expected_class,
+                    source=mutated_source,
+                )
+            )
+
+        offset += len(line)
+
+    return mutations
+
+
 _OPERATOR_FUNCTIONS = {
     "AOR": mutate_aor,
     "BOR": mutate_bor,
@@ -302,6 +370,7 @@ _OPERATOR_FUNCTIONS = {
     "MD": mutate_md,
     "PKR": mutate_pkr,
     "FVR": mutate_fvr,
+    "FXR": mutate_fxr,
 }
 
 
