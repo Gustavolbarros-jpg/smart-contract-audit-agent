@@ -137,6 +137,16 @@ def _recipient_from_transfer_line(line: str) -> str:
     if call_match:
         return call_match.group(1)
 
+    # A parameter already typed `address payable` is called directly, with no
+    # payable(...) wrapper — e.g. `to.call{value: amount}("")`. At least as common as
+    # the wrapped form above when the recipient comes straight from a function param.
+    bare_call_match = re.search(
+        r"\b([A-Za-z_][A-Za-z0-9_]*)\s*\.\s*call\s*\{\s*value\s*:",
+        stripped,
+    )
+    if bare_call_match:
+        return bare_call_match.group(1)
+
     return ""
 
 
@@ -902,7 +912,8 @@ def _fallback_findings(contract_path: str, existing_types: set[str], start_index
     if "selfdestruct" in source and "suicidal" not in existing_types:
         findings.extend(_find_selfdestruct_fallbacks(source, idx))
         idx = start_index + len(findings)
-    if ".transfer(" in source and "arbitrary-send-eth" not in existing_types:
+    sends_eth = ".transfer(" in source or ".send(" in source or ".call{value" in source
+    if sends_eth and "arbitrary-send-eth" not in existing_types:
         findings.extend(_find_arbitrary_send_fallbacks(source, idx))
         idx = start_index + len(findings)
     if "unchecked-lowlevel" not in existing_types:

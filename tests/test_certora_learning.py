@@ -529,10 +529,13 @@ contract T {
         finally:
             Path(path).unlink(missing_ok=True)
 
-        self.assertEqual(len(report["vulnerabilidades"]), 1)
-        finding = report["vulnerabilidades"][0]
-        self.assertEqual(finding["type"], "low-level-calls")
-        self.assertTrue(finding["low_level_call_context"]["checked_return"])
+        # `refund` sends to a caller-supplied `to` with no access-control modifier at
+        # all, so besides the checked low-level call itself, this is also a genuine
+        # arbitrary-send-eth: any caller can drain the contract to any address.
+        self.assertEqual(len(report["vulnerabilidades"]), 2)
+        by_type = {v["type"]: v for v in report["vulnerabilidades"]}
+        self.assertEqual(set(by_type), {"low-level-calls", "arbitrary-send-eth"})
+        self.assertTrue(by_type["low-level-calls"]["low_level_call_context"]["checked_return"])
         self.assertEqual(static_confirmed_findings(report), [])
 
     def test_low_level_calls_with_if_not_success_stays_non_actionable(self):
