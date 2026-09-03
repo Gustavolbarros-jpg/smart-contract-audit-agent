@@ -89,7 +89,43 @@ def render_frame(scrollback: list, font_r, font_b, path: str) -> None:
     img.save(path)
 
 
-def build_video(run_dir: str, speed: float, out_path: str, fps: int) -> None:
+def render_title_card(lines: list, path: str) -> None:
+    """Card de abertura, mesma moldura de terminal, texto centralizado."""
+    font_title = ImageFont.truetype(FONT_BOLD, 30)
+    font_sub = ImageFont.truetype(FONT_REGULAR, 19)
+
+    img = Image.new("RGB", (WIDTH, HEIGHT), BG)
+    draw = ImageDraw.Draw(img)
+
+    draw.rectangle([0, 0, WIDTH, TOP_BAR], fill=BAR_BG)
+    for i, color in enumerate(DOT_COLORS):
+        cx = 24 + i * 22
+        draw.ellipse([cx - 6, TOP_BAR // 2 - 6, cx + 6, TOP_BAR // 2 + 6], fill=color)
+    draw.text((WIDTH // 2, TOP_BAR // 2), "demo_replay_defivault.py",
+               font=font_sub, fill=TITLE_COLOR, anchor="mm")
+
+    block = []
+    for text, style, big in lines:
+        color, _bold = rc.STYLES[style]
+        font = font_title if big else font_sub
+        block.append((text, color, font))
+
+    gaps = [10 if not big else 22 for (_, _, big) in lines]
+    heights = [draw.textbbox((0, 0), t, font=f)[3] for t, _, f in block]
+    total_h = sum(heights) + sum(gaps[1:]) if len(block) > 1 else (heights[0] if heights else 0)
+
+    y = (HEIGHT + TOP_BAR - total_h) // 2
+    for idx, (text, color, font) in enumerate(block):
+        if idx > 0:
+            y += gaps[idx]
+        draw.text((WIDTH // 2, y), text, font=font, fill=color, anchor="ma")
+        y += heights[idx]
+
+    img.save(path)
+
+
+def build_video(run_dir: str, speed: float, out_path: str, fps: int,
+                 intro_seconds: float) -> None:
     events = rc.build_events(run_dir)
     font_r = ImageFont.truetype(FONT_REGULAR, FONT_SIZE)
     font_b = ImageFont.truetype(FONT_BOLD, FONT_SIZE)
@@ -101,6 +137,23 @@ def build_video(run_dir: str, speed: float, out_path: str, fps: int) -> None:
     try:
         with open(concat_path, "w", encoding="utf-8") as concat_f:
             last_frame_path = None
+
+            if intro_seconds > 0:
+                intro_path = os.path.join(workdir, "frame_intro.png")
+                render_title_card(
+                    [
+                        ("Segurança de Contratos Inteligentes", "header", True),
+                        ("IA + Verificação Formal — Auditoria e Correção Automática", "dim", False),
+                        ("", "dim", False),
+                        ("Gustavo Ferreira Leite de Barros", "default", False),
+                        ("Centro de Informática — UFPE", "dim", False),
+                    ],
+                    intro_path,
+                )
+                concat_f.write(f"file '{intro_path}'\n")
+                concat_f.write(f"duration {intro_seconds / speed:.3f}\n")
+                last_frame_path = intro_path
+
             for i, event in enumerate(events):
                 scrollback.extend(event.lines)
                 frame_path = os.path.join(workdir, f"frame_{i:03d}.png")
@@ -120,6 +173,7 @@ def build_video(run_dir: str, speed: float, out_path: str, fps: int) -> None:
                 "-f", "concat", "-safe", "0", "-i", concat_path,
                 "-vf", f"fps={fps},format=yuv420p",
                 "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+                "-profile:v", "baseline", "-level", "3.0",
                 out_path,
             ],
             check=True,
@@ -140,10 +194,13 @@ def main() -> None:
                                                "apresentacao-2min-tela.mp4"))
     parser.add_argument("--fps", type=int, default=8,
                          help="fps do video de saida (o conteudo e mudanca de tela, nao precisa de mais)")
+    parser.add_argument("--intro-seconds", type=float, default=20.0,
+                         help="duracao do card de abertura (nome/tema), 0 para pular")
     args = parser.parse_args()
     if args.speed <= 0:
         parser.error("--speed precisa ser > 0")
-    build_video(os.path.abspath(args.run_dir), args.speed, args.output, args.fps)
+    build_video(os.path.abspath(args.run_dir), args.speed, args.output, args.fps,
+                args.intro_seconds)
 
 
 if __name__ == "__main__":

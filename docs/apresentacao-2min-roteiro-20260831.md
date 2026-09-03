@@ -1,108 +1,98 @@
 # Roteiro — Apresentação de 2 minutos + demo
 
-Data: 2026-08-31
-Slides: `docs/apresentacao-2min-slides.pdf` (gerado por `docs/gerar_slides_apresentacao.py`)
+Data: 2026-09-03
+
+O vídeo final é `docs/apresentacao-2min-tela.mp4` (108.5s, **mudo**): 20s de
+card de abertura (nome/tema) + 88.5s do pipeline rodando no `DeFiVault.sol`.
+Gerado por `python3 docs/gerar_video_demo.py` a partir de dados reais de uma
+run salva — não é gravação de tela, é renderizado quadro a quadro
+(`docs/_replay_content.py`).
+
+**Como gravar sua narração:** toque o vídeo e fale em cima dele, seguindo os
+tempos abaixo (são o instante em que cada trecho aparece na tela — fale um
+pouco antes ou durante, não precisa ser cirúrgico). Grave num único take
+contínuo do início ao fim do vídeo.
 
 ---
 
-## Parte 1 — Fala (≈ 2 min, ritmo de ~160 palavras/min)
+## Parte 1 — O que falar, timestamp por timestamp
 
-Marcações de tempo são um guia para não perder o ritmo, não para decorar.
-Troque de slide no colchete `[slide N]`.
+**[0:00 – 0:20] card de abertura (nome/tema na tela)**
 
-**[0:00] [slide 1 — título]**
+> Olá! Meu nome é Gustavo Ferreira Leite de Barros, sou estudante do Centro
+> de Informática da Universidade Federal de Pernambuco. Minha pesquisa
+> investiga como tornar contratos inteligentes mais seguros combinando
+> inteligência artificial e verificação formal. Em vez de só explicar, vou
+> mostrar a ferramenta rodando de verdade em um contrato real.
 
-> Olá! Meu nome é Gustavo Ferreira Leite de Barros, sou estudante do Centro de
-> Informática da Universidade Federal de Pernambuco, e esta pesquisa investiga
-> como tornar contratos inteligentes mais seguros utilizando inteligência
-> artificial e verificação formal.
+**[0:21] Slither analisando o DeFiVault.sol**
 
-**[0:15] [slide 2 — o problema]**
+> Primeiro, o Slither examina o contrato inteiro e aponta os pontos
+> suspeitos: controle de acesso, endereços não validados, chamadas externas
+> arriscadas.
 
-> Contratos inteligentes são programas executados em uma blockchain. Eles
-> permitem automatizar transferências financeiras e outros serviços digitais
-> sem depender de uma instituição intermediária. Porém, uma falha em seu
-> código pode ser explorada, provocando ataques e prejuízos financeiros.
+**[0:30] Seleção dos candidatos formalizáveis**
 
-**[0:30]**
+> Nem todo achado vira correção. Só os que dá pra provar matematicamente
+> passam pra próxima etapa — cinco, neste contrato.
 
-> Outro desafio é o gás, que representa o custo de execução das operações na
-> blockchain. Desenvolvedores procuram otimizar seus contratos para reduzir
-> esse custo, mas uma alteração no código pode modificar o comportamento
-> original ou introduzir novas vulnerabilidades.
+**[0:39] Geração da especificação CVL**
 
-**[0:45] [slide 3 — a pipeline]**
+> Essas cinco propriedades viram uma especificação formal, na linguagem CVL,
+> que o Certora Prover consegue verificar.
 
-> Para enfrentar esse problema, desenvolvemos uma pipeline automática de
-> análise e correção.
+**[0:48 – 0:51] Certora entra no contrato original**
 
-**[0:50] [slide 4 — detecção]**
+> Agora o Certora Prover analisa o contrato original.
 
-> Primeiro, utilizamos o Slither para examinar o código e detectar possíveis
-> vulnerabilidades. Depois, um modelo de inteligência artificial interpreta os
-> resultados, identifica os problemas relevantes e auxilia na criação de
-> propriedades de segurança.
+**[0:51 – 1:04] As 5 propriedades violadas (FAIL, em vermelho)**
 
-**[1:00] [slide 5 — verificação formal]**
+> E aqui está: as cinco propriedades realmente falham. Não é suposição — é
+> prova matemática de que o contrato tem essas brechas.
 
-> Essas propriedades são analisadas pelo Certora Prover, uma ferramenta de
-> verificação formal. Diferentemente de testes tradicionais, que avaliam
-> apenas alguns exemplos, a verificação formal procura analisar
-> matematicamente os possíveis comportamentos do contrato.
+**[1:04 – 1:18] Diagnóstico linha a linha (LLM)**
 
-**[1:15]**
+> Com a violação confirmada, a IA entra: lê a causa raiz de cada uma e
+> propõe a correção exata — trocar `tx.origin` por `msg.sender`, validar
+> endereço zero, e assim por diante.
 
-> Quando uma propriedade é violada, a ferramenta apresenta um contraexemplo.
-> Com essa informação, a inteligência artificial diagnostica a causa da falha
-> e produz uma versão corrigida do código.
+**[1:18 – 1:27] patch_guard validando o escopo do patch**
 
-**[1:25] [slide 6 — ciclo de correção]**
+> Antes de aceitar, um guardrail confere se o patch mexeu só no necessário.
+> Nada de reescrever o contrato inteiro.
 
-> A correção não é aceita imediatamente. O novo contrato passa novamente
-> pelas ferramentas de análise e verificação. Se o problema permanecer, o
-> sistema realiza outra tentativa, formando um ciclo automático de correção e
-> validação.
+**[1:27 – 1:30] Certora revalida o contrato corrigido**
 
-**[1:35] [slide 7 — estudo de caso]**
+> O contrato corrigido volta pro Certora.
 
-> Como estudo de caso, utilizamos o DeFiVault, um contrato que simula um
-> cofre de finanças descentralizadas. A pipeline identificou e corrigiu
-> problemas de controle de acesso, endereços inválidos, transferências
-> inseguras e risco de reentrância.
+**[1:30 – 1:40] As 5 propriedades verificadas (VERIFIED, em verde)**
 
-**[1:50] [slide 8 — resultado / slide 9 — fechamento]**
+> Dessa vez, as cinco propriedades passam. Verificadas matematicamente, não
+> só testadas.
 
-> O diferencial da pesquisa é combinar a capacidade de geração da
-> inteligência artificial com as evidências da verificação formal, buscando
-> tornar a auditoria de contratos inteligentes mais automática, segura e
-> confiável.
+**[1:40 – 1:48] resultado final**
 
-**[2:00]**
-
-> Obrigado!
+> Cinco de cinco corrigidas, em uma única iteração. Essa é a ferramenta: ela
+> gera a correção **e** prova que funciona. Obrigado!
 
 ---
 
-## Parte 2 — Contrato "rodando" em paralelo, enquanto você fala
+## Parte 2 — Gravar e juntar
 
-### Opção A — gravar um vídeo final (voz + tela juntas)
-
-`docs/apresentacao-2min-tela.mp4` já vem pronto: 88.5s, sem áudio, mostrando
-uma execução **real e já validada** do pipeline sobre o `DeFiVault.sol` (run
-`20260524_232148_DeFiVault`, 5/5 vulnerabilidades corrigidas em 1 iteração) —
-Slither encontrando os achados, seleção dos candidatos formalizáveis, geração
-da spec CVL, o Certora **violando** as 5 propriedades no original, o
-diagnóstico linha a linha, o `patch_guard` validando o patch, e o Certora
-**verificando** tudo no contrato corrigido. Foi renderizado quadro a quadro a
-partir dos dados reais (`docs/_replay_content.py`), não é uma captura de
-tela — por isso não depende do seu desktop nem de rede/LLM/Certora ao vivo.
+`docs/apresentacao-2min-tela.mp4` já vem pronto: **108.5s, sem áudio**
+(20s de abertura com nome/tema + 88.5s do pipeline rodando no
+`DeFiVault.sol`, run `20260524_232148_DeFiVault`, 5/5 vulnerabilidades
+corrigidas em 1 iteração). Renderizado quadro a quadro a partir de dados
+reais (`docs/_replay_content.py`), não é captura de tela — não depende do
+seu desktop nem de rede/LLM/Certora ao vivo.
 
 Passos:
 
-1. Regrave sua narração separada (celular, app de voz) assistindo o vídeo
-   tocando, seguindo a [Parte 1](#parte-1--fala-2-min-ritmo-de-160-palavrasmin)
-   ou a cola solta em `docs/apresentacao-2min-cola.md`.
-2. Me manda o caminho do arquivo de áudio.
+1. Toque `docs/apresentacao-2min-tela.mp4` e grave sua narração à parte
+   (celular, app de voz), lendo a [Parte 1](#parte-1--o-que-falar-timestamp-por-timestamp)
+   em cima — um único take contínuo do início ao fim do vídeo.
+2. Me manda o arquivo de áudio (caminho, se já estiver salvo aqui no
+   laptop).
 3. Eu junto os dois:
    ```bash
    docs/juntar_video_audio.sh docs/apresentacao-2min-tela.mp4 SEU_AUDIO.m4a final.mp4
@@ -110,25 +100,24 @@ Passos:
    Se o áudio começar antes/depois do vídeo, me diga quantos segundos de
    diferença que eu ajusto (`juntar_video_audio.sh` aceita um offset).
 
-Para regerar o vídeo em outro ritmo:
+Pra regerar o vídeo em outro ritmo (a Parte 1 muda de tempos junto, eu
+recalculo se pedir):
 
 ```bash
-python3 docs/gerar_video_demo.py --speed 2 -o docs/apresentacao-2min-tela.mp4   # ~44s
-python3 docs/gerar_video_demo.py --speed 0.7 -o docs/apresentacao-2min-tela.mp4 # ~126s
+python3 docs/gerar_video_demo.py --speed 2 -o docs/apresentacao-2min-tela.mp4   # ~54s
+python3 docs/gerar_video_demo.py --speed 0.7 -o docs/apresentacao-2min-tela.mp4 # ~155s
 ```
 
-### Opção B — terminal ao vivo, sem gravar nada
+### Sem gravar nada — terminal ao vivo
 
-Abra um segundo terminal (ou divida a tela: slides de um lado, terminal do
-outro) e, junto com a introdução, dispare:
+Se for apresentar presencialmente em vez de mandar vídeo gravado:
 
 ```bash
 python3 docs/demo_replay_defivault.py
 ```
 
-Mesmo conteúdo do vídeo, mas impresso ao vivo no terminal em vez de
-renderizado — útil se for apresentar presencialmente sem gravação. Aceita o
-mesmo `--speed`.
+Mesmo conteúdo, impresso ao vivo no terminal (sem o card de abertura).
+Aceita o mesmo `--speed`.
 
 ---
 

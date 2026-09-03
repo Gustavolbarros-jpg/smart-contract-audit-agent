@@ -32,7 +32,8 @@ ffmpeg -y \
     -i "$VIDEO" \
     -itsoffset "$OFFSET" -i "$AUDIO" \
     -map 0:v:0 -map 1:a:0 \
-    -c:v libx264 -preset veryfast -crf 20 -pix_fmt yuv420p -c:a aac -b:a 160k \
+    -c:v libx264 -preset veryfast -crf 20 -profile:v baseline -level 3.0 \
+    -pix_fmt yuv420p -c:a aac -b:a 160k \
     -shortest \
     "$SAIDA"
 
