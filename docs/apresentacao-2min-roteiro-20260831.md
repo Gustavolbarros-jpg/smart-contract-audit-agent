@@ -83,7 +83,41 @@ Troque de slide no colchete `[slide N]`.
 
 ---
 
-## Parte 2 — Demo ao vivo (depois da fala, sem limite de 2 min)
+## Parte 2 — Contrato "rodando" em paralelo, enquanto você fala
+
+Abra um segundo terminal (ou divida a tela: slides de um lado, terminal do
+outro) e, **junto com o [slide 1]**, dispare:
+
+```bash
+python3 docs/demo_replay_defivault.py
+```
+
+Isso reproduz, em tempo real na tela, uma execução **real e já validada** do
+pipeline sobre o `DeFiVault.sol` (run `20260524_232148_DeFiVault`, 5/5
+vulnerabilidades corrigidas em 1 iteração): Slither encontrando os achados,
+seleção dos candidatos formalizáveis, geração da spec CVL, o Certora
+**violando** as 5 propriedades no contrato original, o diagnóstico linha a
+linha, o `patch_guard` validando o escopo do patch, e o Certora **verificando**
+as mesmas 5 propriedades no contrato corrigido — sem chamar Slither, LLM nem
+Certora de verdade. Sem rede, sem credencial, sem risco de travar no meio da
+fala.
+
+No ritmo padrão (`--speed 1`) leva ~80s — cabe dentro dos 2 minutos e ainda
+sobra um tempo com a tela final ("Pipeline concluído", 5/5 em verde) enquanto
+você fecha a fala. Ajuste conforme o ritmo do dia:
+
+```bash
+python3 docs/demo_replay_defivault.py --speed 2     # mais rápido, ~40s
+python3 docs/demo_replay_defivault.py --speed 0.7   # mais lento, ~115s
+```
+
+Não precisa sincronizar linha a linha com a fala — o terminal fica em
+segundo plano, avançando sozinho, como prova visual de que a ferramenta
+"roda de verdade" enquanto você narra o que está acontecendo.
+
+---
+
+## Parte 3 — Demo sequencial, se sobrar tempo depois da fala
 
 **Não rode o pipeline completo ao vivo.** Sem `GROQ_API_KEY` real e com
 `CERTORAKEY` ainda no placeholder (`minha-chave`), uma chamada real ao LLM ou
