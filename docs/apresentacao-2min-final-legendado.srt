@@ -1,0 +1,52 @@
+1
+00:00:00,000 --> 00:00:08,005
+Olá! Meu nome é Gustavo Ferreira Leite de Barros, sou estudante do Centro de Informática da Universidade Federal de Pernambuco.
+
+2
+00:00:08,005 --> 00:00:16,136
+Minha pesquisa investiga como tornar contratos inteligentes mais seguros combinando inteligência artificial e verificação formal.
+
+3
+00:00:16,136 --> 00:00:21,620
+Em vez de só explicar, vou mostrar a ferramenta rodando de verdade em um contrato real.
+
+4
+00:00:21,620 --> 00:00:32,486
+Primeiro, o Slither examina o contrato inteiro e aponta os pontos suspeitos: controle de acesso, endereços não validados, chamadas externas arriscadas.
+
+5
+00:00:32,686 --> 00:00:42,853
+Nem todo achado vira correção. Só os que dá pra provar matematicamente passam pra próxima etapa — cinco, neste contrato.
+
+6
+00:00:43,053 --> 00:00:51,759
+Essas cinco propriedades viram uma especificação formal, na linguagem CVL, que o Certora Prover consegue verificar.
+
+7
+00:00:51,959 --> 00:00:56,566
+Agora o Certora Prover analisa o contrato original.
+
+8
+00:00:56,766 --> 00:01:07,212
+E aqui está: as cinco propriedades realmente falham. Não é suposição — é prova matemática de que o contrato tem essas brechas.
+
+9
+00:01:07,412 --> 00:01:22,459
+Com a violação confirmada, a IA entra: lê a causa raiz de cada uma e propõe a correção exata — trocar tx.origin por msg.sender, validar endereço zero, e assim por diante.
+
+10
+00:01:22,659 --> 00:01:33,325
+Antes de aceitar, um guardrail confere se o patch mexeu só no necessário. Nada de reescrever o contrato inteiro.
+
+11
+00:01:33,525 --> 00:01:37,732
+O contrato corrigido volta pro Certora.
+
+12
+00:01:37,932 --> 00:01:46,498
+Dessa vez, as cinco propriedades passam. Verificadas matematicamente, não só testadas.
+
+13
+00:01:46,698 --> 00:01:56,205
+Cinco de cinco corrigidas, em uma única iteração. Essa é a ferramenta: ela gera a correção e prova que funciona. Obrigado!
+
