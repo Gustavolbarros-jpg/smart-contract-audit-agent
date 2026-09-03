@@ -85,35 +85,50 @@ Troque de slide no colchete `[slide N]`.
 
 ## Parte 2 — Contrato "rodando" em paralelo, enquanto você fala
 
+### Opção A — gravar um vídeo final (voz + tela juntas)
+
+`docs/apresentacao-2min-tela.mp4` já vem pronto: 88.5s, sem áudio, mostrando
+uma execução **real e já validada** do pipeline sobre o `DeFiVault.sol` (run
+`20260524_232148_DeFiVault`, 5/5 vulnerabilidades corrigidas em 1 iteração) —
+Slither encontrando os achados, seleção dos candidatos formalizáveis, geração
+da spec CVL, o Certora **violando** as 5 propriedades no original, o
+diagnóstico linha a linha, o `patch_guard` validando o patch, e o Certora
+**verificando** tudo no contrato corrigido. Foi renderizado quadro a quadro a
+partir dos dados reais (`docs/_replay_content.py`), não é uma captura de
+tela — por isso não depende do seu desktop nem de rede/LLM/Certora ao vivo.
+
+Passos:
+
+1. Regrave sua narração separada (celular, app de voz) assistindo o vídeo
+   tocando, seguindo a [Parte 1](#parte-1--fala-2-min-ritmo-de-160-palavrasmin)
+   ou a cola solta em `docs/apresentacao-2min-cola.md`.
+2. Me manda o caminho do arquivo de áudio.
+3. Eu junto os dois:
+   ```bash
+   docs/juntar_video_audio.sh docs/apresentacao-2min-tela.mp4 SEU_AUDIO.m4a final.mp4
+   ```
+   Se o áudio começar antes/depois do vídeo, me diga quantos segundos de
+   diferença que eu ajusto (`juntar_video_audio.sh` aceita um offset).
+
+Para regerar o vídeo em outro ritmo:
+
+```bash
+python3 docs/gerar_video_demo.py --speed 2 -o docs/apresentacao-2min-tela.mp4   # ~44s
+python3 docs/gerar_video_demo.py --speed 0.7 -o docs/apresentacao-2min-tela.mp4 # ~126s
+```
+
+### Opção B — terminal ao vivo, sem gravar nada
+
 Abra um segundo terminal (ou divida a tela: slides de um lado, terminal do
-outro) e, **junto com o [slide 1]**, dispare:
+outro) e, junto com a introdução, dispare:
 
 ```bash
 python3 docs/demo_replay_defivault.py
 ```
 
-Isso reproduz, em tempo real na tela, uma execução **real e já validada** do
-pipeline sobre o `DeFiVault.sol` (run `20260524_232148_DeFiVault`, 5/5
-vulnerabilidades corrigidas em 1 iteração): Slither encontrando os achados,
-seleção dos candidatos formalizáveis, geração da spec CVL, o Certora
-**violando** as 5 propriedades no contrato original, o diagnóstico linha a
-linha, o `patch_guard` validando o escopo do patch, e o Certora **verificando**
-as mesmas 5 propriedades no contrato corrigido — sem chamar Slither, LLM nem
-Certora de verdade. Sem rede, sem credencial, sem risco de travar no meio da
-fala.
-
-No ritmo padrão (`--speed 1`) leva ~80s — cabe dentro dos 2 minutos e ainda
-sobra um tempo com a tela final ("Pipeline concluído", 5/5 em verde) enquanto
-você fecha a fala. Ajuste conforme o ritmo do dia:
-
-```bash
-python3 docs/demo_replay_defivault.py --speed 2     # mais rápido, ~40s
-python3 docs/demo_replay_defivault.py --speed 0.7   # mais lento, ~115s
-```
-
-Não precisa sincronizar linha a linha com a fala — o terminal fica em
-segundo plano, avançando sozinho, como prova visual de que a ferramenta
-"roda de verdade" enquanto você narra o que está acontecendo.
+Mesmo conteúdo do vídeo, mas impresso ao vivo no terminal em vez de
+renderizado — útil se for apresentar presencialmente sem gravação. Aceita o
+mesmo `--speed`.
 
 ---
 
