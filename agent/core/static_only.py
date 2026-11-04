@@ -135,7 +135,9 @@ def executar_static_only(contract_path: str, with_plugins: bool = False) -> dict
 
     source = path.read_text(encoding="utf-8")
     repo_root = Path(__file__).resolve().parents[2]
-    run_dir = create_run_dir(contract_path, root=str(repo_root / "runs"))
+    # Kept apart from runs/: the evaluation tooling takes the newest folder per contract name,
+    # and a static-only run has none of the full pipeline's artifacts.
+    run_dir = create_run_dir(contract_path, root=str(repo_root / "runs" / "static_only"))
     copy_contract(contract_path, run_dir)
     write_metadata(run_dir, contract_path, "none (static-only)")
     print(f"Run artifacts: {run_dir}")
