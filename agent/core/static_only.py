@@ -66,6 +66,21 @@ def build_report(findings: list[dict], patches: list[dict], remaining: list[dict
     }
 
 
+def _findings_of_patched(original: Path, patched_source: str) -> list[dict]:
+    """Re-run Slither on the patched source placed beside the original.
+
+    Relative imports resolve against the file's own directory, so analyzing a copy kept in
+    the run folder would report every contract with an import as "does not compile".
+    """
+    sibling = original.with_name(f"{original.stem}__static_fixed.sol")
+    sibling.write_text(patched_source, encoding="utf-8")
+    try:
+        raw = run_slither_raw(str(sibling))
+        return normalize_slither_json(raw, str(sibling))["vulnerabilidades"]
+    finally:
+        sibling.unlink(missing_ok=True)
+
+
 def executar_static_only(contract_path: str) -> dict | None:
     path = Path(contract_path)
     if not path.exists():
@@ -85,7 +100,11 @@ def executar_static_only(contract_path: str) -> dict | None:
         print(f"Toolchain preflight blocked: {toolchain['reason']}")
         return None
 
-    raw = run_slither_raw(contract_path)
+    try:
+        raw = run_slither_raw(contract_path)
+    except SlitherRunError as exc:
+        print(f"Slither could not analyze the contract: {exc}")
+        return None
     save_json(run_dir / "slither_raw.json", raw)
     normalized = normalize_slither_json(raw, contract_path)
     save_json(run_dir / "slither_normalized.json", normalized)
@@ -95,13 +114,10 @@ def executar_static_only(contract_path: str) -> dict | None:
     remaining: list[dict] = []
     patch_compiles = True
     if patches:
-        patched_path = run_dir / f"{path.stem}_STATIC_FIXED.sol"
-        save_text(patched_path, patched_source)
+        save_text(run_dir / f"{path.stem}_STATIC_FIXED.sol", patched_source)
         save_json(run_dir / "deterministic_patch.json", {"patches": patches})
         try:
-            remaining = normalize_slither_json(run_slither_raw(str(patched_path)), str(patched_path))[
-                "vulnerabilidades"
-            ]
+            remaining = _findings_of_patched(path, patched_source)
         except SlitherRunError as exc:
             # A patch that does not compile resolves nothing; say so instead of crashing.
             print(f"Patched source does not compile, no patch counts as resolved: {exc}")
