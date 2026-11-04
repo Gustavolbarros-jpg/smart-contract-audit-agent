@@ -35,6 +35,11 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Copy the validated *_FIXED.sol file back into smart-audt/contracts.",
     )
     parser.add_argument(
+        "--static-only",
+        action="store_true",
+        help="Run only Slither, the catalog and deterministic patches (no LLM, no Certora).",
+    )
+    parser.add_argument(
         "--list-contracts",
         action="store_true",
         help="List local Solidity contracts and exit.",
@@ -123,6 +128,11 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     os.chdir(AGENT_DIR)
+
+    if args.static_only:
+        from core.static_only import executar_static_only
+
+        return 0 if executar_static_only(str(contract_path)) is not None else 1
 
     from orchestrator import executar_pipeline
 
