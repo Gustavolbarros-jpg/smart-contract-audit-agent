@@ -136,3 +136,74 @@ class ZeroCheckInsertionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def _patch(source, check, function="f()", vuln_id="V1"):
+    finding = {"id": vuln_id, "type": check, "function": function}
+    return apply_deterministic_patches(source, [finding])
+
+
+class TxOriginTests(unittest.TestCase):
+    def test_comparison_is_rewritten_to_msg_sender(self):
+        source = 'contract C { address owner; function f() public {\n    require(tx.origin == owner, "no");\n} }'
+        patched, applied = _patch(source, "tx-origin")
+        self.assertIn("require(msg.sender == owner", patched)
+        self.assertNotIn("tx.origin", patched.split("// FIX")[0])
+        self.assertEqual(len(applied), 1)
+
+    def test_eoa_check_against_msg_sender_is_left_alone(self):
+        source = "contract C { function f() public {\n    require(tx.origin == msg.sender);\n} }"
+        patched, applied = _patch(source, "tx-origin")
+        self.assertEqual(patched, source)
+        self.assertEqual(applied, [])
+
+    def test_non_comparison_use_is_left_alone(self):
+        source = "contract C { function f() public {\n    payable(tx.origin).transfer(1);\n} }"
+        self.assertEqual(_patch(source, "tx-origin")[1], [])
+
+    def test_mention_in_a_comment_is_not_patched(self):
+        source = "contract C { function f() public {\n    // was: tx.origin == owner\n} }"
+        self.assertEqual(_patch(source, "tx-origin")[1], [])
+
+
+class UncheckedCallTests(unittest.TestCase):
+    def test_ignored_call_gets_a_checked_result(self):
+        source = 'contract C { function f(address t, bytes calldata p) external {\n        t.call(p);\n    } }'
+        patched, applied = _patch(source, "unchecked-lowlevel", "f(address,bytes)")
+        self.assertIn("(bool callOk1, ) = t.call(p);", patched)
+        self.assertIn("require(callOk1,", patched)
+        self.assertEqual(len(applied), 1)
+
+    def test_two_calls_in_one_function_get_distinct_names(self):
+        source = 'contract C { function f(address a, address b) external {\n        payable(a).call{value: 1}("");\n        payable(b).call{value: 2}("");\n    } }'
+        patched, _ = _patch(source, "unchecked-lowlevel", "f(address,address)")
+        self.assertIn("callOk1", patched)
+        self.assertIn("callOk2", patched)
+
+    def test_already_checked_call_is_untouched(self):
+        source = 'contract C { function f(address t) external {\n        (bool ok, ) = t.call("");\n        require(ok);\n    } }'
+        self.assertEqual(_patch(source, "unchecked-lowlevel", "f(address)")[1], [])
+
+    def test_call_inside_require_is_untouched(self):
+        source = 'contract C { function f(address t) external {\n        require(t.call(""));\n    } }'
+        self.assertEqual(_patch(source, "unchecked-lowlevel", "f(address)")[1], [])
+
+
+class UncheckedTransferTests(unittest.TestCase):
+    def test_erc20_transfer_is_wrapped_in_require(self):
+        source = "contract C { function f(address to) external {\n        token.transfer(to, 1);\n    } }"
+        patched, applied = _patch(source, "unchecked-transfer", "f(address)")
+        self.assertIn("require(token.transfer(to, 1),", patched)
+        self.assertEqual(len(applied), 1)
+
+    def test_eth_transfer_with_one_argument_is_untouched(self):
+        source = "contract C { function f(address to) external {\n        payable(to).transfer(1);\n    } }"
+        self.assertEqual(_patch(source, "unchecked-transfer", "f(address)")[1], [])
+
+    def test_bare_function_name_from_the_static_fallback_is_accepted(self):
+        source = 'contract C { function f(address t, bytes calldata p) external {\n        t.call(p);\n    } }'
+        self.assertEqual(len(_patch(source, "unchecked-lowlevel", "f")[1]), 1)
+
+    def test_non_function_label_is_not_a_function_name(self):
+        source = 'contract C { function f(address t, bytes calldata p) external {\n        t.call(p);\n    } }'
+        self.assertEqual(_patch(source, "unchecked-lowlevel", "modifier/function")[1], [])

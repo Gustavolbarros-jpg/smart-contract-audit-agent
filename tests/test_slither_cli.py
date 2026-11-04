@@ -86,3 +86,20 @@ class SlitherFailureTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TxOriginFallbackTests(unittest.TestCase):
+    def _types(self, source):
+        import tempfile
+        from core.slither_normalizer import _fallback_findings
+
+        with tempfile.NamedTemporaryFile("w", suffix=".sol", delete=False) as handle:
+            handle.write(source)
+        return [f["type"] for f in _fallback_findings(handle.name, set(), 1)]
+
+    def test_real_use_is_reported(self):
+        self.assertIn("tx-origin", self._types("contract C { function f() public { require(tx.origin == owner); } }"))
+
+    def test_mention_in_a_comment_or_string_is_not(self):
+        source = 'contract C { function f() public { require(msg.sender == owner, "not tx.origin"); // was tx.origin\n} }'
+        self.assertNotIn("tx-origin", self._types(source))

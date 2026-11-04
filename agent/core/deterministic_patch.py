@@ -16,7 +16,16 @@ def apply_deterministic_patches(
     applied: list[dict[str, Any]] = []
 
     for finding in confirmed_findings:
-        if finding.get("type") != "missing-zero-check":
+        kind = finding.get("type")
+        if kind in _STATEMENT_PATCHES:
+            patched_next, changed = _STATEMENT_PATCHES[kind](
+                patched, _function_name(str(finding.get("function") or "")), str(finding.get("id") or "")
+            )
+            if changed:
+                patched = patched_next
+                applied.append({"id": finding.get("id"), "type": kind, "function": finding.get("function")})
+            continue
+        if kind != "missing-zero-check":
             continue
         parameter = str(finding.get("target_parameter") or _variable_element_name(finding) or "").strip()
         function_name = _function_name(str(finding.get("function") or ""))
@@ -44,7 +53,8 @@ def apply_deterministic_patches(
 
 
 def _function_name(signature: str) -> str:
-    match = re.match(r"\s*([A-Za-z_][A-Za-z0-9_]*)\s*\(", signature)
+    # Slither writes "f(address)"; the static fallbacks write the bare name "f".
+    match = re.match(r"\s*([A-Za-z_][A-Za-z0-9_]*)\s*(?:\(|$)", signature)
     return match.group(1) if match else ""
 
 
@@ -96,3 +106,110 @@ def _insert_zero_check(source: str, function_name: str, parameter: str, vuln_id:
     return source[:line_end] + insertion + source[line_end:], True
 
 
+
+
+_CONTROL_KEYWORDS = {"require", "assert", "if", "while", "for", "return", "emit", "revert"}
+
+
+def _function_body(masked: str, function_name: str) -> tuple[int, int] | None:
+    match = re.search(rf"\bfunction\s+{re.escape(function_name)}\s*\([^)]*\)[^{{;]*{{", masked, re.DOTALL)
+    if not match:
+        return None
+    brace_index = masked.find("{", match.end() - 1)
+    return brace_index, matching_brace(masked, brace_index)
+
+
+def _top_level_args(call_args: str) -> int:
+    depth = 0
+    count = 1 if call_args.strip() else 0
+    for char in call_args:
+        depth += char in "([{"
+        depth -= char in ")]}"
+        if char == "," and depth == 0:
+            count += 1
+    return count
+
+
+def _replace_tx_origin(source: str, _function: str, vuln_id: str) -> tuple[str, bool]:
+    """tx.origin -> msg.sender, only where it authorizes by comparison.
+
+    A line that already compares against msg.sender (the usual "caller is an EOA" check) is
+    left alone: replacing it would make the comparison trivially true.
+    """
+    raw_lines = source.splitlines(keepends=True)
+    masked_lines = mask_comments_and_strings(source).splitlines(keepends=True)
+    changed = False
+    for index, (raw, masked) in enumerate(zip(raw_lines, masked_lines)):
+        if "msg.sender" in masked or not re.search(r"\btx\.origin\s*[!=]=|[!=]=\s*tx\.origin\b", masked):
+            continue
+        for hit in reversed(list(re.finditer(r"\btx\.origin\b", masked))):
+            raw = raw[: hit.start()] + "msg.sender" + raw[hit.end():]
+        newline = "\n" if raw.endswith("\n") else ""
+        raw_lines[index] = f"{raw.rstrip(chr(10))} // FIX {vuln_id}{newline}" if vuln_id else raw
+        changed = True
+    return "".join(raw_lines), changed
+
+
+def _fresh_name(source: str, base: str, taken: set[str]) -> str:
+    n = 1
+    while f"{base}{n}" in source or f"{base}{n}" in taken:
+        n += 1
+    taken.add(f"{base}{n}")
+    return f"{base}{n}"
+
+
+_LOW_LEVEL_STATEMENT = re.compile(
+    r"(?m)^(?P<indent>[ \t]*)(?P<expr>[A-Za-z_][^\n;=]*?\.call\s*(?:\{[^}\n]*\})?\s*\([^\n;]*\))[ \t]*;"
+)
+_TOKEN_TRANSFER_STATEMENT = re.compile(
+    r"(?m)^(?P<indent>[ \t]*)(?P<expr>[A-Za-z_][\w.\[\]]*\.(?:transfer|transferFrom)\s*\((?P<args>[^\n;]*)\))[ \t]*;"
+)
+
+
+def _rewrite_statements(source, function_name, pattern, build, accept=lambda match: True):
+    masked = mask_comments_and_strings(source)
+    span = _function_body(masked, function_name) if function_name else None
+    if not span:
+        return source, False
+    start, end = span
+    matches = [
+        m for m in pattern.finditer(masked, start, end + 1)
+        if m.group("expr").split("(")[0].split(".")[0].strip() not in _CONTROL_KEYWORDS and accept(m)
+    ]
+    # Built in source order so generated names read top to bottom, applied back to front so
+    # earlier offsets stay valid.
+    replacements = [build(m.group("indent"), source[m.start("expr"): m.end("expr")]) for m in matches]
+    for match, replacement in reversed(list(zip(matches, replacements))):
+        source = source[: match.start()] + replacement + source[match.end():]
+    return source, bool(matches)
+
+
+def _require_low_level_success(source: str, function_name: str, vuln_id: str) -> tuple[str, bool]:
+    fix = f" // FIX {vuln_id}" if vuln_id else ""
+    taken: set[str] = set()
+
+    def build(indent: str, expr: str) -> str:
+        name = _fresh_name(source, "callOk", taken)
+        return f'{indent}(bool {name}, ) = {expr};\n{indent}require({name}, "Low-level call failed");{fix}'
+
+    return _rewrite_statements(source, function_name, _LOW_LEVEL_STATEMENT, build)
+
+
+def _require_token_transfer_success(source: str, function_name: str, vuln_id: str) -> tuple[str, bool]:
+    fix = f" // FIX {vuln_id}" if vuln_id else ""
+
+    def build(indent: str, expr: str) -> str:
+        return f'{indent}require({expr}, "Token transfer failed");{fix}'
+
+    # ETH transfer takes one argument and returns nothing; only the ERC20 forms are wrapped.
+    return _rewrite_statements(
+        source, function_name, _TOKEN_TRANSFER_STATEMENT, build,
+        accept=lambda m: _top_level_args(m.group("args")) >= 2,
+    )
+
+
+_STATEMENT_PATCHES = {
+    "tx-origin": _replace_tx_origin,
+    "unchecked-lowlevel": _require_low_level_success,
+    "unchecked-transfer": _require_token_transfer_success,
+}

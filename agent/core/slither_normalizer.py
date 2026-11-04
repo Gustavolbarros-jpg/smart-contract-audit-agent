@@ -11,6 +11,7 @@ import os
 import re
 from pathlib import Path
 
+from core.solidity_source import mask_comments_and_strings
 from core.vulnerability_catalog import get_catalog_entry
 
 
@@ -907,7 +908,9 @@ def _fallback_findings(contract_path: str, existing_types: set[str], start_index
         )
         idx += 1
 
-    if "tx.origin" in source and "tx-origin" not in existing_types:
+    # Masked so a comment or string that merely mentions tx.origin (typically a note that it
+    # was replaced) is not reported as a use.
+    if re.search(r"\btx\.origin\b", mask_comments_and_strings(source)) and "tx-origin" not in existing_types:
         add("tx-origin", "modifier/function", "Contract source uses tx.origin.", "medium", "high")
     if "selfdestruct" in source and "suicidal" not in existing_types:
         findings.extend(_find_selfdestruct_fallbacks(source, idx))

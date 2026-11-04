@@ -16,7 +16,7 @@ from core.deterministic_patch import apply_deterministic_patches
 from core.run_store import copy_contract, create_run_dir, save_json, save_text, write_metadata
 from core.slither_normalizer import normalize_slither_json
 from core.toolchain import check_solidity_toolchain
-from tools.slither_cli import run_slither_raw
+from tools.slither_cli import SlitherRunError, run_slither_raw
 
 
 def classify(finding: dict, entry: dict) -> str:
@@ -93,15 +93,22 @@ def executar_static_only(contract_path: str) -> dict | None:
 
     patched_source, patches = apply_deterministic_patches(source, findings)
     remaining: list[dict] = []
+    patch_compiles = True
     if patches:
         patched_path = run_dir / f"{path.stem}_STATIC_FIXED.sol"
         save_text(patched_path, patched_source)
-        remaining = normalize_slither_json(run_slither_raw(str(patched_path)), str(patched_path))[
-            "vulnerabilidades"
-        ]
         save_json(run_dir / "deterministic_patch.json", {"patches": patches})
+        try:
+            remaining = normalize_slither_json(run_slither_raw(str(patched_path)), str(patched_path))[
+                "vulnerabilidades"
+            ]
+        except SlitherRunError as exc:
+            # A patch that does not compile resolves nothing; say so instead of crashing.
+            print(f"Patched source does not compile, no patch counts as resolved: {exc}")
+            patch_compiles = False
 
-    report = build_report(findings, patches, remaining)
+    report = build_report(findings, patches, remaining if patch_compiles else findings)
+    report["patch_compiles"] = patch_compiles
     save_json(run_dir / "static_report.json", report)
     _print_summary(report)
     return report
