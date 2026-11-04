@@ -45,7 +45,7 @@ from core.static_analysis import (
 )
 from core.spec_patterns import build_spec_pattern_context
 from core.toolchain import extract_solidity_constraint, version_satisfies_constraint
-from core.vulnerability_catalog import get_catalog_entry
+from core.vulnerability_catalog import CATALOG, get_catalog_entry
 from tools.spec_validator import (
     aplicar_auth_probe_rules,
     aplicar_target_binding_rules,
@@ -454,6 +454,45 @@ Result for zero_address_reverts: zero_address_reverts: FAIL: lastReverted
         self.assertFalse(entry["formalizable"])
         self.assertFalse(entry.get("static_confirmed", False))
         self.assertEqual(entry["repair_strategy"], "static_review")
+
+    def test_slither_scan_detectors_have_catalog_entries(self):
+        scanned = [
+            "arbitrary-send-erc20", "controlled-delegatecall", "divide-before-multiply",
+            "unused-return", "incorrect-equality", "uninitialized-local", "incorrect-exp",
+            "encode-packed-collision", "weak-prng", "locked-ether", "erc20-interface",
+            "reentrancy-events", "events-maths", "events-access", "shadowing-local",
+            "incorrect-modifier",
+        ]
+        for check in scanned:
+            with self.subTest(check=check):
+                self.assertNotEqual(get_catalog_entry(check)["reason"], "no catalog mapping yet")
+
+    def test_every_installed_slither_detector_has_a_catalog_entry(self):
+        import json
+        import shutil
+        import subprocess
+
+        if shutil.which("slither") is None:
+            self.skipTest("slither is not installed")
+        listed = subprocess.run(["slither", "--list-detectors-json"], capture_output=True, text=True, timeout=60)
+        missing = sorted(d["check"] for d in json.loads(listed.stdout) if d["check"] not in CATALOG)
+        # A new Slither release that adds detectors fails here on purpose: give each an entry.
+        self.assertEqual(missing, [])
+
+    def test_unrestricted_write_is_review_evidence_only(self):
+        entry = get_catalog_entry("unrestricted-write")
+        self.assertFalse(entry["formalizable"])
+        self.assertEqual(entry["repair_strategy"], "static_review")
+        self.assertNotEqual(entry["reason"], "no catalog mapping yet")
+
+    def test_new_catalog_entries_are_not_formalizable_without_a_spec_pattern(self):
+        from core.spec_patterns import pattern_for_type
+
+        for check in ["arbitrary-send-erc20", "controlled-delegatecall", "divide-before-multiply", "unused-return"]:
+            with self.subTest(check=check):
+                entry = get_catalog_entry(check)
+                if entry["formalizable"]:
+                    self.assertIsNotNone(pattern_for_type(check))
 
     def test_static_unchecked_lowlevel_resolution_uses_slither_rerun(self):
         original = {

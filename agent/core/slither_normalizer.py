@@ -11,6 +11,7 @@ import os
 import re
 from pathlib import Path
 
+from core.solidity_source import mask_comments_and_strings
 from core.vulnerability_catalog import get_catalog_entry
 
 
@@ -300,6 +301,11 @@ def _parse_params_from_signature(params_raw: str) -> list[dict]:
     return params
 
 
+# `IVirtualAccount(account).call(data)` is a high-level call to an interface method that happens
+# to be named call. Casts to address and payable are lowercase, so a capitalized cast marks it.
+_INTERFACE_CAST_CALL = re.compile(r"\b[A-Z][A-Za-z0-9_]*\s*\([^;()]*(?:\([^()]*\)[^;()]*)*\)\s*\.call\b")
+
+
 def _low_level_call_contexts(source: str) -> list[dict]:
     contexts = []
     assignment_pattern = re.compile(
@@ -334,7 +340,7 @@ def _low_level_call_contexts(source: str) -> list[dict]:
                 )
                 continue
 
-            if bare_pattern.search(line):
+            if bare_pattern.search(line) and not _INTERFACE_CAST_CALL.search(line):
                 contexts.append(
                     {
                         "function": function["signature"],
@@ -907,7 +913,9 @@ def _fallback_findings(contract_path: str, existing_types: set[str], start_index
         )
         idx += 1
 
-    if "tx.origin" in source and "tx-origin" not in existing_types:
+    # Masked so a comment or string that merely mentions tx.origin (typically a note that it
+    # was replaced) is not reported as a use.
+    if re.search(r"\btx\.origin\b", mask_comments_and_strings(source)) and "tx-origin" not in existing_types:
         add("tx-origin", "modifier/function", "Contract source uses tx.origin.", "medium", "high")
     if "selfdestruct" in source and "suicidal" not in existing_types:
         findings.extend(_find_selfdestruct_fallbacks(source, idx))

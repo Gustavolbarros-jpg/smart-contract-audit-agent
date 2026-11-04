@@ -86,3 +86,94 @@ class SlitherFailureTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TxOriginFallbackTests(unittest.TestCase):
+    def _types(self, source):
+        import tempfile
+        from core.slither_normalizer import _fallback_findings
+
+        with tempfile.NamedTemporaryFile("w", suffix=".sol", delete=False) as handle:
+            handle.write(source)
+        return [f["type"] for f in _fallback_findings(handle.name, set(), 1)]
+
+    def test_real_use_is_reported(self):
+        self.assertIn("tx-origin", self._types("contract C { function f() public { require(tx.origin == owner); } }"))
+
+    def test_mention_in_a_comment_or_string_is_not(self):
+        source = 'contract C { function f() public { require(msg.sender == owner, "not tx.origin"); // was tx.origin\n} }'
+        self.assertNotIn("tx-origin", self._types(source))
+
+
+class ProjectRunOptionsTests(unittest.TestCase):
+    def setUp(self):
+        import tempfile
+
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        (self.root / "src").mkdir()
+        self.contract = self.root / "src" / "C.sol"
+        self.contract.write_text("contract C {}", encoding="utf-8")
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def test_contract_outside_a_foundry_project_keeps_the_default_cwd(self):
+        from tools.slither_cli import _project_run_options
+
+        self.assertEqual(_project_run_options(CONTRACT), {})
+
+    def test_contract_inside_a_foundry_project_runs_from_its_root(self):
+        from tools.slither_cli import _project_run_options
+
+        (self.root / "foundry.toml").write_text("[profile.default]\n", encoding="utf-8")
+        self.assertEqual(_project_run_options(str(self.contract))["cwd"], str(self.root.resolve()))
+
+    def test_all_three_spellings_of_the_solc_pin_are_read(self):
+        from tools.slither_cli import pinned_solc
+
+        for line in ('solc = "0.8.18"', "solc_version = '0.8.17'", 'solc-version = "0.8.19"'):
+            with self.subTest(line=line):
+                (self.root / "foundry.toml").write_text(f"[profile.default]\n{line}\n", encoding="utf-8")
+                self.assertEqual(pinned_solc(self.root), line.split("=")[1].strip(" '\""))
+
+    def test_explicit_solc_version_wins_over_the_project_pin(self):
+        from tools.slither_cli import _project_run_options
+
+        (self.root / "foundry.toml").write_text('solc = "0.8.17"\n', encoding="utf-8")
+        with mock.patch.dict("os.environ", {"SOLC_VERSION": "0.8.26"}):
+            self.assertNotIn("env", _project_run_options(str(self.contract)))
+
+    def test_run_passes_the_project_root_to_subprocess(self):
+        (self.root / "foundry.toml").write_text("[profile.default]\n", encoding="utf-8")
+        payload = '{"success": true, "error": null, "results": {"detectors": []}}'
+        with mock.patch("subprocess.run", return_value=_completed(payload)) as run:
+            run_slither_raw(str(self.contract))
+        self.assertEqual(run.call_args.kwargs["cwd"], str(self.root.resolve()))
+
+    def test_remappings_file_marks_a_project_without_foundry_toml(self):
+        from tools.slither_cli import _project_run_options
+
+        (self.root / "remappings.txt").write_text("lib/=lib/\n", encoding="utf-8")
+        self.assertEqual(_project_run_options(str(self.contract))["cwd"], str(self.root.resolve()))
+
+    def test_bare_src_directory_falls_back_to_its_parent(self):
+        from tools.slither_cli import _project_run_options
+
+        self.assertEqual(_project_run_options(str(self.contract))["cwd"], str(self.root.resolve()))
+
+
+class InterfaceCallFallbackTests(unittest.TestCase):
+    def _calls(self, statement):
+        from core.slither_normalizer import _low_level_call_contexts
+
+        source = f"contract C {{\n    function f(address a, bytes memory p) external {{\n        {statement}\n    }}\n}}"
+        return _low_level_call_contexts(source)
+
+    def test_interface_method_named_call_is_not_a_low_level_call(self):
+        self.assertEqual(self._calls("IVirtualAccount(a).call(p);"), [])
+
+    def test_payable_and_address_calls_are_still_low_level(self):
+        for statement in ('payable(a).call{value: 1}("");', 'address(a).call(p);', "a.call(p);"):
+            with self.subTest(statement=statement):
+                self.assertEqual(len(self._calls(statement)), 1)

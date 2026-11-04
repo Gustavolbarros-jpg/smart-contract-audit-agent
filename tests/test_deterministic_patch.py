@@ -136,3 +136,193 @@ class ZeroCheckInsertionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def _patch(source, check, function="f()", vuln_id="V1"):
+    finding = {"id": vuln_id, "type": check, "function": function}
+    return apply_deterministic_patches(source, [finding])
+
+
+class TxOriginTests(unittest.TestCase):
+    def test_comparison_is_rewritten_to_msg_sender(self):
+        source = 'contract C { address owner; function f() public {\n    require(tx.origin == owner, "no");\n} }'
+        patched, applied = _patch(source, "tx-origin")
+        self.assertIn("require(msg.sender == owner", patched)
+        self.assertNotIn("tx.origin", patched.split("// FIX")[0])
+        self.assertEqual(len(applied), 1)
+
+    def test_eoa_check_against_msg_sender_is_left_alone(self):
+        source = "contract C { function f() public {\n    require(tx.origin == msg.sender);\n} }"
+        patched, applied = _patch(source, "tx-origin")
+        self.assertEqual(patched, source)
+        self.assertEqual(applied, [])
+
+    def test_non_comparison_use_is_left_alone(self):
+        source = "contract C { function f() public {\n    payable(tx.origin).transfer(1);\n} }"
+        self.assertEqual(_patch(source, "tx-origin")[1], [])
+
+    def test_mention_in_a_comment_is_not_patched(self):
+        source = "contract C { function f() public {\n    // was: tx.origin == owner\n} }"
+        self.assertEqual(_patch(source, "tx-origin")[1], [])
+
+
+class UncheckedCallTests(unittest.TestCase):
+    def test_ignored_call_gets_a_checked_result(self):
+        source = 'contract C { function f(address t, bytes calldata p) external {\n        t.call(p);\n    } }'
+        patched, applied = _patch(source, "unchecked-lowlevel", "f(address,bytes)")
+        self.assertIn("(bool callOk1, ) = t.call(p);", patched)
+        self.assertIn("require(callOk1,", patched)
+        self.assertEqual(len(applied), 1)
+
+    def test_two_calls_in_one_function_get_distinct_names(self):
+        source = 'contract C { function f(address a, address b) external {\n        payable(a).call{value: 1}("");\n        payable(b).call{value: 2}("");\n    } }'
+        patched, _ = _patch(source, "unchecked-lowlevel", "f(address,address)")
+        self.assertIn("callOk1", patched)
+        self.assertIn("callOk2", patched)
+
+    def test_already_checked_call_is_untouched(self):
+        source = 'contract C { function f(address t) external {\n        (bool ok, ) = t.call("");\n        require(ok);\n    } }'
+        self.assertEqual(_patch(source, "unchecked-lowlevel", "f(address)")[1], [])
+
+    def test_call_inside_require_is_untouched(self):
+        source = 'contract C { function f(address t) external {\n        require(t.call(""));\n    } }'
+        self.assertEqual(_patch(source, "unchecked-lowlevel", "f(address)")[1], [])
+
+
+class UncheckedTransferTests(unittest.TestCase):
+    def test_erc20_transfer_is_wrapped_in_require(self):
+        source = "contract C { function f(address to) external {\n        token.transfer(to, 1);\n    } }"
+        patched, applied = _patch(source, "unchecked-transfer", "f(address)")
+        self.assertIn("require(token.transfer(to, 1),", patched)
+        self.assertEqual(len(applied), 1)
+
+    def test_eth_transfer_with_one_argument_is_untouched(self):
+        source = "contract C { function f(address to) external {\n        payable(to).transfer(1);\n    } }"
+        self.assertEqual(_patch(source, "unchecked-transfer", "f(address)")[1], [])
+
+    def test_bare_function_name_from_the_static_fallback_is_accepted(self):
+        source = 'contract C { function f(address t, bytes calldata p) external {\n        t.call(p);\n    } }'
+        self.assertEqual(len(_patch(source, "unchecked-lowlevel", "f")[1]), 1)
+
+    def test_non_function_label_is_not_a_function_name(self):
+        source = 'contract C { function f(address t, bytes calldata p) external {\n        t.call(p);\n    } }'
+        self.assertEqual(_patch(source, "unchecked-lowlevel", "modifier/function")[1], [])
+
+
+class OwnerGuardTests(unittest.TestCase):
+    def test_unprotected_selfdestruct_gets_an_owner_guard(self):
+        source = "contract C {\n    address public owner;\n    function destroy() external {\n        selfdestruct(payable(msg.sender));\n    }\n}"
+        patched, applied = _patch(source, "suicidal", "destroy")
+        self.assertIn('require(msg.sender == owner, "Not owner"); // FIX V1', patched)
+        self.assertLess(patched.index("require(msg.sender == owner"), patched.index("selfdestruct"))
+        self.assertEqual(len(applied), 1)
+
+    def test_no_owner_variable_means_no_patch(self):
+        source = "contract C {\n    function destroy() external {\n        selfdestruct(payable(msg.sender));\n    }\n}"
+        self.assertEqual(_patch(source, "suicidal", "destroy")[1], [])
+
+    def test_function_with_a_modifier_is_left_alone(self):
+        source = "contract C {\n    address owner;\n    function destroy() external onlyAdmin {\n        selfdestruct(payable(msg.sender));\n    }\n}"
+        self.assertEqual(_patch(source, "suicidal", "destroy")[1], [])
+
+    def test_existing_owner_check_is_not_duplicated(self):
+        source = "contract C {\n    address owner;\n    function destroy() external {\n        require(msg.sender == owner);\n        selfdestruct(payable(owner));\n    }\n}"
+        self.assertEqual(_patch(source, "suicidal", "destroy")[1], [])
+
+    def test_return_clause_is_not_mistaken_for_a_modifier(self):
+        source = "contract C {\n    address owner;\n    function destroy() external returns (bool) {\n        selfdestruct(payable(msg.sender));\n    }\n}"
+        self.assertEqual(len(_patch(source, "suicidal", "destroy")[1]), 1)
+
+
+class UncheckedSendTests(unittest.TestCase):
+    def test_ignored_send_is_required(self):
+        source = "contract C { function f(address to) external {\n        payable(to).send(1);\n    } }"
+        patched, applied = _patch(source, "unchecked-send", "f(address)")
+        self.assertIn("require(payable(to).send(1),", patched)
+        self.assertEqual(len(applied), 1)
+
+    def test_captured_send_is_untouched(self):
+        source = "contract C { function f(address to) external {\n        bool ok = payable(to).send(1);\n        require(ok);\n    } }"
+        self.assertEqual(_patch(source, "unchecked-send", "f(address)")[1], [])
+
+    def test_interface_method_named_call_is_not_treated_as_a_low_level_call(self):
+        source = "contract C { function f(address a, bytes calldata p) external {\n        IVirtualAccount(a).call(p);\n    } }"
+        self.assertEqual(_patch(source, "unchecked-lowlevel", "f(address,bytes)")[1], [])
+
+    def test_payable_and_address_receivers_are_still_patched(self):
+        for receiver in ("payable(a)", "address(a)", "a"):
+            with self.subTest(receiver=receiver):
+                source = f'contract C {{ function f(address a) external {{\n        {receiver}.call("");\n    }} }}'
+                self.assertEqual(len(_patch(source, "unchecked-lowlevel", "f(address)")[1]), 1)
+
+
+class ConstructorZeroCheckTests(unittest.TestCase):
+    def test_constructor_parameter_gets_a_zero_check(self):
+        source = "contract C {\n    address owner;\n    constructor(address _owner) {\n        owner = _owner;\n    }\n}"
+        finding = {"id": "V1", "type": "missing-zero-check", "function": "constructor(address)", "target_parameter": "_owner"}
+        patched, applied = apply_deterministic_patches(source, [finding])
+        self.assertIn('require(_owner != address(0), "Zero address"); // FIX V1', patched)
+        self.assertEqual(len(applied), 1)
+
+    def test_the_constructor_that_takes_the_parameter_is_chosen(self):
+        source = (
+            "contract A {\n    constructor(uint256 x) {\n        y = x;\n    }\n}\n"
+            "contract B {\n    constructor(address _owner) {\n        owner = _owner;\n    }\n}"
+        )
+        finding = {"id": "V1", "type": "missing-zero-check", "function": "constructor(address)", "target_parameter": "_owner"}
+        patched, _ = apply_deterministic_patches(source, [finding])
+        self.assertLess(patched.index("contract B"), patched.index("require(_owner"))
+
+    def test_existing_constructor_guard_is_not_duplicated(self):
+        source = "contract C {\n    constructor(address _owner) {\n        require(_owner != address(0));\n        owner = _owner;\n    }\n}"
+        finding = {"id": "V1", "type": "missing-zero-check", "function": "constructor(address)", "target_parameter": "_owner"}
+        self.assertEqual(apply_deterministic_patches(source, [finding])[1], [])
+
+
+class OverloadAndCastTests(unittest.TestCase):
+    def test_every_overload_of_the_flagged_function_is_patched(self):
+        source = (
+            "contract C { function deposit(uint a) public {\n        token.transferFrom(msg.sender, me, a);\n    }\n"
+            "    function deposit(address u, uint a) public {\n        token.transferFrom(u, me, a);\n    } }"
+        )
+        patched, applied = _patch(source, "unchecked-transfer", "deposit(uint256)")
+        self.assertEqual(patched.count("require(token.transferFrom"), 2)
+        self.assertEqual(len(applied), 1)
+
+    def test_transfer_through_an_interface_cast_is_wrapped(self):
+        source = "contract C { function f(address t, address to) external {\n        IERC20(t).transfer(to, 1);\n    } }"
+        patched, applied = _patch(source, "unchecked-transfer", "f(address,address)")
+        self.assertIn("require(IERC20(t).transfer(to, 1),", patched)
+        self.assertEqual(len(applied), 1)
+
+    def test_safe_transfer_wrappers_are_not_wrapped(self):
+        source = "contract C { function f(address to) external {\n        token.safeTransfer(to, 1);\n        to.safeTransferETH(1);\n    } }"
+        self.assertEqual(_patch(source, "unchecked-transfer", "f(address)")[1], [])
+
+
+class TokenSourceTests(unittest.TestCase):
+    VAULT = (
+        "contract C {\n    function deposit(address from, uint256 amount) external {\n"
+        "        require(token.transferFrom(from, address(this), amount));\n    }\n}"
+    )
+
+    def test_parameter_source_becomes_msg_sender(self):
+        patched, applied = _patch(self.VAULT, "arbitrary-send-erc20", "deposit(address,uint256)")
+        self.assertIn("token.transferFrom(msg.sender, address(this), amount)", patched)
+        self.assertEqual(len(applied), 1)
+
+    def test_a_guard_is_not_what_slither_accepts_so_the_source_is_rewritten_not_guarded(self):
+        patched, _ = _patch(self.VAULT, "arbitrary-send-erc20", "deposit(address,uint256)")
+        self.assertNotIn("require(from == msg.sender", patched)
+
+    def test_function_that_already_uses_msg_sender_is_left_alone(self):
+        source = self.VAULT.replace("require(token", "require(approved[from][msg.sender]);\n        require(token")
+        self.assertEqual(_patch(source, "arbitrary-send-erc20", "deposit(address,uint256)")[1], [])
+
+    def test_function_with_a_modifier_is_left_alone(self):
+        source = self.VAULT.replace("external {", "external onlyRouter {")
+        self.assertEqual(_patch(source, "arbitrary-send-erc20", "deposit(address,uint256)")[1], [])
+
+    def test_source_that_is_not_a_parameter_is_left_alone(self):
+        source = self.VAULT.replace("transferFrom(from,", "transferFrom(vaultOwner,")
+        self.assertEqual(_patch(source, "arbitrary-send-erc20", "deposit(address,uint256)")[1], [])
