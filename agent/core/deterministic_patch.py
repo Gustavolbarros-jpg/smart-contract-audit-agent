@@ -146,17 +146,35 @@ def _top_level_args(call_args: str) -> int:
     return count
 
 
-def _replace_tx_origin(source: str, _function: str, vuln_id: str) -> tuple[str, bool]:
-    """tx.origin -> msg.sender, only where it authorizes by comparison.
+def _enclosing_parameters(masked: str, offset: int) -> set[str]:
+    """Parameter names of the function or modifier whose header precedes ``offset``."""
+    headers = list(re.finditer(r"\b(?:function|modifier)\s+\w*\s*\(([^)]*)\)", masked[:offset]))
+    if not headers:
+        return set()
+    return set(re.findall(r"(\w+)\s*(?:,|$)", headers[-1].group(1).strip()))
 
-    A line that already compares against msg.sender (the usual "caller is an EOA" check) is
-    left alone: replacing it would make the comparison trivially true.
+
+def _replace_tx_origin(source: str, _function: str, vuln_id: str) -> tuple[str, bool]:
+    """tx.origin -> msg.sender, only where it authorizes by comparison with state.
+
+    Left alone: a line that already compares against msg.sender, and a comparison with a
+    parameter of the enclosing function. `if (caller == tx.origin)` is the usual "caller is an
+    EOA" check; rewriting it to msg.sender changes who may call, not how they are authorized.
     """
+    masked_source = mask_comments_and_strings(source)
     raw_lines = source.splitlines(keepends=True)
-    masked_lines = mask_comments_and_strings(source).splitlines(keepends=True)
+    masked_lines = masked_source.splitlines(keepends=True)
     changed = False
+    offset = 0
     for index, (raw, masked) in enumerate(zip(raw_lines, masked_lines)):
-        if "msg.sender" in masked or not re.search(r"\btx\.origin\s*[!=]=|[!=]=\s*tx\.origin\b", masked):
+        line_offset, offset = offset, offset + len(masked)
+        if "msg.sender" in masked:
+            continue
+        compared = re.search(r"\btx\.origin\s*[!=]=\s*([A-Za-z_]\w*)|([A-Za-z_]\w*)\s*[!=]=\s*tx\.origin\b", masked)
+        if not compared:
+            continue
+        operand = compared.group(1) or compared.group(2)
+        if operand in _enclosing_parameters(masked_source, line_offset):
             continue
         for hit in reversed(list(re.finditer(r"\btx\.origin\b", masked))):
             raw = raw[: hit.start()] + "msg.sender" + raw[hit.end():]

@@ -326,3 +326,19 @@ class TokenSourceTests(unittest.TestCase):
     def test_source_that_is_not_a_parameter_is_left_alone(self):
         source = self.VAULT.replace("transferFrom(from,", "transferFrom(vaultOwner,")
         self.assertEqual(_patch(source, "arbitrary-send-erc20", "deposit(address,uint256)")[1], [])
+
+
+class EoaCheckTests(unittest.TestCase):
+    def test_comparison_with_a_parameter_is_the_eoa_idiom_and_is_left_alone(self):
+        source = "contract C {\n    function allowed(address caller) public view returns (bool) {\n        if (caller == tx.origin) return true;\n        return false;\n    }\n}"
+        self.assertEqual(_patch(source, "tx-origin")[1], [])
+
+    def test_comparison_with_state_is_still_rewritten(self):
+        source = "contract C {\n    address owner;\n    function f(uint x) public {\n        require(tx.origin == owner);\n    }\n}"
+        patched, applied = _patch(source, "tx-origin")
+        self.assertIn("require(msg.sender == owner)", patched)
+        self.assertEqual(len(applied), 1)
+
+    def test_modifier_comparing_with_state_is_still_rewritten(self):
+        source = "contract C {\n    address owner;\n    modifier onlyOwner() {\n        require(tx.origin == owner);\n        _;\n    }\n}"
+        self.assertEqual(len(_patch(source, "tx-origin")[1]), 1)

@@ -2089,3 +2089,25 @@ class TestFixLibrary(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestSpecEnvFields(unittest.TestCase):
+    def test_bare_tx_origin_becomes_an_env_field(self):
+        from tools.spec_validator import corrigir_spec
+
+        spec = "rule r {\n  env e;\n  require e.msg.sender != tx.origin;\n  f@withrevert(e);\n  assert lastReverted;\n}"
+        fixed, notes = corrigir_spec(spec)
+        self.assertIn("e.msg.sender != e.tx.origin", fixed)
+        self.assertTrue(any("env" in note for note in notes))
+
+    def test_already_prefixed_fields_are_left_alone(self):
+        from tools.spec_validator import corrigir_spec
+
+        spec = "rule r {\n  env e;\n  require e.msg.sender != e.tx.origin;\n  require e.msg.value == 0;\n  f@withrevert(e);\n  assert lastReverted;\n}"
+        self.assertEqual(corrigir_spec(spec)[0], spec)
+
+    def test_a_comment_mentioning_tx_origin_is_not_rewritten(self):
+        from tools.spec_validator import corrigir_spec
+
+        spec = "// tx.origin is used here\nrule r {\n  env e;\n  f@withrevert(e);\n  assert lastReverted;\n}"
+        self.assertEqual(corrigir_spec(spec)[0], spec)

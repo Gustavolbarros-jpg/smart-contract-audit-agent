@@ -386,6 +386,14 @@ def corrigir_spec(spec_cvl: str) -> tuple[str, list[str]]:
             novas_linhas[i] = novas_linhas[i].replace('block.number', 'e.block.number')
             correcoes.append(f"Linha {i+1}: block.number → e.block.number")
 
+        # CORREÇÃO 2b: msg.*/tx.* soltos. Em CVL só existem como campos do env ("e.msg.sender",
+        # "e.tx.origin"); o Prover recusa o spec com "Variable `tx` has not been declared".
+        if 'methods' not in linha:
+            nova = re.sub(r'(?<![\w.])(msg|tx)\.(sender|value|origin)\b', r'e.\1.\2', novas_linhas[i])
+            if nova != novas_linhas[i]:
+                novas_linhas[i] = nova
+                correcoes.append(f"Linha {i+1}: msg/tx solto → campo do env (e.msg / e.tx)")
+
     envfree_funcs = set()
     in_methods = False
     for linha in novas_linhas:
