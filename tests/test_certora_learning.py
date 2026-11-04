@@ -2111,3 +2111,68 @@ class TestSpecEnvFields(unittest.TestCase):
 
         spec = "// tx.origin is used here\nrule r {\n  env e;\n  f@withrevert(e);\n  assert lastReverted;\n}"
         self.assertEqual(corrigir_spec(spec)[0], spec)
+
+
+class TestTransitiveRemappings(unittest.TestCase):
+    def _project(self, root):
+        (root / "src").mkdir()
+        (root / "lib" / "oz" / "token").mkdir(parents=True)
+        (root / "lib" / "oz" / "token" / "IERC.sol").write_text("pragma solidity ^0.8.0;\n", encoding="utf-8")
+        (root / "lib" / "other").mkdir()
+        (root / "lib" / "other" / "Lib.sol").write_text('import "@oz/contracts/token/IERC.sol";\n', encoding="utf-8")
+        (root / "remappings.txt").write_text("other/=lib/other/\n@oz/contracts/=lib/oz/\n", encoding="utf-8")
+        (root / "foundry.toml").write_text("[profile.default]\n", encoding="utf-8")
+
+    def test_package_imported_only_by_an_imported_file_is_still_mapped(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._project(root)
+            (root / "src" / "C.sol").write_text('import "other/Lib.sol";\ncontract C {}\n', encoding="utf-8")
+            prefixes = [r.split("=")[0] for r in solc_remappings(root / "src" / "C.sol")]
+            self.assertEqual(sorted(prefixes), ["@oz/contracts/", "other/"])
+
+    def test_multi_segment_prefix_is_matched(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._project(root)
+            (root / "src" / "C.sol").write_text('import "@oz/contracts/token/IERC.sol";\ncontract C {}\n', encoding="utf-8")
+            prefixes = [r.split("=")[0] for r in solc_remappings(root / "src" / "C.sol")]
+            self.assertEqual(prefixes, ["@oz/contracts/"])
+
+    def test_a_package_that_nothing_reaches_is_not_passed(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._project(root)
+            (root / "src" / "C.sol").write_text('import "other/Lib.sol";\ncontract C {}\n', encoding="utf-8")
+            (root / "remappings.txt").write_text(
+                "other/=lib/other/\n@oz/contracts/=lib/oz/\nunused/=lib/unused/\n", encoding="utf-8"
+            )
+            prefixes = [r.split("=")[0] for r in solc_remappings(root / "src" / "C.sol")]
+            self.assertNotIn("unused/", prefixes)
+
+    def test_file_with_only_relative_imports_keeps_every_project_remapping(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._project(root)
+            (root / "src" / "C.sol").write_text('import "./D.sol";\ncontract C {}\n', encoding="utf-8")
+            (root / "src" / "D.sol").write_text("contract D {}\n", encoding="utf-8")
+            prefixes = [r.split("=")[0] for r in solc_remappings(root / "src" / "C.sol")]
+            self.assertEqual(sorted(prefixes), ["@oz/contracts/", "other/"])
+
+
+class TestMethodsBlockTypes(unittest.TestCase):
+    def test_mapping_key_of_contract_type_is_an_address_in_cvl(self):
+        from core.contract_context import build_methods_block
+
+        source = "interface IMarket {}\ncontract C {\n    mapping (IMarket => uint) public supplies;\n}"
+        block = build_methods_block(source)
+        self.assertIn("function supplies(address) external returns(uint) envfree;", block)
+        self.assertNotIn("IMarket", block)

@@ -82,16 +82,51 @@ def _foundry_remappings(contract_path: str | Path) -> list[str]:
     return remaps
 
 
+def _remap_for(import_path: str, remaps: list[str]) -> tuple[str, Path] | None:
+    """The remapping with the longest prefix that covers ``import_path``, and the file it points to."""
+    best = None
+    for remap in remaps:
+        prefix, target = remap.split("=", 1)
+        if import_path.startswith(prefix) and (best is None or len(prefix) > len(best[0])):
+            best = (prefix, target)
+    if best is None:
+        return None
+    prefix, target = best
+    return best[0] + "=" + target, Path(target) / import_path[len(prefix):]
+
+
+def needed_remappings(contract_path: str | Path, remaps: list[str], limit: int = 5000) -> list[str]:
+    """Remappings needed by the contract's imports, followed through the files they resolve to.
+
+    A contract rarely imports the package that matters (openzeppelin, solmate) itself; the files
+    it imports do. Only direct imports used to be considered, so the Prover could not find them,
+    and a prefix with several segments (``@openzeppelin/contracts/``) never matched.
+    """
+    needed: dict[str, None] = {}
+    seen: set[Path] = set()
+    queue = [Path(contract_path).resolve()]
+    while queue and len(seen) < limit:
+        current = queue.pop()
+        if current in seen:
+            continue
+        seen.add(current)
+        for import_path in solidity_imports(_read_source(current)):
+            if import_path.startswith((".", "/")):
+                queue.append((current.parent / import_path).resolve())
+                continue
+            match = _remap_for(import_path, remaps)
+            if match is not None:
+                needed[match[0]] = None
+                queue.append(match[1].resolve())
+    return list(needed)
+
+
 def solc_remappings(contract_path: str | Path, source: str | None = None) -> list[str]:
     path = Path(contract_path).resolve()
     source = _read_source(path) if source is None else source
     prefixes = sorted({prefix for imp in solidity_imports(source) if (prefix := _package_prefix(imp))})
     foundry_remaps = _foundry_remappings(path)
-    matched_foundry = []
-    for remap in foundry_remaps:
-        remap_prefix = remap.split("=", 1)[0].rstrip("/")
-        if any(remap_prefix == prefix for prefix in prefixes):
-            matched_foundry.append(remap)
+    matched_foundry = needed_remappings(path, foundry_remaps)
     if not prefixes:
         return foundry_remaps
 

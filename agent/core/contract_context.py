@@ -121,7 +121,7 @@ def _state_getter_signature(line: str) -> str | None:
         value_type = _clean_type(value_type)
         if not _is_cvl_primitive_type(value_type):
             return None
-        return f"  function {name}({_clean_type(key_type)}) external returns({value_type}) envfree;"
+        return f"  function {name}({_type_for_cvl(key_type)}) external returns({value_type}) envfree;"
 
     simple_match = re.match(
         r"([A-Za-z_][A-Za-z0-9_\[\]]*)\s+public(?:\s+\w+)*\s+([A-Za-z_][A-Za-z0-9_]*)\b",
