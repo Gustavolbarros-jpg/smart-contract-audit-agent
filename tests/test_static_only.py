@@ -67,3 +67,20 @@ class ScopeTests(unittest.TestCase):
         raw = {"results": {"detectors": [self._detector("/p/lib/B.sol")]}}
         scoped_to_file(raw, Path("/p/A.sol"))
         self.assertEqual(len(raw["results"]["detectors"]), 1)
+
+
+class PluginMergeTests(unittest.TestCase):
+    def test_plugin_results_are_appended_without_mutating_the_input(self):
+        from core.static_only import with_plugin_findings
+
+        raw = {"success": True, "results": {"detectors": [{"check": "a"}]}}
+        merged = with_plugin_findings(raw, [{"check": "unrestricted-write"}])
+        self.assertEqual([d["check"] for d in merged["results"]["detectors"]], ["a", "unrestricted-write"])
+        self.assertEqual(len(raw["results"]["detectors"]), 1)
+
+    def test_a_failing_plugin_does_not_block_the_run(self):
+        from unittest import mock
+        from core.static_only import _plugin_findings
+
+        with mock.patch("tools.slither_plugin_runner.run_unrestricted_write", side_effect=RuntimeError("boom")):
+            self.assertEqual(_plugin_findings("x.sol"), [])

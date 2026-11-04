@@ -108,7 +108,26 @@ def _findings_of_patched(original: Path, patched_source: str) -> list[dict]:
         sibling.unlink(missing_ok=True)
 
 
-def executar_static_only(contract_path: str) -> dict | None:
+def with_plugin_findings(raw: dict, plugin_findings: list[dict]) -> dict:
+    """``raw`` plus the project detectors' results, without mutating ``raw``."""
+    merged = dict(raw)
+    merged["results"] = dict(raw.get("results", {}))
+    merged["results"]["detectors"] = list(raw.get("results", {}).get("detectors", [])) + plugin_findings
+    return merged
+
+
+def _plugin_findings(contract_path: str) -> list[dict]:
+    """Findings of the project's own detectors; a plugin that cannot run never blocks the run."""
+    from tools.slither_plugin_runner import run_unrestricted_write
+
+    try:
+        return run_unrestricted_write(contract_path)
+    except Exception as exc:  # the plugin is additive evidence, not a required stage
+        print(f"Project detectors skipped: {exc}")
+        return []
+
+
+def executar_static_only(contract_path: str, with_plugins: bool = False) -> dict | None:
     path = Path(contract_path)
     if not path.exists():
         print(f"Contract not found: {contract_path}")
@@ -133,6 +152,8 @@ def executar_static_only(contract_path: str) -> dict | None:
         print(f"Slither could not analyze the contract: {exc}")
         return None
     save_json(run_dir / "slither_raw.json", raw)
+    if with_plugins:
+        raw = with_plugin_findings(raw, _plugin_findings(contract_path))
     normalized = normalize_slither_json(scoped_to_file(raw, path), contract_path)
     save_json(run_dir / "slither_normalized.json", normalized)
     findings = normalized["vulnerabilidades"]
