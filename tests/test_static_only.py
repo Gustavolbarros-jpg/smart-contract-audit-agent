@@ -41,3 +41,29 @@ class StaticOnlyTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ScopeTests(unittest.TestCase):
+    def _detector(self, *filenames):
+        return {"check": "x", "elements": [{"source_mapping": {"filename_absolute": n}} for n in filenames]}
+
+    def test_detectors_in_imported_files_are_dropped(self):
+        from core.static_only import scoped_to_file
+
+        here = Path("/p/A.sol")
+        raw = {"results": {"detectors": [self._detector("/p/A.sol"), self._detector("/p/lib/B.sol")]}}
+        kept = scoped_to_file(raw, here)["results"]["detectors"]
+        self.assertEqual(len(kept), 1)
+
+    def test_detector_without_source_mapping_is_kept(self):
+        from core.static_only import scoped_to_file
+
+        raw = {"results": {"detectors": [{"check": "x", "elements": []}]}}
+        self.assertEqual(len(scoped_to_file(raw, Path("/p/A.sol"))["results"]["detectors"]), 1)
+
+    def test_input_is_not_mutated(self):
+        from core.static_only import scoped_to_file
+
+        raw = {"results": {"detectors": [self._detector("/p/lib/B.sol")]}}
+        scoped_to_file(raw, Path("/p/A.sol"))
+        self.assertEqual(len(raw["results"]["detectors"]), 1)

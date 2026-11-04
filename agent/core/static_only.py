@@ -66,6 +66,33 @@ def build_report(findings: list[dict], patches: list[dict], remaining: list[dict
     }
 
 
+def scoped_to_file(raw: dict, contract_path: Path) -> dict:
+    """Keep only the detectors whose elements live in ``contract_path``.
+
+    Slither analyzes everything the file imports, so each run also reports the imported
+    contracts. Counting those per file recounts them for every importer, and after a patch
+    it brings the unpatched original back through a cyclic import, so the fix looked
+    unresolved. A detector with no source-mapped element is kept: there is nothing to scope by.
+    """
+    target = str(contract_path.resolve())
+
+    def located_here(detector: dict) -> bool:
+        names = [
+            element.get("source_mapping", {}).get("filename_absolute")
+            for element in detector.get("elements", [])
+            if isinstance(element, dict)
+        ]
+        names = [name for name in names if name]
+        return not names or target in names
+
+    scoped = dict(raw)
+    scoped["results"] = dict(raw.get("results", {}))
+    scoped["results"]["detectors"] = [
+        detector for detector in raw.get("results", {}).get("detectors", []) if located_here(detector)
+    ]
+    return scoped
+
+
 def _findings_of_patched(original: Path, patched_source: str) -> list[dict]:
     """Re-run Slither on the patched source placed beside the original.
 
@@ -75,7 +102,7 @@ def _findings_of_patched(original: Path, patched_source: str) -> list[dict]:
     sibling = original.with_name(f"{original.stem}__static_fixed.sol")
     sibling.write_text(patched_source, encoding="utf-8")
     try:
-        raw = run_slither_raw(str(sibling))
+        raw = scoped_to_file(run_slither_raw(str(sibling)), sibling)
         return normalize_slither_json(raw, str(sibling))["vulnerabilidades"]
     finally:
         sibling.unlink(missing_ok=True)
@@ -106,7 +133,7 @@ def executar_static_only(contract_path: str) -> dict | None:
         print(f"Slither could not analyze the contract: {exc}")
         return None
     save_json(run_dir / "slither_raw.json", raw)
-    normalized = normalize_slither_json(raw, contract_path)
+    normalized = normalize_slither_json(scoped_to_file(raw, path), contract_path)
     save_json(run_dir / "slither_normalized.json", normalized)
     findings = normalized["vulnerabilidades"]
 

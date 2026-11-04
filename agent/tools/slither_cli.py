@@ -5,7 +5,9 @@ Runs Slither and returns deterministic normalized findings.
 
 import json
 import os
+import re
 import subprocess
+from pathlib import Path
 
 from core.import_context import solc_remappings
 from core.slither_normalizer import normalize_slither_json
@@ -24,6 +26,44 @@ def _tail(text: str, max_lines: int = 12) -> str:
     return "\n".join(lines[-max_lines:])
 
 
+def foundry_root(contract_path: str) -> Path | None:
+    """Nearest ancestor holding a foundry.toml, i.e. the project the contract belongs to."""
+    for parent in Path(contract_path).resolve().parents:
+        if (parent / "foundry.toml").is_file():
+            return parent
+    return None
+
+
+def pinned_solc(root: Path) -> str:
+    """Compiler version the project itself pins (``solc``, ``solc_version`` or ``solc-version``)."""
+    try:
+        text = (root / "foundry.toml").read_text(encoding="utf-8")
+    except OSError:
+        return ""
+    match = re.search(r"""^\s*solc(?:[_-]version)?\s*=\s*['"]([\d.]+)['"]""", text, re.M)
+    return match.group(1) if match else ""
+
+
+def _project_run_options(contract_path: str) -> dict:
+    """``cwd``/``env`` for subprocess.run so a Foundry contract is compiled as its project does.
+
+    From outside the project root Slither exits 1 with nothing on either stream: 121 of the
+    184 files that failed this way analyze fine once the working directory is the root.
+    An explicit SOLC_VERSION from the caller always wins over the project's pin.
+    """
+    root = foundry_root(contract_path)
+    if root is None:
+        return {}
+    options: dict = {"cwd": str(root)}
+    version = pinned_solc(root)
+    if version and "SOLC_VERSION" not in os.environ:
+        from core.toolchain import installed_solc_versions
+
+        if version in installed_solc_versions():
+            options["env"] = dict(os.environ, SOLC_VERSION=version)
+    return options
+
+
 def run_slither_raw(contract_path: str) -> dict:
     """Run Slither and return the raw JSON output."""
     if not os.path.exists(contract_path):
@@ -35,7 +75,9 @@ def run_slither_raw(contract_path: str) -> dict:
 
     try:
         print(f"[Slither] Analisando {contract_path}...")
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=120, **_project_run_options(contract_path)
+        )
     except subprocess.TimeoutExpired:
         raise TimeoutError("Slither demorou mais de 2 minutos.")
 

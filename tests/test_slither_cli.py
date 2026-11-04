@@ -103,3 +103,50 @@ class TxOriginFallbackTests(unittest.TestCase):
     def test_mention_in_a_comment_or_string_is_not(self):
         source = 'contract C { function f() public { require(msg.sender == owner, "not tx.origin"); // was tx.origin\n} }'
         self.assertNotIn("tx-origin", self._types(source))
+
+
+class ProjectRunOptionsTests(unittest.TestCase):
+    def setUp(self):
+        import tempfile
+
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        (self.root / "src").mkdir()
+        self.contract = self.root / "src" / "C.sol"
+        self.contract.write_text("contract C {}", encoding="utf-8")
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def test_contract_outside_a_foundry_project_keeps_the_default_cwd(self):
+        from tools.slither_cli import _project_run_options
+
+        self.assertEqual(_project_run_options(CONTRACT), {})
+
+    def test_contract_inside_a_foundry_project_runs_from_its_root(self):
+        from tools.slither_cli import _project_run_options
+
+        (self.root / "foundry.toml").write_text("[profile.default]\n", encoding="utf-8")
+        self.assertEqual(_project_run_options(str(self.contract))["cwd"], str(self.root.resolve()))
+
+    def test_all_three_spellings_of_the_solc_pin_are_read(self):
+        from tools.slither_cli import pinned_solc
+
+        for line in ('solc = "0.8.18"', "solc_version = '0.8.17'", 'solc-version = "0.8.19"'):
+            with self.subTest(line=line):
+                (self.root / "foundry.toml").write_text(f"[profile.default]\n{line}\n", encoding="utf-8")
+                self.assertEqual(pinned_solc(self.root), line.split("=")[1].strip(" '\""))
+
+    def test_explicit_solc_version_wins_over_the_project_pin(self):
+        from tools.slither_cli import _project_run_options
+
+        (self.root / "foundry.toml").write_text('solc = "0.8.17"\n', encoding="utf-8")
+        with mock.patch.dict("os.environ", {"SOLC_VERSION": "0.8.26"}):
+            self.assertNotIn("env", _project_run_options(str(self.contract)))
+
+    def test_run_passes_the_project_root_to_subprocess(self):
+        (self.root / "foundry.toml").write_text("[profile.default]\n", encoding="utf-8")
+        payload = '{"success": true, "error": null, "results": {"detectors": []}}'
+        with mock.patch("subprocess.run", return_value=_completed(payload)) as run:
+            run_slither_raw(str(self.contract))
+        self.assertEqual(run.call_args.kwargs["cwd"], str(self.root.resolve()))

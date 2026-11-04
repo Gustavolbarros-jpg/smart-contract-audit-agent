@@ -244,3 +244,13 @@ class UncheckedSendTests(unittest.TestCase):
     def test_captured_send_is_untouched(self):
         source = "contract C { function f(address to) external {\n        bool ok = payable(to).send(1);\n        require(ok);\n    } }"
         self.assertEqual(_patch(source, "unchecked-send", "f(address)")[1], [])
+
+    def test_interface_method_named_call_is_not_treated_as_a_low_level_call(self):
+        source = "contract C { function f(address a, bytes calldata p) external {\n        IVirtualAccount(a).call(p);\n    } }"
+        self.assertEqual(_patch(source, "unchecked-lowlevel", "f(address,bytes)")[1], [])
+
+    def test_payable_and_address_receivers_are_still_patched(self):
+        for receiver in ("payable(a)", "address(a)", "a"):
+            with self.subTest(receiver=receiver):
+                source = f'contract C {{ function f(address a) external {{\n        {receiver}.call("");\n    }} }}'
+                self.assertEqual(len(_patch(source, "unchecked-lowlevel", "f(address)")[1]), 1)

@@ -193,7 +193,13 @@ def _require_low_level_success(source: str, function_name: str, vuln_id: str) ->
         name = _fresh_name(source, "callOk", taken)
         return f'{indent}(bool {name}, ) = {expr};\n{indent}require({name}, "Low-level call failed");{fix}'
 
-    return _rewrite_statements(source, function_name, _LOW_LEVEL_STATEMENT, build)
+    # `IFoo(account).call(data)` is a high-level call to a method that happens to be named
+    # call; it returns the interface's own type, so the (bool, bytes) form would not compile.
+    # A cast to a type name (leading capital) marks it; address variables and payable() do not.
+    return _rewrite_statements(
+        source, function_name, _LOW_LEVEL_STATEMENT, build,
+        accept=lambda m: not re.match(r"\s*[A-Z]\w*\s*\(", m.group("expr")),
+    )
 
 
 def _require_token_transfer_success(source: str, function_name: str, vuln_id: str) -> tuple[str, bool]:
