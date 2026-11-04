@@ -161,3 +161,19 @@ class ProjectRunOptionsTests(unittest.TestCase):
         from tools.slither_cli import _project_run_options
 
         self.assertEqual(_project_run_options(str(self.contract))["cwd"], str(self.root.resolve()))
+
+
+class InterfaceCallFallbackTests(unittest.TestCase):
+    def _calls(self, statement):
+        from core.slither_normalizer import _low_level_call_contexts
+
+        source = f"contract C {{\n    function f(address a, bytes memory p) external {{\n        {statement}\n    }}\n}}"
+        return _low_level_call_contexts(source)
+
+    def test_interface_method_named_call_is_not_a_low_level_call(self):
+        self.assertEqual(self._calls("IVirtualAccount(a).call(p);"), [])
+
+    def test_payable_and_address_calls_are_still_low_level(self):
+        for statement in ('payable(a).call{value: 1}("");', 'address(a).call(p);', "a.call(p);"):
+            with self.subTest(statement=statement):
+                self.assertEqual(len(self._calls(statement)), 1)

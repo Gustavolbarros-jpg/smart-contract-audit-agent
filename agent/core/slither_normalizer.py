@@ -301,6 +301,11 @@ def _parse_params_from_signature(params_raw: str) -> list[dict]:
     return params
 
 
+# `IVirtualAccount(account).call(data)` is a high-level call to an interface method that happens
+# to be named call. Casts to address and payable are lowercase, so a capitalized cast marks it.
+_INTERFACE_CAST_CALL = re.compile(r"\b[A-Z][A-Za-z0-9_]*\s*\([^;()]*(?:\([^()]*\)[^;()]*)*\)\s*\.call\b")
+
+
 def _low_level_call_contexts(source: str) -> list[dict]:
     contexts = []
     assignment_pattern = re.compile(
@@ -335,7 +340,7 @@ def _low_level_call_contexts(source: str) -> list[dict]:
                 )
                 continue
 
-            if bare_pattern.search(line):
+            if bare_pattern.search(line) and not _INTERFACE_CAST_CALL.search(line):
                 contexts.append(
                     {
                         "function": function["signature"],

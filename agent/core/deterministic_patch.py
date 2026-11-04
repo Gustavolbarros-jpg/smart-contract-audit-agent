@@ -126,12 +126,13 @@ def _insert_first_statement(
 _CONTROL_KEYWORDS = {"require", "assert", "if", "while", "for", "return", "emit", "revert"}
 
 
-def _function_body(masked: str, function_name: str) -> tuple[int, int] | None:
-    match = re.search(rf"\bfunction\s+{re.escape(function_name)}\s*\([^)]*\)[^{{;]*{{", masked, re.DOTALL)
-    if not match:
-        return None
-    brace_index = masked.find("{", match.end() - 1)
-    return brace_index, matching_brace(masked, brace_index)
+def _function_bodies(masked: str, function_name: str) -> list[tuple[int, int]]:
+    """Body span of every definition with this name; overloads share one finding's name."""
+    spans = []
+    for match in re.finditer(rf"\bfunction\s+{re.escape(function_name)}\s*\([^)]*\)[^{{;]*{{", masked, re.DOTALL):
+        brace_index = masked.find("{", match.end() - 1)
+        spans.append((brace_index, matching_brace(masked, brace_index)))
+    return spans
 
 
 def _top_level_args(call_args: str) -> int:
@@ -177,20 +178,21 @@ _LOW_LEVEL_STATEMENT = re.compile(
     r"(?m)^(?P<indent>[ \t]*)(?P<expr>[A-Za-z_][^\n;=]*?\.call\s*(?:\{[^}\n]*\})?\s*\([^\n;]*\))[ \t]*;"
 )
 _TOKEN_TRANSFER_STATEMENT = re.compile(
-    r"(?m)^(?P<indent>[ \t]*)(?P<expr>[A-Za-z_][\w.\[\]]*\.(?:transfer|transferFrom)\s*\((?P<args>[^\n;]*)\))[ \t]*;"
+    r"(?m)^(?P<indent>[ \t]*)(?P<expr>[A-Za-z_][\w.\[\]]*(?:\([^;\n()]*\))?\.(?:transfer|transferFrom)\s*\((?P<args>[^\n;]*)\))[ \t]*;"
 )
 
 
 def _rewrite_statements(source, function_name, pattern, build, accept=lambda match: True):
     masked = mask_comments_and_strings(source)
-    span = _function_body(masked, function_name) if function_name else None
-    if not span:
-        return source, False
-    start, end = span
+    spans = _function_bodies(masked, function_name) if function_name else []
     matches = [
-        m for m in pattern.finditer(masked, start, end + 1)
+        m
+        for start, end in spans
+        for m in pattern.finditer(masked, start, end + 1)
         if m.group("expr").split("(")[0].split(".")[0].strip() not in _CONTROL_KEYWORDS and accept(m)
     ]
+    if not matches:
+        return source, False
     # Built in source order so generated names read top to bottom, applied back to front so
     # earlier offsets stay valid.
     replacements = [build(m.group("indent"), source[m.start("expr"): m.end("expr")]) for m in matches]

@@ -277,3 +277,24 @@ class ConstructorZeroCheckTests(unittest.TestCase):
         source = "contract C {\n    constructor(address _owner) {\n        require(_owner != address(0));\n        owner = _owner;\n    }\n}"
         finding = {"id": "V1", "type": "missing-zero-check", "function": "constructor(address)", "target_parameter": "_owner"}
         self.assertEqual(apply_deterministic_patches(source, [finding])[1], [])
+
+
+class OverloadAndCastTests(unittest.TestCase):
+    def test_every_overload_of_the_flagged_function_is_patched(self):
+        source = (
+            "contract C { function deposit(uint a) public {\n        token.transferFrom(msg.sender, me, a);\n    }\n"
+            "    function deposit(address u, uint a) public {\n        token.transferFrom(u, me, a);\n    } }"
+        )
+        patched, applied = _patch(source, "unchecked-transfer", "deposit(uint256)")
+        self.assertEqual(patched.count("require(token.transferFrom"), 2)
+        self.assertEqual(len(applied), 1)
+
+    def test_transfer_through_an_interface_cast_is_wrapped(self):
+        source = "contract C { function f(address t, address to) external {\n        IERC20(t).transfer(to, 1);\n    } }"
+        patched, applied = _patch(source, "unchecked-transfer", "f(address,address)")
+        self.assertIn("require(IERC20(t).transfer(to, 1),", patched)
+        self.assertEqual(len(applied), 1)
+
+    def test_safe_transfer_wrappers_are_not_wrapped(self):
+        source = "contract C { function f(address to) external {\n        token.safeTransfer(to, 1);\n        to.safeTransferETH(1);\n    } }"
+        self.assertEqual(_patch(source, "unchecked-transfer", "f(address)")[1], [])
