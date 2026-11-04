@@ -65,12 +65,26 @@ def _variable_element_name(finding: dict[str, Any]) -> str:
     return ""
 
 
+def _find_definition(masked: str, function_name: str, parameter: str) -> re.Match | None:
+    """The function (or constructor) definition that takes ``parameter``.
+
+    A file can hold several contracts and so several constructors; the finding names only
+    "constructor", so the one whose parameter list contains the flagged name is chosen.
+    """
+    if function_name != "constructor":
+        return re.search(rf"\bfunction\s+{re.escape(function_name)}\s*\([^)]*\)[^{{;]*{{", masked, re.DOTALL)
+    for match in re.finditer(r"\bconstructor\s*\(([^)]*)\)[^{;]*{", masked, re.DOTALL):
+        if re.search(rf"\b{re.escape(parameter)}\b", match.group(1)):
+            return match
+    return None
+
+
 def _insert_zero_check(source: str, function_name: str, parameter: str, vuln_id: str) -> tuple[str, bool]:
     # Located on masked source so a "function foo(" written in a comment cannot match
     # and a brace inside a string literal cannot close the body early. A truncated body
     # made an existing guard invisible and the patch inserted a duplicate require.
     masked = mask_comments_and_strings(source)
-    match = re.search(rf"\bfunction\s+{re.escape(function_name)}\s*\([^)]*\)[^{{;]*{{", masked, re.DOTALL)
+    match = _find_definition(masked, function_name, parameter)
     if not match:
         return source, False
 

@@ -254,3 +254,26 @@ class UncheckedSendTests(unittest.TestCase):
             with self.subTest(receiver=receiver):
                 source = f'contract C {{ function f(address a) external {{\n        {receiver}.call("");\n    }} }}'
                 self.assertEqual(len(_patch(source, "unchecked-lowlevel", "f(address)")[1]), 1)
+
+
+class ConstructorZeroCheckTests(unittest.TestCase):
+    def test_constructor_parameter_gets_a_zero_check(self):
+        source = "contract C {\n    address owner;\n    constructor(address _owner) {\n        owner = _owner;\n    }\n}"
+        finding = {"id": "V1", "type": "missing-zero-check", "function": "constructor(address)", "target_parameter": "_owner"}
+        patched, applied = apply_deterministic_patches(source, [finding])
+        self.assertIn('require(_owner != address(0), "Zero address"); // FIX V1', patched)
+        self.assertEqual(len(applied), 1)
+
+    def test_the_constructor_that_takes_the_parameter_is_chosen(self):
+        source = (
+            "contract A {\n    constructor(uint256 x) {\n        y = x;\n    }\n}\n"
+            "contract B {\n    constructor(address _owner) {\n        owner = _owner;\n    }\n}"
+        )
+        finding = {"id": "V1", "type": "missing-zero-check", "function": "constructor(address)", "target_parameter": "_owner"}
+        patched, _ = apply_deterministic_patches(source, [finding])
+        self.assertLess(patched.index("contract B"), patched.index("require(_owner"))
+
+    def test_existing_constructor_guard_is_not_duplicated(self):
+        source = "contract C {\n    constructor(address _owner) {\n        require(_owner != address(0));\n        owner = _owner;\n    }\n}"
+        finding = {"id": "V1", "type": "missing-zero-check", "function": "constructor(address)", "target_parameter": "_owner"}
+        self.assertEqual(apply_deterministic_patches(source, [finding])[1], [])

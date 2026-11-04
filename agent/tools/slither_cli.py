@@ -26,11 +26,22 @@ def _tail(text: str, max_lines: int = 12) -> str:
     return "\n".join(lines[-max_lines:])
 
 
-def foundry_root(contract_path: str) -> Path | None:
-    """Nearest ancestor holding a foundry.toml, i.e. the project the contract belongs to."""
-    for parent in Path(contract_path).resolve().parents:
-        if (parent / "foundry.toml").is_file():
+_PROJECT_MARKERS = ("foundry.toml", "remappings.txt", "hardhat.config.ts", "hardhat.config.js")
+
+
+def project_root(contract_path: str) -> Path | None:
+    """Root of the project a contract belongs to, or None for a standalone file.
+
+    The nearest ancestor holding a build marker wins; failing that, the parent of the
+    nearest ``src`` directory (solmate ships nothing but ``src``).
+    """
+    parents = list(Path(contract_path).resolve().parents)
+    for parent in parents:
+        if any((parent / marker).is_file() for marker in _PROJECT_MARKERS):
             return parent
+    for parent in parents:
+        if parent.name == "src" and parent.parent != parent:
+            return parent.parent
     return None
 
 
@@ -45,13 +56,14 @@ def pinned_solc(root: Path) -> str:
 
 
 def _project_run_options(contract_path: str) -> dict:
-    """``cwd``/``env`` for subprocess.run so a Foundry contract is compiled as its project does.
+    """``cwd``/``env`` for subprocess.run so a contract is compiled as its project does.
 
     From outside the project root Slither exits 1 with nothing on either stream: 121 of the
-    184 files that failed this way analyze fine once the working directory is the root.
+    184 files that failed this way analyze fine once the working directory is the root,
+    and so do projects without a foundry.toml (solmate, inverse).
     An explicit SOLC_VERSION from the caller always wins over the project's pin.
     """
-    root = foundry_root(contract_path)
+    root = project_root(contract_path)
     if root is None:
         return {}
     options: dict = {"cwd": str(root)}

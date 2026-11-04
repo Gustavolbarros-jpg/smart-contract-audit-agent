@@ -150,3 +150,14 @@ class ProjectRunOptionsTests(unittest.TestCase):
         with mock.patch("subprocess.run", return_value=_completed(payload)) as run:
             run_slither_raw(str(self.contract))
         self.assertEqual(run.call_args.kwargs["cwd"], str(self.root.resolve()))
+
+    def test_remappings_file_marks_a_project_without_foundry_toml(self):
+        from tools.slither_cli import _project_run_options
+
+        (self.root / "remappings.txt").write_text("lib/=lib/\n", encoding="utf-8")
+        self.assertEqual(_project_run_options(str(self.contract))["cwd"], str(self.root.resolve()))
+
+    def test_bare_src_directory_falls_back_to_its_parent(self):
+        from tools.slither_cli import _project_run_options
+
+        self.assertEqual(_project_run_options(str(self.contract))["cwd"], str(self.root.resolve()))
