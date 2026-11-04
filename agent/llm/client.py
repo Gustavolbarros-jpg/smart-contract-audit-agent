@@ -9,7 +9,9 @@ from pathlib import Path
 from openai import OpenAI
 from pydantic import BaseModel
 
-MODELO_LLM = "llama-3.3-70b-versatile"
+# The default is the model the pipeline was built and measured with. It is overridable because a
+# provider can withdraw a model: on 2026-11-04 the Groq account answered 404 for it.
+MODELO_LLM = os.getenv("AUDIT_LLM_MODEL", "llama-3.3-70b-versatile")
 
 
 def _load_env_file() -> None:
