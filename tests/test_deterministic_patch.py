@@ -207,3 +207,40 @@ class UncheckedTransferTests(unittest.TestCase):
     def test_non_function_label_is_not_a_function_name(self):
         source = 'contract C { function f(address t, bytes calldata p) external {\n        t.call(p);\n    } }'
         self.assertEqual(_patch(source, "unchecked-lowlevel", "modifier/function")[1], [])
+
+
+class OwnerGuardTests(unittest.TestCase):
+    def test_unprotected_selfdestruct_gets_an_owner_guard(self):
+        source = "contract C {\n    address public owner;\n    function destroy() external {\n        selfdestruct(payable(msg.sender));\n    }\n}"
+        patched, applied = _patch(source, "suicidal", "destroy")
+        self.assertIn('require(msg.sender == owner, "Not owner"); // FIX V1', patched)
+        self.assertLess(patched.index("require(msg.sender == owner"), patched.index("selfdestruct"))
+        self.assertEqual(len(applied), 1)
+
+    def test_no_owner_variable_means_no_patch(self):
+        source = "contract C {\n    function destroy() external {\n        selfdestruct(payable(msg.sender));\n    }\n}"
+        self.assertEqual(_patch(source, "suicidal", "destroy")[1], [])
+
+    def test_function_with_a_modifier_is_left_alone(self):
+        source = "contract C {\n    address owner;\n    function destroy() external onlyAdmin {\n        selfdestruct(payable(msg.sender));\n    }\n}"
+        self.assertEqual(_patch(source, "suicidal", "destroy")[1], [])
+
+    def test_existing_owner_check_is_not_duplicated(self):
+        source = "contract C {\n    address owner;\n    function destroy() external {\n        require(msg.sender == owner);\n        selfdestruct(payable(owner));\n    }\n}"
+        self.assertEqual(_patch(source, "suicidal", "destroy")[1], [])
+
+    def test_return_clause_is_not_mistaken_for_a_modifier(self):
+        source = "contract C {\n    address owner;\n    function destroy() external returns (bool) {\n        selfdestruct(payable(msg.sender));\n    }\n}"
+        self.assertEqual(len(_patch(source, "suicidal", "destroy")[1]), 1)
+
+
+class UncheckedSendTests(unittest.TestCase):
+    def test_ignored_send_is_required(self):
+        source = "contract C { function f(address to) external {\n        payable(to).send(1);\n    } }"
+        patched, applied = _patch(source, "unchecked-send", "f(address)")
+        self.assertIn("require(payable(to).send(1),", patched)
+        self.assertEqual(len(applied), 1)
+
+    def test_captured_send_is_untouched(self):
+        source = "contract C { function f(address to) external {\n        bool ok = payable(to).send(1);\n        require(ok);\n    } }"
+        self.assertEqual(_patch(source, "unchecked-send", "f(address)")[1], [])

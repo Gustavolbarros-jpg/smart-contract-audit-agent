@@ -84,28 +84,29 @@ def _insert_zero_check(source: str, function_name: str, parameter: str, vuln_id:
     if re.search(rf"address\s*\(\s*0\s*\)\s*!=\s*\b{escaped}\b", body):
         return source, False
 
-    line_start = source.rfind("\n", 0, match.start()) + 1
-    base_indent = re.match(r"\s*", source[line_start:match.start()]).group(0)
-    indent = base_indent + "    "
     fix_comment = f" // FIX {vuln_id}" if vuln_id else ""
-    require_line = f'{indent}require({parameter} != address(0), "Zero address");{fix_comment}'
+    statement = f'require({parameter} != address(0), "Zero address");{fix_comment}'
+    return _insert_first_statement(source, match.start(), brace_index, end_index, statement)
+
+
+def _insert_first_statement(
+    source: str, function_start: int, brace_index: int, end_index: int, statement: str
+) -> tuple[str, bool]:
+    line_start = source.rfind("\n", 0, function_start) + 1
+    base_indent = re.match(r"\s*", source[line_start:function_start]).group(0)
+    indent = base_indent + "    "
+    line = f"{indent}{statement}"
 
     if "\n" not in source[brace_index:end_index + 1]:
         inner = source[brace_index + 1:end_index].strip()
         inner_lines = [f"{indent}{inner}"] if inner else []
-        replacement_lines = ["{", require_line, *inner_lines, f"{base_indent}}}"]
-        replacement = "\n".join(replacement_lines)
+        replacement = "\n".join(["{", line, *inner_lines, f"{base_indent}}}"])
         return source[:brace_index] + replacement + source[end_index + 1:], True
 
     line_end = source.find("\n", brace_index)
     if line_end == -1:
         return source, False
-
-    insertion = f"\n{require_line}"
-
-    return source[:line_end] + insertion + source[line_end:], True
-
-
+    return source[:line_end] + f"\n{line}" + source[line_end:], True
 
 
 _CONTROL_KEYWORDS = {"require", "assert", "if", "while", "for", "return", "emit", "revert"}
@@ -208,7 +209,56 @@ def _require_token_transfer_success(source: str, function_name: str, vuln_id: st
     )
 
 
+_OWNER_STATE_VARIABLE = re.compile(
+    r"\baddress(?:\s+payable)?\s+(?:(?:public|private|internal|immutable|constant)\s+)*owner\b"
+)
+_HEADER_KEYWORDS = {"external", "public", "internal", "private", "payable", "view", "pure", "virtual", "override"}
+
+
+def _require_owner(source: str, function_name: str, vuln_id: str) -> tuple[str, bool]:
+    """Guard an unprotected selfdestruct with the contract's own ``owner``.
+
+    Only applied when the contract already declares an ``address owner`` and the function
+    has no modifier at all, so the guard never duplicates or contradicts an existing one.
+    """
+    masked = mask_comments_and_strings(source)
+    if not function_name or not _OWNER_STATE_VARIABLE.search(masked):
+        return source, False
+    match = re.search(rf"\bfunction\s+{re.escape(function_name)}\s*\(([^)]*)\)([^{{;]*){{", masked, re.DOTALL)
+    if not match:
+        return source, False
+    header = re.sub(r"returns\s*\([^)]*\)", "", match.group(2))
+    if set(re.findall(r"[A-Za-z_]\w*", header)) - _HEADER_KEYWORDS:
+        return source, False
+
+    brace_index = masked.find("{", match.end() - 1)
+    end_index = matching_brace(masked, brace_index)
+    body = masked[brace_index:end_index + 1]
+    if re.search(r"msg\.sender\s*[!=]=\s*owner\b|\bowner\s*[!=]=\s*msg\.sender", body):
+        return source, False
+    fix = f" // FIX {vuln_id}" if vuln_id else ""
+    return _insert_first_statement(
+        source, match.start(), brace_index, end_index, f'require(msg.sender == owner, "Not owner");{fix}'
+    )
+
+
+_SEND_STATEMENT = re.compile(
+    r"(?m)^(?P<indent>[ \t]*)(?P<expr>[A-Za-z_][^\n;=]*?\.send\s*\([^\n;]*\))[ \t]*;"
+)
+
+
+def _require_send_success(source: str, function_name: str, vuln_id: str) -> tuple[str, bool]:
+    fix = f" // FIX {vuln_id}" if vuln_id else ""
+
+    def build(indent: str, expr: str) -> str:
+        return f'{indent}require({expr}, "Send failed");{fix}'
+
+    return _rewrite_statements(source, function_name, _SEND_STATEMENT, build)
+
+
 _STATEMENT_PATCHES = {
+    "suicidal": _require_owner,
+    "unchecked-send": _require_send_success,
     "tx-origin": _replace_tx_origin,
     "unchecked-lowlevel": _require_low_level_success,
     "unchecked-transfer": _require_token_transfer_success,
