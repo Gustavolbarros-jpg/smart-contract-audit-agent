@@ -21,4 +21,13 @@ deliberately contradictory rule. The Prover's closing "Failures summary" also na
 `rule_not_vacuous` for `VaultFixed`; the table above is what was relied on, and the banner was not
 explained.
 
-Validated on this one pair only, not on a real project contract.
+## Check on real contracts: not promoted
+
+The 7 `arbitrary-send-erc20` findings in the real projects (3 files) were read by hand. None is a
+clear vulnerability: `astaria/TransferProxy.tokenTransferFrom` is guarded by `requiresAuth`;
+`maia/FlywheelCore.claimRewards` and `setFlywheelRewards` pull from the rewards contract, the second
+one `onlyOwner`; `maia/BranchPort.bridgeOut` and `bridgeOutMultiple` are `requiresBridgeAgent`. All
+seven use `safeTransferFrom`, which the `_.transferFrom` summary does not intercept. This rule says
+"the source must be the caller", which these designs violate on purpose, so it would raise alarms on
+correct code. The catalog entry therefore keeps `formalizable: False`. The Certora run on the real
+files was not made: the conclusion follows from the code and from the summary not matching the call.

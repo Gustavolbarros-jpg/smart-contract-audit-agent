@@ -101,7 +101,7 @@ rule transfer_only_pulls_from_the_caller {
             "Do not link or import a concrete token: the summary on _.transferFrom works for any token interface.",
             "Keep the ghost and the summary function above the methods block; targetFunction takes the real argument list.",
             "Do not assert on balanceOf: it needs the token's code in the scene, which the pipeline does not provide.",
-            "Validated only on a minimal vault pair (violated on the vulnerable one, verified and non-vacuous on the fixed one).",
+            "Validated only on a minimal vault pair. On the real projects every finding is an authorized pull, and they call safeTransferFrom, which this summary does not intercept; do not use it as a bug detector there.",
         ],
     },
     "reentrancy-eth": {
