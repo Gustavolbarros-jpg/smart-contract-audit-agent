@@ -13,6 +13,7 @@ from collections import Counter
 from pathlib import Path
 
 from core.deterministic_patch import apply_deterministic_patches
+from core.slither_scope import scoped_to_file  # noqa: F401  (re-exported for callers and tests)
 from core.run_store import copy_contract, create_run_dir, save_json, save_text, write_metadata
 from core.slither_normalizer import normalize_slither_json
 from core.toolchain import check_solidity_toolchain
@@ -64,33 +65,6 @@ def build_report(findings: list[dict], patches: list[dict], remaining: list[dict
         "resolved_after_rerun": sum(row["resolved_after_rerun"] for row in rows),
         "findings": rows,
     }
-
-
-def scoped_to_file(raw: dict, contract_path: Path) -> dict:
-    """Keep only the detectors whose elements live in ``contract_path``.
-
-    Slither analyzes everything the file imports, so each run also reports the imported
-    contracts. Counting those per file recounts them for every importer, and after a patch
-    it brings the unpatched original back through a cyclic import, so the fix looked
-    unresolved. A detector with no source-mapped element is kept: there is nothing to scope by.
-    """
-    target = str(contract_path.resolve())
-
-    def located_here(detector: dict) -> bool:
-        names = [
-            element.get("source_mapping", {}).get("filename_absolute")
-            for element in detector.get("elements", [])
-            if isinstance(element, dict)
-        ]
-        names = [name for name in names if name]
-        return not names or target in names
-
-    scoped = dict(raw)
-    scoped["results"] = dict(raw.get("results", {}))
-    scoped["results"]["detectors"] = [
-        detector for detector in raw.get("results", {}).get("detectors", []) if located_here(detector)
-    ]
-    return scoped
 
 
 def _findings_of_patched(original: Path, patched_source: str) -> list[dict]:

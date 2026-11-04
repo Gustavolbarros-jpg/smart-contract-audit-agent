@@ -82,8 +82,11 @@ def run_slither_raw(contract_path: str) -> dict:
         raise FileNotFoundError(f"Contrato nao encontrado: {contract_path}")
     
     cmd = ["slither", contract_path, "--json", "-", "--no-fail-pedantic"]
-    for remap in solc_remappings(contract_path):
-        cmd.extend(["--solc-remaps", remap])
+    # One flag with every remapping, space separated: crytic-compile keeps only the last value
+    # when the flag is repeated, which silently dropped all but one package of a project.
+    remaps = solc_remappings(contract_path)
+    if remaps:
+        cmd.extend(["--solc-remaps", " ".join(remaps)])
 
     try:
         print(f"[Slither] Analisando {contract_path}...")

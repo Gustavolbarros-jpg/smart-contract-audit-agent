@@ -2176,3 +2176,47 @@ class TestMethodsBlockTypes(unittest.TestCase):
         block = build_methods_block(source)
         self.assertIn("function supplies(address) external returns(uint) envfree;", block)
         self.assertNotIn("IMarket", block)
+
+
+class TestRemappingTargetSlash(unittest.TestCase):
+    def test_target_keeps_the_trailing_slash_of_its_prefix(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "lib" / "dep").mkdir(parents=True)
+            (root / "remappings.txt").write_text("dep/=lib/dep/\n@scoped=lib/dep\n", encoding="utf-8")
+            (root / "C.sol").write_text('import "dep/X.sol";\nimport "@scoped/Y.sol";\n', encoding="utf-8")
+            remaps = dict(r.split("=", 1) for r in solc_remappings(root / "C.sol"))
+            self.assertTrue(remaps["dep/"].endswith("/"))
+            self.assertFalse(remaps["@scoped"].endswith("/"))
+
+
+class TestCertoraCompilerFlags(unittest.TestCase):
+    def _flags(self, toml):
+        import tempfile
+        from core.import_context import certora_compiler_flags
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            if toml is not None:
+                (root / "foundry.toml").write_text(toml, encoding="utf-8")
+            (root / "C.sol").write_text("contract C {}\n", encoding="utf-8")
+            return certora_compiler_flags(root / "C.sol")
+
+    def test_foundry_default_turns_the_optimizer_on(self):
+        self.assertEqual(self._flags("[profile.default]\nsrc = 'src'\n"), ["--solc_optimize", "200"])
+
+    def test_optimizer_runs_are_taken_from_the_project(self):
+        self.assertEqual(self._flags("optimizer_runs = 999\n"), ["--solc_optimize", "999"])
+        self.assertEqual(self._flags("optimizer-runs = 5\n"), ["--solc_optimize", "5"])
+
+    def test_optimizer_can_be_disabled(self):
+        self.assertEqual(self._flags("optimizer = false\n"), [])
+
+    def test_via_ir_is_forwarded_only_when_enabled(self):
+        self.assertIn("--solc_via_ir", self._flags("via_ir = true\n"))
+        self.assertNotIn("--solc_via_ir", self._flags("# via_ir = true\n"))
+
+    def test_project_without_foundry_toml_gets_no_flags(self):
+        self.assertEqual(self._flags(None), [])

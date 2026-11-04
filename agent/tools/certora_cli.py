@@ -5,7 +5,7 @@ Ferramenta para executar a Verificação Formal via Certora Prover.
 import subprocess
 import os
 
-from core.import_context import packages_path, solc_remappings
+from core.import_context import certora_compiler_flags, packages_path, solc_remappings
 
 
 def run_certora(
@@ -40,6 +40,7 @@ def run_certora(
         "--solc_allow_path", "..",
         "--msg", "Agent Verification"
     ]
+    cmd.extend(certora_compiler_flags(contract_path))
     package_dir = packages_path(contract_path)
     if package_dir:
         cmd.extend(["--packages_path", str(package_dir)])
@@ -50,11 +51,12 @@ def run_certora(
         print(f"🔬 [Certora] Iniciando Prover para {file_name} ({contract_name}) com {os.path.basename(spec_path)}...")
         print("⏳ Isso pode demorar alguns minutos...")
 
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        timeout = int(os.getenv("AUDIT_CERTORA_TIMEOUT", "600"))
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
 
         return result.stdout + "\n" + result.stderr
 
     except subprocess.TimeoutExpired:
-        raise TimeoutError("Certora abortado: excedeu 10 minutos.")
+        raise TimeoutError(f"Certora abortado: excedeu {timeout // 60} minutos (AUDIT_CERTORA_TIMEOUT).")
     except FileNotFoundError:
         raise RuntimeError("'certoraRun' não encontrado. Certora CLI está instalado?")

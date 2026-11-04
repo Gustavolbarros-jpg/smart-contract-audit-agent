@@ -177,3 +177,22 @@ class InterfaceCallFallbackTests(unittest.TestCase):
         for statement in ('payable(a).call{value: 1}("");', 'address(a).call(p);', "a.call(p);"):
             with self.subTest(statement=statement):
                 self.assertEqual(len(self._calls(statement)), 1)
+
+
+class RemappingsFlagTests(unittest.TestCase):
+    def test_all_remappings_travel_in_a_single_flag(self):
+        payload = '{"success": true, "error": null, "results": {"detectors": []}}'
+        remaps = ["a/=/x/a/", "b/=/x/b/", "c/=/x/c/"]
+        with mock.patch("tools.slither_cli.solc_remappings", return_value=remaps):
+            with mock.patch("subprocess.run", return_value=_completed(payload)) as run:
+                run_slither_raw(CONTRACT)
+        cmd = run.call_args.args[0]
+        self.assertEqual(cmd.count("--solc-remaps"), 1)
+        self.assertEqual(cmd[cmd.index("--solc-remaps") + 1], " ".join(remaps))
+
+    def test_no_remappings_means_no_flag(self):
+        payload = '{"success": true, "error": null, "results": {"detectors": []}}'
+        with mock.patch("tools.slither_cli.solc_remappings", return_value=[]):
+            with mock.patch("subprocess.run", return_value=_completed(payload)) as run:
+                run_slither_raw(CONTRACT)
+        self.assertNotIn("--solc-remaps", run.call_args.args[0])

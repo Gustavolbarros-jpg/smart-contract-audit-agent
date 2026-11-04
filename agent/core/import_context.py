@@ -78,7 +78,12 @@ def _foundry_remappings(contract_path: str | Path) -> list[str]:
         target_path = Path(target)
         if not target_path.is_absolute():
             target_path = project_root / target_path
-        remaps.append(f"{prefix}={target_path.resolve()}")
+        resolved = str(target_path.resolve())
+        # solc joins the target and the rest of the import verbatim, so a prefix ending in a slash
+        # needs a target ending in one: `forge-std/=/x/src` would turn forge-std/Test.sol into /x/srcTest.sol.
+        if prefix.endswith("/") and not resolved.endswith("/"):
+            resolved += "/"
+        remaps.append(f"{prefix}={resolved}")
     return remaps
 
 
@@ -149,3 +154,34 @@ def packages_path(contract_path: str | Path) -> Path | None:
         return None
     node_modules = package_root / "node_modules"
     return node_modules if node_modules.is_dir() else None
+
+
+def certora_compiler_flags(contract_path: str | Path) -> list[str]:
+    """Compiler flags for certoraRun that match how a Foundry project compiles itself.
+
+    Foundry turns the optimizer on by default, and the Prover compiles to bytecode, so without
+    these flags a contract that builds fine in its own project can fail with "Stack too deep".
+    Returns nothing for a project without a foundry.toml.
+    """
+    root = find_project_root(contract_path)
+    config = root / "foundry.toml" if root else None
+    if config is None or not config.is_file():
+        return []
+    text = "\n".join(
+        line for line in config.read_text(encoding="utf-8", errors="ignore").splitlines()
+        if not line.strip().startswith("#")
+    )
+
+    def value(*names: str) -> str | None:
+        for name in names:
+            found = re.search(rf"^\s*{re.escape(name)}\s*=\s*[\"']?([\w.]+)[\"']?\s*$", text, re.MULTILINE)
+            if found:
+                return found.group(1)
+        return None
+
+    flags: list[str] = []
+    if value("optimizer") != "false":
+        flags += ["--solc_optimize", value("optimizer_runs", "optimizer-runs") or "200"]
+    if value("via_ir", "via-ir") == "true":
+        flags.append("--solc_via_ir")
+    return flags
