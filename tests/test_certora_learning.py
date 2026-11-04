@@ -467,6 +467,12 @@ Result for zero_address_reverts: zero_address_reverts: FAIL: lastReverted
             with self.subTest(check=check):
                 self.assertNotEqual(get_catalog_entry(check)["reason"], "no catalog mapping yet")
 
+    def test_unrestricted_write_is_review_evidence_only(self):
+        entry = get_catalog_entry("unrestricted-write")
+        self.assertFalse(entry["formalizable"])
+        self.assertEqual(entry["repair_strategy"], "static_review")
+        self.assertNotEqual(entry["reason"], "no catalog mapping yet")
+
     def test_new_catalog_entries_are_not_formalizable_without_a_spec_pattern(self):
         from core.spec_patterns import pattern_for_type
 
