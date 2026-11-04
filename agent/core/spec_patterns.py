@@ -72,6 +72,38 @@ rule unauthorized_recipient_reverts {
             "Do not invent an authorized recipient variable that is not in the contract.",
         ],
     },
+    "arbitrary-send-erc20": {
+        "goal": "A function that moves tokens with transferFrom must only pull them from the caller.",
+        "use_when": "Slither reports arbitrary-send-erc20 for a function whose transferFrom source is a parameter.",
+        "valid_example": """// VULN_XXX - arbitrary-send-erc20
+ghost bool sawTransferFrom;
+ghost address lastTransferFrom;
+
+function recordTransferFrom(address from) returns bool {
+    sawTransferFrom = true;
+    lastTransferFrom = from;
+    return true;
+}
+
+methods {
+    function _.transferFrom(address from, address to, uint256 amount) external => recordTransferFrom(from) expect bool;
+}
+
+rule transfer_only_pulls_from_the_caller {
+  env e;
+  address from;
+  uint256 amount;
+  require !sawTransferFrom;
+  targetFunction@withrevert(e, from, amount);
+  assert sawTransferFrom => lastTransferFrom == e.msg.sender;
+}""",
+        "avoid": [
+            "Do not link or import a concrete token: the summary on _.transferFrom works for any token interface.",
+            "Keep the ghost and the summary function above the methods block; targetFunction takes the real argument list.",
+            "Do not assert on balanceOf: it needs the token's code in the scene, which the pipeline does not provide.",
+            "Validated only on a minimal vault pair (violated on the vulnerable one, verified and non-vacuous on the fixed one).",
+        ],
+    },
     "reentrancy-eth": {
         "goal": "Prefer static CEI validation. Use Certora only for a concrete state property.",
         "use_when": "There is a clear state getter and a meaningful postcondition.",

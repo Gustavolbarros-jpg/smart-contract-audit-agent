@@ -298,3 +298,31 @@ class OverloadAndCastTests(unittest.TestCase):
     def test_safe_transfer_wrappers_are_not_wrapped(self):
         source = "contract C { function f(address to) external {\n        token.safeTransfer(to, 1);\n        to.safeTransferETH(1);\n    } }"
         self.assertEqual(_patch(source, "unchecked-transfer", "f(address)")[1], [])
+
+
+class TokenSourceTests(unittest.TestCase):
+    VAULT = (
+        "contract C {\n    function deposit(address from, uint256 amount) external {\n"
+        "        require(token.transferFrom(from, address(this), amount));\n    }\n}"
+    )
+
+    def test_parameter_source_becomes_msg_sender(self):
+        patched, applied = _patch(self.VAULT, "arbitrary-send-erc20", "deposit(address,uint256)")
+        self.assertIn("token.transferFrom(msg.sender, address(this), amount)", patched)
+        self.assertEqual(len(applied), 1)
+
+    def test_a_guard_is_not_what_slither_accepts_so_the_source_is_rewritten_not_guarded(self):
+        patched, _ = _patch(self.VAULT, "arbitrary-send-erc20", "deposit(address,uint256)")
+        self.assertNotIn("require(from == msg.sender", patched)
+
+    def test_function_that_already_uses_msg_sender_is_left_alone(self):
+        source = self.VAULT.replace("require(token", "require(approved[from][msg.sender]);\n        require(token")
+        self.assertEqual(_patch(source, "arbitrary-send-erc20", "deposit(address,uint256)")[1], [])
+
+    def test_function_with_a_modifier_is_left_alone(self):
+        source = self.VAULT.replace("external {", "external onlyRouter {")
+        self.assertEqual(_patch(source, "arbitrary-send-erc20", "deposit(address,uint256)")[1], [])
+
+    def test_source_that_is_not_a_parameter_is_left_alone(self):
+        source = self.VAULT.replace("transferFrom(from,", "transferFrom(vaultOwner,")
+        self.assertEqual(_patch(source, "arbitrary-send-erc20", "deposit(address,uint256)")[1], [])

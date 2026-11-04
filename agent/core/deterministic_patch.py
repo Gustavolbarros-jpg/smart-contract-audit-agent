@@ -278,7 +278,48 @@ def _require_send_success(source: str, function_name: str, vuln_id: str) -> tupl
     return _rewrite_statements(source, function_name, _SEND_STATEMENT, build)
 
 
+_TRANSFER_FROM_SOURCE = re.compile(r"\.transferFrom\s*\(\s*([A-Za-z_]\w*)\s*,")
+
+
+def _use_msg_sender_as_token_source(source: str, function_name: str, vuln_id: str) -> tuple[str, bool]:
+    """``token.transferFrom(from, ...)`` -> ``token.transferFrom(msg.sender, ...)``.
+
+    Slither only accepts a literal msg.sender as the source: a ``require(from == msg.sender)``
+    guard leaves the finding in place. Applied only where ``from`` is a parameter of the flagged
+    function and the function never mentions msg.sender or a modifier, because an allowance or
+    operator check keyed on the caller means the pull is authorized some other way and the
+    rewrite would break it.
+    """
+    masked = mask_comments_and_strings(source)
+    edits: list[tuple[int, int]] = []
+    for match in re.finditer(
+        rf"\bfunction\s+{re.escape(function_name)}\s*\(([^)]*)\)([^{{;]*){{", masked, re.DOTALL
+    ):
+        parameters = set(re.findall(r"(\w+)\s*(?:,|$)", match.group(1).strip()))
+        header = re.sub(r"returns\s*\([^)]*\)", "", match.group(2))
+        if set(re.findall(r"[A-Za-z_]\w*", header)) - _HEADER_KEYWORDS:
+            continue
+        brace_index = masked.find("{", match.end() - 1)
+        end_index = matching_brace(masked, brace_index)
+        body = masked[brace_index:end_index + 1]
+        if "msg.sender" in body:
+            continue
+        for call in _TRANSFER_FROM_SOURCE.finditer(masked, brace_index, end_index + 1):
+            if call.group(1) in parameters:
+                edits.append((call.start(1), call.end(1)))
+    if not edits or not function_name:
+        return source, False
+    for start, end in reversed(edits):
+        line_end = source.find("\n", end)
+        line_end = len(source) if line_end == -1 else line_end
+        source = source[:start] + "msg.sender" + source[end:line_end] + (
+            f" // FIX {vuln_id}" if vuln_id else ""
+        ) + source[line_end:]
+    return source, True
+
+
 _STATEMENT_PATCHES = {
+    "arbitrary-send-erc20": _use_msg_sender_as_token_source,
     "suicidal": _require_owner,
     "unchecked-send": _require_send_success,
     "tx-origin": _replace_tx_origin,
