@@ -196,3 +196,22 @@ class RemappingsFlagTests(unittest.TestCase):
             with mock.patch("subprocess.run", return_value=_completed(payload)) as run:
                 run_slither_raw(CONTRACT)
         self.assertNotIn("--solc-remaps", run.call_args.args[0])
+
+
+class SafeTransferFalsePositiveTests(unittest.TestCase):
+    def _report(self, call):
+        from core.slither_normalizer import normalize_slither_json
+
+        detector = {
+            "check": "unchecked-transfer", "impact": "High", "confidence": "Medium", "elements": [],
+            "description": f"C.f() (src/C.sol#1-3) ignores return value by {call} (src/C.sol#2)\n",
+        }
+        return normalize_slither_json({"results": {"detectors": [detector]}}, "")["vulnerabilidades"]
+
+    def test_safe_wrappers_are_not_reported(self):
+        for call in ("msg.sender.safeTransferETH(amount)", "token.safeTransferFrom(a, b, 1)", "ERC721(n).safeTransferFrom(a, b, 2)"):
+            with self.subTest(call=call):
+                self.assertEqual(self._report(call), [])
+
+    def test_plain_erc20_transfer_is_still_reported(self):
+        self.assertEqual([f["type"] for f in self._report("token.transferFrom(a, b, 1)")], ["unchecked-transfer"])

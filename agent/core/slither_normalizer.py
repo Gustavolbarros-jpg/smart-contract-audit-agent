@@ -936,6 +936,12 @@ def _fallback_findings(contract_path: str, existing_types: set[str], start_index
     return findings
 
 
+# safeTransfer, safeTransferFrom, safeTransferETH and the like (solmate, OpenZeppelin SafeERC20) revert
+# on failure and return nothing, so Slither's "ignores return value" on them is not a defect and
+# wrapping them in require would not compile.
+_SAFE_TRANSFER_CALL = re.compile(r"\.safe(?:Transfer|TransferFrom|TransferETH|Approve)\w*\(")
+
+
 def normalize_slither_json(slither_json: dict, contract_path: str = "") -> dict:
     detectors = slither_json.get("results", {}).get("detectors", [])
     vulnerabilities = []
@@ -946,6 +952,8 @@ def normalize_slither_json(slither_json: dict, contract_path: str = "") -> dict:
 
     for idx, detector in enumerate(detectors, start=1):
         check_type = detector.get("check", "")
+        if check_type == "unchecked-transfer" and _SAFE_TRANSFER_CALL.search(detector.get("description", "")):
+            continue
         entry = get_catalog_entry(check_type)
         description = detector.get("description", "").strip()
         elements = _elements(detector)
