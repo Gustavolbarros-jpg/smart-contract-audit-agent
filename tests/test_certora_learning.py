@@ -2220,3 +2220,23 @@ class TestCertoraCompilerFlags(unittest.TestCase):
 
     def test_project_without_foundry_toml_gets_no_flags(self):
         self.assertEqual(self._flags(None), [])
+
+
+class TestAutofinderFallbackIsNotAnError(unittest.TestCase):
+    FALLBACK = (
+        "Encountered an exception generating autofinder x/Visibility.sol (solc had an error:\n"
+        'ParserError: Builtin function "mod" must be called.\n   --> Test.sol:155:135:\n'
+        "), falling back to original file Visibility.sol\n"
+    )
+
+    def test_the_fallback_notice_alone_is_not_blocking(self):
+        from core.certora_error_catalog import analyze_certora_errors, has_certora_blocking_error
+
+        self.assertFalse(has_certora_blocking_error(self.FALLBACK + "Finished running verifier\n"))
+        self.assertEqual(analyze_certora_errors(self.FALLBACK)["matches"], [])
+
+    def test_a_real_compilation_error_next_to_it_still_blocks(self):
+        from core.certora_error_catalog import has_certora_blocking_error
+
+        real = "solc had an error:\nParserError: Source \"x/y.sol\" not found: File not found.\n"
+        self.assertTrue(has_certora_blocking_error(self.FALLBACK + real))
