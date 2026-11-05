@@ -33,11 +33,11 @@ def _merge_ranges(ranges: list[tuple[int, int]]) -> list[tuple[int, int]]:
     return [(start, end) for start, end in merged]
 
 
-def _extract_interface(source: str) -> dict:
+def _extract_interface(source: str, contract_name: str = "") -> dict:
     public_state = []
     functions = []
     modifiers = []
-    source = _primary_contract_source(source)
+    source = _primary_contract_source(source, contract_name)
 
     for line in source.splitlines():
         stripped = line.strip()
@@ -68,9 +68,9 @@ def _extract_interface(source: str) -> dict:
     }
 
 
-def _primary_contract_source(source: str) -> str:
+def _primary_contract_source(source: str, preferred: str = "") -> str:
     masked = _mask_comments_and_strings(source)
-    contract_name = extract_primary_contract_name(source)
+    contract_name = extract_primary_contract_name(source, preferred)
     if not contract_name:
         return source
 
@@ -340,10 +340,10 @@ def _function_info(line: str) -> dict | None:
     }
 
 
-def owner_only_functions(source: str) -> list[dict]:
+def owner_only_functions(source: str, contract_name: str = "") -> list[dict]:
     """Return public/external functions protected by an onlyOwner modifier."""
     functions = []
-    for line in _extract_interface(source)["functions"]:
+    for line in _extract_interface(source, contract_name)["functions"]:
         if "onlyOwner" not in line:
             continue
         info = _function_info(line)
@@ -352,9 +352,9 @@ def owner_only_functions(source: str) -> list[dict]:
     return functions
 
 
-def choose_auth_probe_function(source: str) -> dict | None:
+def choose_auth_probe_function(source: str, contract_name: str = "") -> dict | None:
     """Pick a simple onlyOwner function for tx.origin/auth CVL rules."""
-    functions = owner_only_functions(source)
+    functions = owner_only_functions(source, contract_name)
     if not functions:
         return None
 
@@ -371,9 +371,9 @@ def choose_auth_probe_function(source: str) -> dict | None:
     return functions[0]
 
 
-def build_methods_block(source: str) -> str:
+def build_methods_block(source: str, contract_name: str = "") -> str:
     """Build a deterministic CVL methods{} block from public/external Solidity API."""
-    interface = _extract_interface(source)
+    interface = _extract_interface(source, contract_name)
     function_bodies = _function_bodies(source)
     entries = []
     seen = set()
@@ -409,6 +409,7 @@ def build_contract_brief(
     selected_vulnerabilities: list[dict],
     radius: int = 8,
     include_call_context: bool = True,
+    contract_name: str = "",
 ) -> str:
     """Return interface, call-graph context and relevant numbered snippets.
 
@@ -417,7 +418,7 @@ def build_contract_brief(
     applied modifier reaches the model even when it is far away in the source.
     """
     lines = source.splitlines()
-    interface = _extract_interface(source)
+    interface = _extract_interface(source, contract_name)
     ranges: list[tuple[int, int]] = []
 
     for vuln in selected_vulnerabilities:

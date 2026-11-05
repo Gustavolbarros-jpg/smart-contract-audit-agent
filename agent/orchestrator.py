@@ -644,10 +644,10 @@ def executar_pipeline(contract_path: str, copy_final: bool = True):
         # ── ETAPA 3: Gerar + autocorrigir Spec ───────────────────────
         print("\n▶️  ETAPA 3: Gerando e validando Spec CVL...")
         plano_spec = build_spec_plan_input(plano_formal)
-        contrato_resumido = build_contract_brief(contract_source, vulns_planejadas)
+        contrato_resumido = build_contract_brief(contract_source, vulns_planejadas, contract_name=nome_contrato)
         spec_patterns = build_spec_pattern_context(plano_formal["selected_rules"])
-        methods_block = build_methods_block(contract_source)
-        auth_probe = choose_auth_probe_function(contract_source)
+        methods_block = build_methods_block(contract_source, nome_contrato)
+        auth_probe = choose_auth_probe_function(contract_source, nome_contrato)
         save_json(run_dir / "spec_plan_input.json", plano_spec)
         save_text(run_dir / "contract_brief.txt", contrato_resumido)
         save_text(run_dir / "spec_patterns.md", spec_patterns)
