@@ -2,10 +2,25 @@
 agent/tools/certora_cli.py
 Ferramenta para executar a Verificação Formal via Certora Prover.
 """
-import subprocess
 import os
+import re
+import shutil
+import subprocess
 
 from core.import_context import certora_compiler_flags, packages_path, solc_remappings
+
+
+def _certora_safe_copy(contract_path: str) -> str | None:
+    """The Prover rejects file names with characters such as '-' ("files must end with one
+    of these extensions"). Return a sanitized copy beside the original (relative imports
+    keep resolving), or None when the name is already acceptable."""
+    directory, name = os.path.split(contract_path)
+    safe = re.sub(r"[^A-Za-z0-9_.]", "_", name)
+    if safe == name:
+        return None
+    copy = os.path.join(directory, f"_certora_{safe}")
+    shutil.copyfile(contract_path, copy)
+    return copy
 
 
 def run_certora(
@@ -27,6 +42,13 @@ def run_certora(
         raise FileNotFoundError(f"Contrato não encontrado: {contract_path}")
     if not os.path.exists(spec_path):
         raise FileNotFoundError(f"Spec CVL não encontrado: {spec_path}")
+
+    safe_copy = _certora_safe_copy(contract_path)
+    if safe_copy:
+        try:
+            return run_certora(safe_copy, spec_path, output_dir, contract_name_override)
+        finally:
+            os.unlink(safe_copy)
 
     # Usa o contract_path REAL passado pelo chamador
     file_name     = os.path.basename(contract_path).split('.')[0]
