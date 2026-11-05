@@ -47,6 +47,7 @@ from core.certora_counterexample import extract_counterexamples, format_countere
 from core.fix_library import get_examples_for_prompt, save_pattern
 from core.run_store import copy_contract, create_run_dir, save_json, save_text, write_metadata
 from core.slither_normalizer import normalize_slither_json
+from core.contract_choice import contract_with_most_critical_findings
 from core.slither_scope import scoped_to_file
 from core.spec_patterns import build_spec_pattern_context
 from core.static_analysis import (
@@ -553,7 +554,13 @@ def executar_pipeline(contract_path: str, copy_final: bool = True):
     slither_raw = run_slither_raw(contract_path)
     save_json(run_dir / "slither_raw.json", slither_raw)
 
-    relatorio_normalizado = normalize_slither_json(scoped_to_file(slither_raw, Path(contract_path)), contract_path)
+    slither_raw_escopo = scoped_to_file(slither_raw, Path(contract_path))
+    escolhido = contract_with_most_critical_findings(slither_raw_escopo)
+    if escolhido and escolhido != nome_contrato:
+        print(f"ℹ️  Contrato verificado: {escolhido} (concentra os achados críticos; antes: {nome_contrato})")
+        nome_contrato = escolhido
+        write_metadata(run_dir, contract_path, MODELO_LLM, internal_contract_name=nome_contrato)
+    relatorio_normalizado = normalize_slither_json(slither_raw_escopo, contract_path)
     save_json(run_dir / "slither_normalized.json", relatorio_normalizado)
 
     candidatos_formais = build_formal_candidates(relatorio_normalizado)
