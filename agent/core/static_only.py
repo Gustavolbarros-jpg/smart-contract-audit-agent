@@ -13,7 +13,7 @@ from collections import Counter
 from pathlib import Path
 
 from core.deterministic_patch import apply_deterministic_patches
-from core.slither_scope import scoped_to_file  # noqa: F401  (re-exported for callers and tests)
+from core.slither_scope import scoped_to_file, without_harness_contracts  # noqa: F401  (re-exported)
 from core.run_store import copy_contract, create_run_dir, save_json, save_text, write_metadata
 from core.slither_normalizer import normalize_slither_json
 from core.toolchain import check_solidity_toolchain
@@ -76,7 +76,7 @@ def _findings_of_patched(original: Path, patched_source: str) -> list[dict]:
     sibling = original.with_name(f"{original.stem}__static_fixed.sol")
     sibling.write_text(patched_source, encoding="utf-8")
     try:
-        raw = scoped_to_file(run_slither_raw(str(sibling)), sibling)
+        raw = without_harness_contracts(scoped_to_file(run_slither_raw(str(sibling)), sibling))
         return normalize_slither_json(raw, str(sibling))["vulnerabilidades"]
     finally:
         sibling.unlink(missing_ok=True)
@@ -130,7 +130,7 @@ def executar_static_only(contract_path: str, with_plugins: bool = False) -> dict
     save_json(run_dir / "slither_raw.json", raw)
     if with_plugins:
         raw = with_plugin_findings(raw, _plugin_findings(contract_path))
-    normalized = normalize_slither_json(scoped_to_file(raw, path), contract_path)
+    normalized = normalize_slither_json(without_harness_contracts(scoped_to_file(raw, path)), contract_path)
     save_json(run_dir / "slither_normalized.json", normalized)
     findings = normalized["vulnerabilidades"]
 

@@ -11,6 +11,7 @@ import os
 import re
 from pathlib import Path
 
+from core.contract_choice import blank_harness_contracts
 from core.solidity_source import mask_comments_and_strings
 from core.vulnerability_catalog import get_catalog_entry
 
@@ -883,7 +884,7 @@ def _fallback_findings(contract_path: str, existing_types: set[str], start_index
     if not contract_path or not os.path.exists(contract_path):
         return []
 
-    source = Path(contract_path).read_text(encoding="utf-8")
+    source = blank_harness_contracts(Path(contract_path).read_text(encoding="utf-8"))
     findings = []
     idx = start_index
 
@@ -947,7 +948,7 @@ def normalize_slither_json(slither_json: dict, contract_path: str = "") -> dict:
     vulnerabilities = []
     low_level_contexts = []
     if contract_path and os.path.exists(contract_path):
-        source = Path(contract_path).read_text(encoding="utf-8")
+        source = blank_harness_contracts(Path(contract_path).read_text(encoding="utf-8"))
         low_level_contexts = _low_level_call_contexts(source)
 
     for idx, detector in enumerate(detectors, start=1):

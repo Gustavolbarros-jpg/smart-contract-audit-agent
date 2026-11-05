@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from core.contract_choice import _contract_of, is_harness_contract
+
 
 def scoped_to_file(raw: dict, contract_path: Path) -> dict:
     """Keep only the detectors whose elements live in ``contract_path``.
@@ -30,3 +32,23 @@ def scoped_to_file(raw: dict, contract_path: Path) -> dict:
         detector for detector in raw.get("results", {}).get("detectors", []) if located_here(detector)
     ]
     return scoped
+
+
+def without_harness_contracts(raw: dict) -> dict:
+    """Drop detectors that only touch test, exploit or mock contracts.
+
+    A tutorial-style file keeps the exploit beside the vulnerable contract, and its own unchecked
+    calls would be reported and "fixed" as if they were the product: 12 of 19 reported repairs in
+    the DeFiVulnLabs run landed in ContractTest. A detector with no contract named in its
+    elements, or with at least one real contract among them, is kept.
+    """
+    def only_harness(detector: dict) -> bool:
+        names = {_contract_of(e) for e in detector.get("elements", []) if isinstance(e, dict)} - {""}
+        return bool(names) and all(is_harness_contract(name) for name in names)
+
+    filtered = dict(raw)
+    filtered["results"] = dict(raw.get("results", {}))
+    filtered["results"]["detectors"] = [
+        detector for detector in raw.get("results", {}).get("detectors", []) if not only_harness(detector)
+    ]
+    return filtered

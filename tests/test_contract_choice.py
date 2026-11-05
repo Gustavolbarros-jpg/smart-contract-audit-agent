@@ -74,3 +74,58 @@ class HarnessExclusionTests(unittest.TestCase):
     def test_only_harness_findings_leave_the_choice_to_the_caller(self):
         raw = _raw({"check": "arbitrary-send-eth", "elements": [_function_in("Attack")]})
         self.assertEqual(contract_with_most_critical_findings(raw), "")
+
+
+class HarnessWordsTests(unittest.TestCase):
+    def test_whole_words_of_the_name_decide(self):
+        from core.contract_choice import is_harness_contract
+
+        for name in ("ContractTest", "EtherStoreAttack", "Attack", "MockERC20", "ExploitContract", "TestToken"):
+            with self.subTest(name=name):
+                self.assertTrue(is_harness_contract(name))
+        for name in ("Attestation", "Protest", "SimpleBank", "TokenWhale", "Contest", "Latest"):
+            with self.subTest(name=name):
+                self.assertFalse(is_harness_contract(name))
+
+
+class WithoutHarnessTests(unittest.TestCase):
+    def test_detectors_that_only_touch_harness_contracts_are_dropped(self):
+        from core.slither_scope import without_harness_contracts
+
+        raw = _raw(
+            {"check": "unchecked-transfer", "elements": [_function_in("ContractTest")]},
+            {"check": "unchecked-transfer", "elements": [_function_in("SimpleBank")]},
+            {"check": "unchecked-transfer", "elements": [_function_in("Attack"), _function_in("SimpleBank")]},
+            {"check": "timestamp", "elements": []},
+        )
+        kept = without_harness_contracts(raw)["results"]["detectors"]
+        self.assertEqual(len(kept), 3)
+        self.assertEqual(len(raw["results"]["detectors"]), 4)
+
+    def test_a_file_without_harness_contracts_is_unchanged(self):
+        from core.slither_scope import without_harness_contracts
+
+        raw = _raw({"check": "tx-origin", "elements": [_function_in("King")]})
+        self.assertEqual(without_harness_contracts(raw), raw)
+
+
+class BlankHarnessTests(unittest.TestCase):
+    SOURCE = (
+        "contract Vault {\n    function f(address a) external {\n        a.call('');\n    }\n}\n"
+        "contract ContractTest {\n    function testIt(address a) public {\n        a.call('');\n    }\n}\n"
+    )
+
+    def test_harness_body_is_blanked_and_lines_are_kept(self):
+        from core.contract_choice import blank_harness_contracts
+
+        blanked = blank_harness_contracts(self.SOURCE)
+        self.assertEqual(blanked.count("\n"), self.SOURCE.count("\n"))
+        self.assertIn("function f(address a)", blanked)
+        self.assertNotIn("testIt", blanked)
+
+    def test_fallback_detector_no_longer_sees_the_exploit(self):
+        from core.contract_choice import blank_harness_contracts
+        from core.slither_normalizer import _low_level_call_contexts
+
+        names = {c["function_name"] for c in _low_level_call_contexts(blank_harness_contracts(self.SOURCE))}
+        self.assertEqual(names, {"f"})
