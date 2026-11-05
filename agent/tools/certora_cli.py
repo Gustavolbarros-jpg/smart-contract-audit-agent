@@ -74,7 +74,9 @@ def run_certora(
         print("⏳ Isso pode demorar alguns minutos...")
 
         timeout = int(os.getenv("AUDIT_CERTORA_TIMEOUT", "600"))
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        # Without a display the Prover skips opening FinalResults.html in the user's browser.
+        env = {k: v for k, v in os.environ.items() if k not in ("DISPLAY", "WAYLAND_DISPLAY")}
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env)
 
         return result.stdout + "\n" + result.stderr
 
