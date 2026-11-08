@@ -52,30 +52,10 @@ class PlanoFormal(BaseModel):
     global_assumptions: List[str] = Field(default_factory=list)
 
 
-# --- Stage 4 models (Certora analysis) ---
-
-class VulnerabilidadeAnalisada(BaseModel):
-    id: str
-    type: str
-    function: str
-    rule: str = Field(description="The checked CVL rule")
-    status: Literal["confirmed", "confirmed_static", "not_confirmed", "inconclusive"]
-    evidencia: Optional[str] = Field(default=None, description="Evidence explaining the result")
-
-class AnaliseCertora(BaseModel):
-    analises: List[VulnerabilidadeAnalisada]
-
-
 # --- Code-generation models ---
 
 class CodigoGerado(BaseModel):
     codigo: str = Field(description="Complete generated source code, either CVL or Solidity depending on the step")
-
-class ValidacaoSpec(BaseModel):
-    valido: bool = Field(description="True if the spec is valid; false if syntax/type issues remain")
-    erros: List[str] = Field(description="List of detected errors")
-    codigo_corrigido: str = Field(description="Complete corrected spec, or original if already valid")
-
 
 # --- Failure diagnosis model ---
 
