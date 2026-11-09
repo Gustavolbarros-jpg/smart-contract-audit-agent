@@ -75,3 +75,21 @@ class SpecShapeTests(unittest.TestCase):
         fixed, changes = aplicar_auth_probe_rules(spec, {"name": "cancel", "params": []})
         self.assertEqual(spec, fixed)
         self.assertEqual([], changes)
+
+
+class OwnerEnvfreeTests(unittest.TestCase):
+    SPEC = "methods {\n  function finalize() external;\n}\nrule r {\n  env e;\n  require e.msg.sender != owner();\n  finalize@withrevert(e);\n  assert lastReverted;\n}\n"
+
+    def test_inherited_owner_is_declared_envfree(self):
+        from tools.spec_validator import declarar_owner_envfree
+
+        fixed, changes = declarar_owner_envfree(self.SPEC, "contract C is OwnableUpgradeable {}")
+        self.assertIn("function owner() external returns(address) envfree;", fixed)
+        self.assertEqual(1, len(changes))
+
+    def test_nothing_is_declared_for_a_contract_without_an_owner(self):
+        from tools.spec_validator import declarar_owner_envfree
+
+        fixed, changes = declarar_owner_envfree(self.SPEC, "contract C {}")
+        self.assertEqual(self.SPEC, fixed)
+        self.assertEqual([], changes)

@@ -1001,6 +1001,25 @@ def aplicar_auth_probe_rules(spec_cvl: str, auth_probe: dict | None) -> tuple[st
     return '\n'.join(novas), correcoes
 
 
+def declarar_owner_envfree(spec_cvl: str, contract_source: str) -> tuple[str, list[str]]:
+    """Declare an inherited ``owner()`` as envfree when a rule calls it.
+
+    The methods block is built from the contract file alone, so an ``owner()`` that comes
+    from ``Ownable`` is missing and the Prover rejects ``owner()`` as "missing environment
+    parameter". Only done for contracts that visibly inherit or define an owner.
+    """
+    if not re.search(r"(?<![\w.])owner\s*\(\s*\)", spec_cvl) or re.search(r"\bfunction\s+owner\s*\(", spec_cvl):
+        return spec_cvl, []
+    if not re.search(r"\bOwnable\w*\b|\bfunction\s+owner\s*\(|\baddress\s+(?:public\s+)?owner\b", contract_source):
+        return spec_cvl, []
+    match = re.search(r"\bmethods\s*\{", spec_cvl)
+    if not match:
+        return spec_cvl, []
+    declaration = "\n  function owner() external returns(address) envfree;"
+    patched = spec_cvl[: match.end()] + declaration + spec_cvl[match.end():]
+    return patched, ["owner() herdado declarado como envfree no methods"]
+
+
 def validar_spec(spec_cvl: str) -> tuple[bool, list[str]]:
     """
     Valida o spec após autocorreção e retorna (valido, lista_de_avisos).

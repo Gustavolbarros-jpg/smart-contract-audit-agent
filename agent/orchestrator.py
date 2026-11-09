@@ -63,6 +63,7 @@ from tools.slither_cli import run_slither_raw
 from tools.certora_cli import run_certora
 from tools.spec_validator import (
     corrigir_spec,
+    declarar_owner_envfree,
     validar_spec,
     deduplicar_spec,
     aplicar_auth_probe_rules,
@@ -341,6 +342,8 @@ def preparar_spec(
             print(f"      → {d}")
 
     spec_corrigido, correcoes = corrigir_spec(spec_corrigido)
+    spec_corrigido, owner_fix = declarar_owner_envfree(spec_corrigido, contract_source)
+    correcoes = correcoes + owner_fix
     if correcoes:
         print(f"   🔧 Auto-correções no spec ({len(correcoes)}):")
         for c in correcoes:
