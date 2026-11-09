@@ -2,9 +2,12 @@
 
 Custom Slither 0.11.3 detector in `agent/slither_plugins/unrestricted_write.py`, run through
 `run_unrestricted_write(contract_path)` in `agent/tools/slither_plugin_runner.py`. It is
-registered on a private `Slither` instance only; the global `slither` CLI and the pipeline
-(`slither_cli.py`, `slither_normalizer.py`, `orchestrator.py`) are untouched. Wiring it in
-is a separate, reviewed step.
+registered on a private `Slither` instance only; the global `slither` CLI is untouched. The
+full pipeline runs it when `AUDIT_WITH_PLUGINS=1`, and `--static-only --with-plugins` runs it
+too. The finding is repaired mechanically (`restore_access_modifier` in
+`core/deterministic_patch.py`): the contract's only identity-gate modifier (one that just
+compares the caller with a state variable) is added to the function. With zero or several such
+modifiers nothing is patched, since the choice of guard would be a guess.
 
 Output: Slither JSON detector results (`check = "unrestricted-write"`, `impact = "High"`,
 `confidence = "Medium"`, `description`, `elements` with `name`, `type` and
