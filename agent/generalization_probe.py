@@ -129,10 +129,19 @@ def run_probe(contract: Path, operators: tuple[str, ...], limit: int, dry_run: b
     print(f"classificacao  : {summary['counts']}")
     print(f"taxa de novos  : {summary['novel_rate']}")
     print("=" * 60)
-    print(
-        "\nSem nenhum fix 'novel', o agente nao demonstrou capacidade de generalizar —\n"
-        "apenas de reaplicar o que ja estava na biblioteca."
-    )
+    novel = summary["counts"].get("novel", 0)
+    if repaired == 0:
+        print("\nNenhum mutante foi reparado: nada a concluir sobre generalizacao.")
+    elif novel == 0:
+        print(
+            "\nSem nenhum fix 'novel', o agente nao demonstrou capacidade de generalizar —\n"
+            "apenas de reaplicar o que ja estava na biblioteca."
+        )
+    else:
+        print(
+            f"\n{novel} de {repaired} fixes reparados sao 'novel'. Com {len(mutations) - repaired} mutantes\n"
+            "sem reparo, a amostra so vale se as falhas nao forem de infraestrutura."
+        )
     return 0
 
 

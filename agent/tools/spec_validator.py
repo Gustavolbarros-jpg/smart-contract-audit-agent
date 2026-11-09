@@ -394,6 +394,18 @@ def corrigir_spec(spec_cvl: str) -> tuple[str, list[str]]:
                 novas_linhas[i] = nova
                 correcoes.append(f"Linha {i+1}: msg/tx solto → campo do env (e.msg / e.tx)")
 
+        # CORREÇÃO 2c: construções que não existem em CVL. "assume X;" é "require X;", e os
+        # campos do env não se atribuem ("e.msg.sender = x;"), constrangem-se com require.
+        if 'methods' not in linha:
+            nova = re.sub(r'^(\s*)assume\b', r'\1require', novas_linhas[i])
+            if nova != novas_linhas[i]:
+                novas_linhas[i] = nova
+                correcoes.append(f"Linha {i+1}: assume → require")
+            nova = re.sub(r'^(\s*)(e\.(?:msg|tx|block)\.\w+)\s*=(?!=)\s*(.+;)\s*$', r'\1require \2 == \3', novas_linhas[i])
+            if nova != novas_linhas[i]:
+                novas_linhas[i] = nova
+                correcoes.append(f"Linha {i+1}: atribuição a campo do env → require ==")
+
     envfree_funcs = set()
     in_methods = False
     for linha in novas_linhas:

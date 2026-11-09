@@ -1696,6 +1696,28 @@ rule smoke {
         self.assertNotIn("createCampaign(uint256 goal, uint256 duration) external returns(uint256) envfree;", fixed)
         self.assertFalse(any("envfree adicionado" in item for item in corrections))
 
+    def test_spec_validator_rewrites_assume_and_env_assignment_into_require(self):
+        spec = """methods {
+  function owner() external returns(address) envfree;
+}
+
+rule r {
+  env e;
+  address to;
+  e.msg.sender = owner();
+  assume to != owner();
+  require e.msg.value == 0;
+  assert true;
+}
+"""
+        fixed, corrections = corrigir_spec(spec)
+
+        self.assertIn("require e.msg.sender == owner();", fixed)
+        self.assertIn("require to != owner();", fixed)
+        self.assertNotIn("assume", fixed)
+        self.assertIn("require e.msg.value == 0;", fixed)
+        self.assertEqual(2, len([c for c in corrections if "assume" in c or "atribuição" in c]))
+
     def test_spec_validator_normalizes_solidity_types_inside_rules(self):
         spec = """methods {
   function notifyPartner(address target, bytes payload) external;
