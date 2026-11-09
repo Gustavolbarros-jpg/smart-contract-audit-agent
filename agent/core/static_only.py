@@ -67,7 +67,7 @@ def build_report(findings: list[dict], patches: list[dict], remaining: list[dict
     }
 
 
-def _findings_of_patched(original: Path, patched_source: str) -> list[dict]:
+def _findings_of_patched(original: Path, patched_source: str, with_plugins: bool = False) -> list[dict]:
     """Re-run Slither on the patched source placed beside the original.
 
     Relative imports resolve against the file's own directory, so analyzing a copy kept in
@@ -76,7 +76,12 @@ def _findings_of_patched(original: Path, patched_source: str) -> list[dict]:
     sibling = original.with_name(f"{original.stem}__static_fixed.sol")
     sibling.write_text(patched_source, encoding="utf-8")
     try:
-        raw = without_harness_contracts(scoped_to_file(run_slither_raw(str(sibling)), sibling))
+        raw = run_slither_raw(str(sibling))
+        if with_plugins:
+            # Without this a plugin finding can never reappear, so it would count as resolved
+            # whether or not the patch fixed it.
+            raw = with_plugin_findings(raw, _plugin_findings(str(sibling)))
+        raw = without_harness_contracts(scoped_to_file(raw, sibling))
         return normalize_slither_json(raw, str(sibling))["vulnerabilidades"]
     finally:
         sibling.unlink(missing_ok=True)
@@ -141,7 +146,7 @@ def executar_static_only(contract_path: str, with_plugins: bool = False) -> dict
         save_text(run_dir / f"{path.stem}_STATIC_FIXED.sol", patched_source)
         save_json(run_dir / "deterministic_patch.json", {"patches": patches})
         try:
-            remaining = _findings_of_patched(path, patched_source)
+            remaining = _findings_of_patched(path, patched_source, with_plugins)
         except SlitherRunError as exc:
             # A patch that does not compile resolves nothing; say so instead of crashing.
             print(f"Patched source does not compile, no patch counts as resolved: {exc}")

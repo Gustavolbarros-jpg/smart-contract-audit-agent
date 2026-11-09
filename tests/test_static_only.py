@@ -5,6 +5,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "agent"))
 
+from unittest import mock
+
+from core import static_only
 from core.static_only import build_report, classify
 from core.vulnerability_catalog import get_catalog_entry
 
@@ -33,6 +36,26 @@ class StaticOnlyTests(unittest.TestCase):
         self.assertFalse(by_id["VULN_002"]["resolved_after_rerun"])
         self.assertEqual(report["patched"], 2)
         self.assertEqual(report["resolved_after_rerun"], 1)
+
+    def test_rerun_includes_plugin_findings_so_they_can_reappear(self):
+        plugin = {
+            "check": "unrestricted-write", "impact": "High", "confidence": "Medium",
+            "description": "setX writes owner", "elements": [
+                {"type": "function", "name": "setX", "source_mapping": {"lines": [3], "filename_absolute": "/tmp/c__static_fixed.sol"}},
+            ],
+        }
+        original = Path("/tmp/c.sol")
+        with mock.patch.object(static_only, "run_slither_raw", return_value={"results": {"detectors": []}}), \
+             mock.patch.object(static_only, "_plugin_findings", return_value=[plugin]) as plugins, \
+             mock.patch.object(static_only, "scoped_to_file", side_effect=lambda raw, _p: raw), \
+             mock.patch.object(static_only, "without_harness_contracts", side_effect=lambda raw: raw), \
+             mock.patch.object(static_only, "normalize_slither_json", side_effect=lambda raw, _p: {"vulnerabilidades": raw["results"]["detectors"]}), \
+             mock.patch.object(Path, "write_text"), mock.patch.object(Path, "unlink"):
+            with_plugins = static_only._findings_of_patched(original, "x", with_plugins=True)
+            without_plugins = static_only._findings_of_patched(original, "x", with_plugins=False)
+        self.assertEqual(len(with_plugins), 1)
+        self.assertEqual(without_plugins, [])
+        plugins.assert_called_once()
 
     def test_unpatched_finding_is_never_resolved(self):
         report = build_report([_finding(1, "tx-origin", "m")], [], [])

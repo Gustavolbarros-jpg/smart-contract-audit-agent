@@ -994,6 +994,8 @@ def executar_pipeline(contract_path: str, copy_final: bool = True):
             analises_fix_certora = analyze_certora_log(certora_fix_log, vulns_confirmadas_formais, spec_corrigido)["analises"]
 
         fixed_slither_raw = run_slither_raw(str(caminho_fix_temp))
+        if os.getenv("AUDIT_WITH_PLUGINS") == "1":
+            fixed_slither_raw = with_plugin_findings(fixed_slither_raw, _plugin_findings(str(caminho_fix_temp)))
         fixed_relatorio_normalizado = normalize_slither_json(fixed_slither_raw, str(caminho_fix_temp))
         save_json(run_dir / f"slither_fixed_t{tentativa}.json", fixed_relatorio_normalizado)
         analise_fix = {
