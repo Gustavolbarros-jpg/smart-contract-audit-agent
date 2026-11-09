@@ -282,6 +282,57 @@ def _require_owner(source: str, function_name: str, vuln_id: str) -> tuple[str, 
     )
 
 
+_IDENTITY_GATE = re.compile(
+    r"require\s*\(\s*(?:msg\.sender\s*==\s*[A-Za-z_]\w*|[A-Za-z_]\w*\s*==\s*msg\.sender)\b"
+    r"|if\s*\(\s*(?:msg\.sender\s*!=\s*[A-Za-z_]\w*|[A-Za-z_]\w*\s*!=\s*msg\.sender)\s*\)\s*\{?\s*revert\b"
+)
+
+
+def _identity_gate_modifiers(masked: str) -> list[str]:
+    """Modifiers that only compare the caller with one state variable (``onlyOwner`` style).
+
+    A mapping lookup (``whitelist[msg.sender]``) or a pause flag is not an identity gate, so
+    ``onlyWhitelisted`` and ``notPaused`` never qualify.
+    """
+    found = []
+    for match in re.finditer(r"\bmodifier\s+([A-Za-z_]\w*)\s*(?:\(\s*\))?\s*(?:virtual\s*)?\{", masked):
+        end = matching_brace(masked, match.end() - 1)
+        body = masked[match.end():end]
+        if _IDENTITY_GATE.search(body) and "[" not in body and body.count(";") <= 2:
+            found.append(match.group(1))
+    return found
+
+
+def _restore_access_modifier(source: str, function_name: str, vuln_id: str) -> tuple[str, bool]:
+    """Re-apply the contract's identity-gate modifier to a privileged function that lacks it.
+
+    Only applied when the contract declares exactly one such modifier and the function name is
+    not overloaded, so the choice of guard is never a guess. A function with an unrelated
+    modifier keeps it and gains the gate after it.
+    """
+    masked = mask_comments_and_strings(source)
+    gates = _identity_gate_modifiers(masked)
+    if len(gates) != 1 or not function_name:
+        return source, False
+    matches = list(re.finditer(rf"\bfunction\s+{re.escape(function_name)}\s*\(([^)]*)\)([^{{;]*){{", masked, re.DOTALL))
+    if len(matches) != 1:
+        return source, False
+    match = matches[0]
+    gate = gates[0]
+    if re.search(rf"\b{re.escape(gate)}\b", match.group(2)):
+        return source, False
+
+    brace_index = match.end() - 1
+    insert_at = brace_index
+    while insert_at > 0 and source[insert_at - 1].isspace():
+        insert_at -= 1
+    # A block comment placed before the brace: a "//" comment would swallow the rest of a
+    # one-line function body, braces included.
+    fix = f"/* FIX {vuln_id} */ " if vuln_id else ""
+    patched = source[:insert_at] + f" {gate} " + fix + source[brace_index:]
+    return patched, True
+
+
 _SEND_STATEMENT = re.compile(
     r"(?m)^(?P<indent>[ \t]*)(?P<expr>[A-Za-z_][^\n;=]*?\.send\s*\([^\n;]*\))[ \t]*;"
 )
@@ -339,6 +390,7 @@ def _use_msg_sender_as_token_source(source: str, function_name: str, vuln_id: st
 _STATEMENT_PATCHES = {
     "arbitrary-send-erc20": _use_msg_sender_as_token_source,
     "suicidal": _require_owner,
+    "unrestricted-write": _restore_access_modifier,
     "unchecked-send": _require_send_success,
     "tx-origin": _replace_tx_origin,
     "unchecked-lowlevel": _require_low_level_success,

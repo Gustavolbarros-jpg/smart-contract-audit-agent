@@ -479,10 +479,11 @@ Result for zero_address_reverts: zero_address_reverts: FAIL: lastReverted
         # A new Slither release that adds detectors fails here on purpose: give each an entry.
         self.assertEqual(missing, [])
 
-    def test_unrestricted_write_is_review_evidence_only(self):
+    def test_unrestricted_write_is_repaired_mechanically_not_formalized(self):
         entry = get_catalog_entry("unrestricted-write")
         self.assertFalse(entry["formalizable"])
-        self.assertEqual(entry["repair_strategy"], "static_review")
+        self.assertTrue(entry["static_confirmed"])
+        self.assertEqual(entry["repair_strategy"], "restore_access_modifier")
         self.assertNotEqual(entry["reason"], "no catalog mapping yet")
 
     def test_new_catalog_entries_are_not_formalizable_without_a_spec_pattern(self):
