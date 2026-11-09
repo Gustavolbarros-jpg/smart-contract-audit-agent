@@ -69,9 +69,42 @@ def _extract_fix_lines(original: str, fixed: str) -> str:
     )
 
 
-def run_probe(contract: Path, operators: tuple[str, ...], limit: int, dry_run: bool) -> int:
+def _detectable_only(contract: Path, source: str, operators: tuple[str, ...], limit: int) -> list:
+    """Mutants that the static stack flags, up to ``limit`` per operator.
+
+    A mutant Slither cannot see never reaches the repair stage, so running it measures the
+    detector, not the agent (see ``mutant_detection.py``).
+    """
+    from mutant_detection import measure
+
+    everything = mutate(source, operators=operators, limit_per_operator=1000)
+    report = measure(contract, with_plugins=True, workers=4)
+    # measure() mutates with every operator; keep this call's operators in the same order.
+    all_ops = mutate(source, operators=tuple(OPERATORS), limit_per_operator=1000)
+    detected = {
+        (m.operator, m.line, m.mutated)
+        for m, r in zip(all_ops, report["results"])
+        if r["status"] == "detected"
+    }
+    kept, per_operator = [], {}
+    for mutation in everything:
+        if (mutation.operator, mutation.line, mutation.mutated) not in detected:
+            continue
+        if per_operator.get(mutation.operator, 0) >= limit:
+            continue
+        per_operator[mutation.operator] = per_operator.get(mutation.operator, 0) + 1
+        kept.append(mutation)
+    return kept
+
+
+def run_probe(
+    contract: Path, operators: tuple[str, ...], limit: int, dry_run: bool, detectable_only: bool = False
+) -> int:
     source = contract.read_text(encoding="utf-8")
-    mutations = mutate(source, operators=operators, limit_per_operator=limit)
+    if detectable_only:
+        mutations = _detectable_only(contract, source, operators, limit)
+    else:
+        mutations = mutate(source, operators=operators, limit_per_operator=limit)
 
     print(f"Contrato base : {contract}")
     print(f"Mutantes      : {len(mutations)} {summarize(mutations)}")
@@ -155,6 +188,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="List the mutants without running the pipeline (needs no credentials).",
     )
+    parser.add_argument(
+        "--detectable-only",
+        action="store_true",
+        help="Keep only mutants that Slither/plugins flag (runs the detection check first).",
+    )
     args = parser.parse_args(argv)
 
     contract = Path(args.contract).resolve()
@@ -162,7 +200,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Contrato nao encontrado: {contract}")
         return 1
 
-    return run_probe(contract, tuple(args.operators), args.limit, args.dry_run)
+    return run_probe(contract, tuple(args.operators), args.limit, args.dry_run, args.detectable_only)
 
 
 if __name__ == "__main__":
