@@ -49,6 +49,8 @@ from core.run_store import copy_contract, create_run_dir, save_json, save_text, 
 from core.slither_normalizer import normalize_slither_json
 from core.contract_choice import contract_with_most_critical_findings
 from core.slither_scope import scoped_to_file, without_harness_contracts
+from core.static_only import _plugin_findings, with_plugin_findings
+from core.vulnerability_catalog import get_catalog_entry
 from core.spec_patterns import build_spec_pattern_context
 from core.static_analysis import (
     analyze_static_after_fix,
@@ -552,6 +554,10 @@ def executar_pipeline(contract_path: str, copy_final: bool = True):
     # ── ETAPA 1: Slither ─────────────────────────────────────────
     print("\n▶️  ETAPA 1: Executando Slither e normalizando deterministicamente...")
     slither_raw = run_slither_raw(contract_path)
+    if os.getenv("AUDIT_WITH_PLUGINS") == "1":
+        # Opt-in, like --static-only --with-plugins: the project's own detectors add findings
+        # that Slither's catalog cannot see (e.g. a privileged setter with no caller check).
+        slither_raw = with_plugin_findings(slither_raw, _plugin_findings(contract_path))
     save_json(run_dir / "slither_raw.json", slither_raw)
 
     slither_raw_escopo = without_harness_contracts(scoped_to_file(slither_raw, Path(contract_path)))
@@ -762,7 +768,22 @@ def executar_pipeline(contract_path: str, copy_final: bool = True):
                 json.dumps(vulns_inconclusivas, ensure_ascii=False),
             )
             return
-        print("\n✅ Nenhuma vulnerabilidade confirmada! O contrato já está seguro.")
+        analisados = {v.get("id") for v in analise["analises"]}
+        em_revisao = [
+            v for v in relatorio_normalizado["vulnerabilidades"]
+            if v.get("id") not in analisados
+            and (get_catalog_entry(v.get("type", "")) or {}).get("category") == "security"
+        ]
+        if em_revisao:
+            # Not proved vulnerable, but not proved safe either: say so instead of "seguro".
+            print(
+                f"\n⚠️  Nenhuma vulnerabilidade confirmada formalmente, mas {len(em_revisao)} achado(s) "
+                "de seguranca sem verificacao formal exigem revisao:"
+            )
+            for v in em_revisao[:10]:
+                print(f"   - {v.get('type')} em {v.get('function')}")
+        else:
+            print("\n✅ Nenhuma vulnerabilidade confirmada! O contrato já está seguro.")
         return
 
     if vulns_inconclusivas:
