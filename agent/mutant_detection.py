@@ -15,7 +15,6 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-import tempfile
 from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -27,6 +26,7 @@ sys.path.insert(0, str(AGENT_DIR))
 from core.mutation import OPERATORS, mutate
 from core.slither_normalizer import normalize_slither_json
 from core.slither_scope import scoped_to_file, without_harness_contracts
+from core.vulnerability_catalog import get_catalog_entry
 from core.static_only import _plugin_findings, with_plugin_findings
 from tools.slither_cli import SlitherRunError, run_slither_raw
 
@@ -36,18 +36,26 @@ def _finding_keys(path: Path, with_plugins: bool) -> Counter:
     if with_plugins:
         raw = with_plugin_findings(raw, _plugin_findings(str(path)))
     normalized = normalize_slither_json(without_harness_contracts(scoped_to_file(raw, path)), str(path))
-    return Counter((v.get("type", ""), v.get("function", "")) for v in normalized["vulnerabilidades"])
+    # Informational findings (naming-convention, solc-version...) are not vulnerabilities: a
+    # mutant that only adds one was not detected, however much noise it makes.
+    return Counter(
+        (v.get("type", ""), v.get("function", ""))
+        for v in normalized["vulnerabilidades"]
+        if (get_catalog_entry(v.get("type", "")) or {}).get("category") == "security"
+    )
 
 
-def _analyze(mutation, directory: Path, name: str, baseline: Counter, with_plugins: bool) -> dict:
-    # One folder per mutant, so concurrent workers never share a file.
-    directory.mkdir()
-    target = directory / name
+def _analyze(mutation, contract: Path, index: int, baseline: Counter, with_plugins: bool) -> dict:
+    # Beside the original, so relative imports resolve; one file name per mutant, so
+    # concurrent workers never share a file.
+    target = contract.with_name(f"{contract.stem}__mut{index}.sol")
     target.write_text(mutation.source, encoding="utf-8")
     try:
         keys = _finding_keys(target, with_plugins)
     except SlitherRunError as exc:
         return {"label": mutation.label, "operator": mutation.operator, "status": "compile_error", "detail": str(exc)[:120]}
+    finally:
+        target.unlink(missing_ok=True)
     added = sorted((keys - baseline).keys())
     return {
         "label": mutation.label,
@@ -63,13 +71,11 @@ def measure(contract: Path, with_plugins: bool, workers: int) -> dict:
     mutations = mutate(source, operators=OPERATORS, limit_per_operator=1000)
     baseline = _finding_keys(contract, with_plugins)
 
-    with tempfile.TemporaryDirectory(dir=contract.parent) as workdir:
-        with ThreadPoolExecutor(max_workers=workers) as pool:
-            futures = [
-                pool.submit(_analyze, m, Path(workdir) / f"m{i}", contract.name, baseline, with_plugins)
-                for i, m in enumerate(mutations)
-            ]
-            results = [f.result() for f in futures]
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = [
+            pool.submit(_analyze, m, contract, i, baseline, with_plugins) for i, m in enumerate(mutations)
+        ]
+        results = [f.result() for f in futures]
 
     by_operator: dict[str, Counter] = defaultdict(Counter)
     for item in results:
