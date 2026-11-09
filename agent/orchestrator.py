@@ -823,6 +823,23 @@ def executar_pipeline(contract_path: str, copy_final: bool = True):
         vulns_confirmadas_full,
         diagnosis_plan,
     )
+    # A finding that a deterministic patch will repair needs no LLM diagnosis. Without this, a
+    # failing LLM call for one uncovered ID blocked the run before the patch that fixes it.
+    _, pre_patches = apply_deterministic_patches(contract_source, vulns_confirmadas_full)
+    covered_by_hints = {item["id"] for item in diagnostico.get("falhas", [])}
+    full_by_id = {item.get("id"): item for item in vulns_confirmadas_full}
+    for patch in pre_patches:
+        if patch["id"] in covered_by_hints:
+            continue
+        finding = full_by_id.get(patch["id"], {})
+        diagnostico.setdefault("falhas", []).append({
+            "id": patch["id"],
+            "rule_que_falhou": str(finding.get("rule") or ""),
+            "motivo": str(finding.get("description") or patch.get("type") or "deterministic repair"),
+            "linha": None,
+            "codigo_atual": None,
+            "correcao_necessaria": f"Repaired by the deterministic {patch.get('type')} patch.",
+        })
     deterministic_ids = {item["id"] for item in diagnostico.get("falhas", [])}
     if deterministic_ids:
         save_json(run_dir / "diagnosis_t0_deterministic.json", diagnostico)

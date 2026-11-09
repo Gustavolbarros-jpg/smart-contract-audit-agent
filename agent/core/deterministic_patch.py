@@ -196,7 +196,8 @@ _LOW_LEVEL_STATEMENT = re.compile(
     r"(?m)^(?P<indent>[ \t]*)(?P<expr>[A-Za-z_][^\n;=]*?\.call\s*(?:\{[^}\n]*\})?\s*\([^\n;]*\))[ \t]*;"
 )
 _TOKEN_TRANSFER_STATEMENT = re.compile(
-    r"(?m)^(?P<indent>[ \t]*)(?P<expr>[A-Za-z_][\w.\[\]]*(?:\([^;\n()]*\))?\.(?:transfer|transferFrom)\s*\((?P<args>[^\n;]*)\))[ \t]*;"
+    # The indent group may carry a single-line "if (cond) " prefix, which the rewrite keeps.
+    r"(?m)^(?P<indent>[ \t]*(?:if\s*\([^\n;{}]*\)\s*)?)(?P<expr>[A-Za-z_][\w.\[\]]*(?:\([^;\n()]*\))?\.(?:transfer|transferFrom)\s*\((?P<args>[^\n;]*)\))[ \t]*;"
 )
 
 

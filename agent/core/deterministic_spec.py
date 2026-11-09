@@ -77,6 +77,11 @@ def _solidity_type(param: str) -> str:
 def _cvl_type(param_type: str) -> str:
     if param_type == "address payable":
         return "address"
+    # CVL has no interface or contract types: "IERC20 token" is an address there.
+    if re.fullmatch(r"[A-Za-z_]\w*", param_type) and not re.fullmatch(
+        r"address|bool|string|bytes\d*|uint\d*|int\d*", param_type
+    ):
+        return "address"
     return param_type
 
 

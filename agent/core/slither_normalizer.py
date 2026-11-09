@@ -370,12 +370,20 @@ def _success_var_checked(lines: list[str], start_index: int, success_var: str) -
         (re.compile(rf"\bif\s*\(\s*{escaped}\s*\)"), "if_success"),
         (re.compile(rf"\breturn\s+{escaped}\s*;"), "return_success"),
     ]
+    # The success value handed to a helper that does the check ("return verify(target, success, ...)").
+    delegated = re.compile(
+        rf"(?<!emit\s)\b(?!emit\b|require\b|assert\b|if\b|revert\b)[A-Za-z_]\w*\s*\([^;]*\b{escaped}\b"
+    )
     for offset, line in enumerate(lines[start_index:], start=start_index):
         if re.search(rf"\b{escaped}\s*=", line):
             return False, 0, ""
+        # A few lines joined, because "require(" often ends a line and the variable starts the next.
+        window = " ".join(part.strip() for part in lines[offset:offset + 4])
         for pattern, kind in check_patterns:
-            if pattern.search(line):
+            if pattern.search(line) or pattern.search(window):
                 return True, offset + 1, kind
+        if delegated.search(window) and re.search(rf"\b{escaped}\b", line):
+            return True, offset + 1, "delegated_check"
     return False, 0, ""
 
 

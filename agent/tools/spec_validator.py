@@ -621,10 +621,19 @@ def _parse_params(params: str) -> list[dict]:
         cleaned = re.sub(r"\s+", " ", cleaned).strip()
         parts = cleaned.split()
         if len(parts) == 1:
-            parsed.append({"type": parts[0], "name": f"arg{index}"})
+            parsed.append({"type": _cvl_param_type(parts[0]), "name": f"arg{index}"})
         else:
-            parsed.append({"type": " ".join(parts[:-1]), "name": parts[-1]})
+            parsed.append({"type": _cvl_param_type(" ".join(parts[:-1])), "name": parts[-1]})
     return parsed
+
+
+def _cvl_param_type(solidity_type: str) -> str:
+    """CVL has no interface or contract types: ``IERC20 token`` is an ``address`` there."""
+    if re.fullmatch(r"[A-Za-z_]\w*", solidity_type) and not re.fullmatch(
+        r"address|bool|string|bytes\d*|uint\d*|int\d*", solidity_type
+    ):
+        return "address"
+    return solidity_type
 
 
 def _parse_function_reference(value: str) -> tuple[str, list[dict]]:
@@ -942,6 +951,10 @@ def aplicar_target_binding_rules(
 def aplicar_auth_probe_rules(spec_cvl: str, auth_probe: dict | None) -> tuple[str, list[str]]:
     """Rewrite tx-origin/auth rules to call a real onlyOwner function."""
     if not auth_probe or not auth_probe.get("name"):
+        return spec_cvl, []
+    # The rewritten rule constrains the caller with owner(); a contract whose methods block has
+    # no owner getter would get a spec the Prover rejects ("could not type owner()").
+    if not re.search(r"\bfunction\s+owner\s*\(", spec_cvl):
         return spec_cvl, []
 
     linhas = spec_cvl.split('\n')

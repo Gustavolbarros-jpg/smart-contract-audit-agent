@@ -1719,6 +1719,13 @@ rule r {
         self.assertIn("require e.msg.value == 0;", fixed)
         self.assertEqual(2, len([c for c in corrections if "assume" in c or "atribuição" in c]))
 
+    def test_interface_typed_parameter_is_declared_as_address_in_generated_rules(self):
+        from tools.spec_validator import _parse_function_reference
+
+        name, params = _parse_function_reference("initialize(IERC20 _token, address _beneficiary, uint256 n)")
+        self.assertEqual("initialize", name)
+        self.assertEqual(["address", "address", "uint256"], [item["type"] for item in params])
+
     def test_spec_validator_normalizes_solidity_types_inside_rules(self):
         spec = """methods {
   function notifyPartner(address target, bytes payload) external;
