@@ -450,6 +450,18 @@ Result for zero_address_reverts: zero_address_reverts: FAIL: lastReverted
         self.assertTrue(entry["static_confirmed"])
         self.assertEqual(entry["repair_strategy"], "block_forwarded_delegatecall_multicall")
 
+    def test_divide_before_multiply_is_static_confirmed_and_mechanical(self):
+        entry = get_catalog_entry("divide-before-multiply")
+        self.assertTrue(entry["static_confirmed"])
+        self.assertFalse(entry["formalizable"])
+        self.assertEqual(entry["repair_strategy"], "multiply_before_divide")
+
+    def test_encode_packed_collision_is_static_confirmed_and_mechanical(self):
+        entry = get_catalog_entry("encode-packed-collision")
+        self.assertTrue(entry["static_confirmed"])
+        self.assertFalse(entry["formalizable"])
+        self.assertEqual(entry["repair_strategy"], "hash_abi_encode_instead_of_packed")
+
     def test_unprotected_critical_update_is_static_review_for_now(self):
         entry = get_catalog_entry("unprotected-critical-update")
         self.assertFalse(entry["formalizable"])

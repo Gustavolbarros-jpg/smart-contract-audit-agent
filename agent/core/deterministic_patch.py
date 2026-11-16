@@ -388,6 +388,107 @@ def _use_msg_sender_as_token_source(source: str, function_name: str, vuln_id: st
     return source, True
 
 
+# A simple operand: an identifier, a number, a member access or an index. Anything with a
+# call, a cast or nested arithmetic is left alone, because reordering it is not mechanical.
+_SIMPLE_OPERAND = r"[A-Za-z_0-9][\w.\[\]]*"
+_DIVIDE_THEN_MULTIPLY = re.compile(
+    rf"(?P<open>\(\s*)?(?P<a>{_SIMPLE_OPERAND})\s*/\s*(?P<b>{_SIMPLE_OPERAND})"
+    rf"(?P<close>\s*\))?\s*\*\s*(?P<c>{_SIMPLE_OPERAND})"
+)
+_ARITHMETIC_TAIL = re.compile(r"\s*[*/%+-]")
+
+
+def _multiply_before_divide(source: str, function_name: str, vuln_id: str) -> tuple[str, bool]:
+    """Reorder ``(a / b) * c`` into ``(a * c) / b``, which is the precision fix itself.
+
+    Solidity truncates integer division, so dividing first throws away the remainder before
+    the multiplication can use it. Multiplying first keeps it. Under 0.8 arithmetic the
+    larger intermediate product cannot wrap silently -- it reverts -- so the reorder does not
+    hide an overflow.
+    """
+    masked = mask_comments_and_strings(source)
+    spans = _function_bodies(masked, function_name) if function_name else []
+    matches = []
+    for start, end in spans:
+        for match in _DIVIDE_THEN_MULTIPLY.finditer(masked, start, end + 1):
+            # Parentheses must match: "(a / b) * c" or "a / b * c", never a half pair taken
+            # out of a larger expression.
+            if bool(match.group("open")) != bool(match.group("close")):
+                continue
+            # A longer chain such as "a / b * c / d" is not a two-operation reorder.
+            if _ARITHMETIC_TAIL.match(masked, match.end()):
+                continue
+            matches.append(match)
+
+    if not matches:
+        return source, False
+
+    fix = f" // FIX {vuln_id}" if vuln_id else ""
+    for match in reversed(matches):
+        a, b, c = match.group("a"), match.group("b"), match.group("c")
+        replacement = f"({a} * {c}) / {b}" if match.group("open") else f"{a} * {c} / {b}"
+        source = source[: match.start()] + replacement + source[match.end():]
+        if fix:
+            line_end = source.find("\n", match.start())
+            line_end = len(source) if line_end == -1 else line_end
+            if "// FIX" not in source[match.start():line_end]:
+                source = source[:line_end] + fix + source[line_end:]
+    return source, True
+
+
+def _matching_paren(masked: str, open_index: int) -> int:
+    """Index of the ``)`` closing the ``(`` at ``open_index``, on masked source."""
+    depth = 0
+    for index in range(open_index, len(masked)):
+        if masked[index] == "(":
+            depth += 1
+        elif masked[index] == ")":
+            depth -= 1
+            if depth == 0:
+                return index
+    return -1
+
+
+_ENCODE_PACKED_IN_HASH = re.compile(r"keccak256\s*\(\s*abi\s*\.\s*encodePacked\s*\(")
+
+
+def _encode_instead_of_encode_packed(source: str, function_name: str, vuln_id: str) -> tuple[str, bool]:
+    """Hash ``abi.encode`` instead of ``abi.encodePacked`` when the arguments can collide.
+
+    ``encodePacked`` concatenates without lengths, so ("a", "bc") and ("ab", "c") hash to the
+    same value. ``abi.encode`` pads each argument, which removes the collision. Only done for
+    a hashed call with two or more arguments: with one argument there is nothing to collide,
+    and the padding would change the hash for no reason.
+    """
+    masked = mask_comments_and_strings(source)
+    spans = _function_bodies(masked, function_name) if function_name else []
+    matches = []
+    for start, end in spans:
+        for match in _ENCODE_PACKED_IN_HASH.finditer(masked, start, end + 1):
+            args_close = _matching_paren(masked, match.end() - 1)
+            if args_close == -1:
+                continue
+            if _top_level_args(masked[match.end(): args_close]) < 2:
+                continue
+            matches.append(match)
+
+    if not matches:
+        return source, False
+
+    fix = f" // FIX {vuln_id}" if vuln_id else ""
+    for match in reversed(matches):
+        packed = source.find("encodePacked", match.start(), match.end())
+        if packed == -1:
+            continue
+        source = source[:packed] + "encode" + source[packed + len("encodePacked"):]
+        if fix:
+            line_end = source.find("\n", packed)
+            line_end = len(source) if line_end == -1 else line_end
+            if "// FIX" not in source[packed:line_end]:
+                source = source[:line_end] + fix + source[line_end:]
+    return source, True
+
+
 _STATEMENT_PATCHES = {
     "arbitrary-send-erc20": _use_msg_sender_as_token_source,
     "suicidal": _require_owner,
@@ -396,4 +497,6 @@ _STATEMENT_PATCHES = {
     "tx-origin": _replace_tx_origin,
     "unchecked-lowlevel": _require_low_level_success,
     "unchecked-transfer": _require_token_transfer_success,
+    "divide-before-multiply": _multiply_before_divide,
+    "encode-packed-collision": _encode_instead_of_encode_packed,
 }

@@ -342,3 +342,85 @@ class EoaCheckTests(unittest.TestCase):
     def test_modifier_comparing_with_state_is_still_rewritten(self):
         source = "contract C {\n    address owner;\n    modifier onlyOwner() {\n        require(tx.origin == owner);\n        _;\n    }\n}"
         self.assertEqual(len(_patch(source, "tx-origin")[1]), 1)
+
+
+class MultiplyBeforeDivideTests(unittest.TestCase):
+    def test_parenthesised_division_is_reordered(self):
+        source = "contract C { function f(uint256 p, uint256 d) public pure returns (uint256) {\n    return (p / 100) * d;\n} }"
+        patched, applied = _patch(source, "divide-before-multiply")
+
+        self.assertIn("return (p * d) / 100;", patched)
+        self.assertIn("// FIX V1", patched)
+        self.assertEqual(len(applied), 1)
+
+    def test_bare_division_is_reordered_without_adding_parentheses(self):
+        source = "contract C { function f(uint256 a, uint256 b, uint256 c) public pure returns (uint256) {\n    return a / b * c;\n} }"
+        patched, applied = _patch(source, "divide-before-multiply")
+
+        self.assertIn("return a * c / b;", patched)
+        self.assertEqual(len(applied), 1)
+
+    def test_a_longer_arithmetic_chain_is_left_alone(self):
+        """Reordering two of four operations is not the mechanical fix."""
+        source = "contract C { function f(uint256 a, uint256 b, uint256 c, uint256 d) public pure returns (uint256) {\n    return a / b * c / d;\n} }"
+        patched, applied = _patch(source, "divide-before-multiply")
+
+        self.assertIn("return a / b * c / d;", patched)
+        self.assertEqual(applied, [])
+
+    def test_a_call_operand_is_left_alone(self):
+        source = "contract C { function f(uint256 b, uint256 c) public view returns (uint256) {\n    return (total() / b) * c;\n} }"
+        patched, applied = _patch(source, "divide-before-multiply")
+
+        self.assertIn("return (total() / b) * c;", patched)
+        self.assertEqual(applied, [])
+
+    def test_a_division_by_a_product_is_left_alone(self):
+        source = "contract C { function f(uint256 a, uint256 b, uint256 c) public pure returns (uint256) {\n    return a / (b * c);\n} }"
+        patched, applied = _patch(source, "divide-before-multiply")
+
+        self.assertIn("return a / (b * c);", patched)
+        self.assertEqual(applied, [])
+
+
+class EncodePackedCollisionTests(unittest.TestCase):
+    def test_hashed_encode_packed_becomes_encode(self):
+        source = (
+            "contract C { function f(string memory s1, string memory s2) public pure returns (bytes32) {\n"
+            "    return keccak256(abi.encodePacked(s1, s2));\n} }"
+        )
+        patched, applied = _patch(source, "encode-packed-collision")
+
+        self.assertIn("keccak256(abi.encode(s1, s2))", patched)
+        self.assertIn("// FIX V1", patched)
+        self.assertEqual(len(applied), 1)
+
+    def test_a_single_argument_cannot_collide_and_is_left_alone(self):
+        source = (
+            "contract C { function f(string memory s1) public pure returns (bytes32) {\n"
+            "    return keccak256(abi.encodePacked(s1));\n} }"
+        )
+        patched, applied = _patch(source, "encode-packed-collision")
+
+        self.assertIn("abi.encodePacked(s1)", patched)
+        self.assertEqual(applied, [])
+
+    def test_encode_packed_outside_a_hash_is_left_alone(self):
+        source = (
+            "contract C { function f(string memory s1, string memory s2) public pure returns (bytes memory) {\n"
+            "    return abi.encodePacked(s1, s2);\n} }"
+        )
+        patched, applied = _patch(source, "encode-packed-collision")
+
+        self.assertIn("return abi.encodePacked(s1, s2);", patched)
+        self.assertEqual(applied, [])
+
+    def test_nested_call_arguments_still_count_as_two(self):
+        source = (
+            "contract C { function f(address a, uint256 n) public pure returns (bytes32) {\n"
+            "    return keccak256(abi.encodePacked(uint160(a), uint8(n)));\n} }"
+        )
+        patched, applied = _patch(source, "encode-packed-collision")
+
+        self.assertIn("abi.encode(uint160(a), uint8(n))", patched)
+        self.assertEqual(len(applied), 1)
