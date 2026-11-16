@@ -20,6 +20,77 @@ def has_imports(source: str) -> bool:
     return bool(solidity_imports(source))
 
 
+TYPE_DECLARATION_RE = re.compile(
+    r"\b(struct|enum|contract|interface|library)\s+([A-Za-z_][A-Za-z0-9_]*)"
+)
+VALUE_TYPE_RE = re.compile(r"\btype\s+([A-Za-z_][A-Za-z0-9_]*)\s+is\b")
+# A struct or enum only exists in CVL under the qualified name of the contract that
+# declares it, so it must never be guessed to be an ``address``; a contract, an
+# interface and a library are all addresses there.
+NOT_AN_ADDRESS = frozenset({"struct", "enum", "type"})
+
+
+def _strip_comments(source: str) -> str:
+    without_blocks = re.sub(r"/\*.*?\*/", " ", source, flags=re.DOTALL)
+    return re.sub(r"//[^\n]*", " ", without_blocks)
+
+
+def _merge_kind(kinds: dict[str, str], name: str, kind: str) -> None:
+    """Keep the kind that CVL cannot spell, so an ambiguous name errs on being dropped."""
+    previous = kinds.get(name)
+    if previous is None or (kind in NOT_AN_ADDRESS and previous not in NOT_AN_ADDRESS):
+        kinds[name] = kind
+
+
+def declared_types_in_source(source: str) -> dict[str, str]:
+    """Every type name declared in one Solidity source, mapped to what declares it."""
+    kinds: dict[str, str] = {}
+    stripped = _strip_comments(source or "")
+    for kind, name in TYPE_DECLARATION_RE.findall(stripped):
+        _merge_kind(kinds, name, kind)
+    for name in VALUE_TYPE_RE.findall(stripped):
+        _merge_kind(kinds, name, "type")
+    return kinds
+
+
+def declared_type_kinds(
+    contract_path: str | Path,
+    source: str | None = None,
+    limit: int = 400,
+) -> dict[str, str]:
+    """Type names declared by the contract or by the files it imports, mapped to their kind.
+
+    The declaration is usually not in the contract's own file: ``Receipt`` of
+    GovernorBravoDelegateMaia lives in an imported interfaces file, which is why a
+    file-local scan reported nothing and the generated spec called it an ``address``.
+    """
+    path = Path(contract_path).resolve()
+    root_source = _read_source(path) if source is None else source
+    remaps = solc_remappings(path, root_source)
+
+    kinds: dict[str, str] = {}
+    seen: set[Path] = set()
+    queue: list[tuple[Path, str | None]] = [(path, root_source)]
+    while queue and len(seen) < limit:
+        current, known_source = queue.pop()
+        if current in seen:
+            continue
+        seen.add(current)
+        current_source = _read_source(current) if known_source is None else known_source
+        if not current_source:
+            continue
+        for name, kind in declared_types_in_source(current_source).items():
+            _merge_kind(kinds, name, kind)
+        for import_path in solidity_imports(current_source):
+            if import_path.startswith((".", "/")):
+                queue.append(((current.parent / import_path).resolve(), None))
+                continue
+            match = _remap_for(import_path, remaps)
+            if match is not None:
+                queue.append((match[1].resolve(), None))
+    return kinds
+
+
 def _package_prefix(import_path: str) -> str | None:
     if import_path.startswith((".", "/")):
         return None

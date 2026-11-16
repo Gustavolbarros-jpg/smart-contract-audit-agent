@@ -36,7 +36,7 @@ from core.deterministic_patch import apply_deterministic_patches
 from core.deterministic_spec import build_deterministic_spec
 from core.formal_candidate import build_formal_candidates
 from core.formal_plan import build_planner_input, build_spec_plan_input, sanitize_formal_plan
-from core.import_context import has_imports
+from core.import_context import declared_type_kinds, has_imports
 from core.perspectives import build_perspective_guidance
 from core.patch_guard import (
     analyze_patch,
@@ -655,7 +655,8 @@ def executar_pipeline(contract_path: str, copy_final: bool = True):
         plano_spec = build_spec_plan_input(plano_formal)
         contrato_resumido = build_contract_brief(contract_source, vulns_planejadas, contract_name=nome_contrato)
         spec_patterns = build_spec_pattern_context(plano_formal["selected_rules"])
-        methods_block = build_methods_block(contract_source, nome_contrato)
+        declared_types = declared_type_kinds(contract_path, contract_source)
+        methods_block = build_methods_block(contract_source, nome_contrato, declared_types=declared_types)
         auth_probe = choose_auth_probe_function(contract_source, nome_contrato)
         save_json(run_dir / "spec_plan_input.json", plano_spec)
         save_text(run_dir / "contract_brief.txt", contrato_resumido)
@@ -672,7 +673,11 @@ def executar_pipeline(contract_path: str, copy_final: bool = True):
             item["id"]: item
             for item in plano_formal["selected_rules"]
         }
-        deterministic_spec = build_deterministic_spec(methods_block, plano_formal["selected_rules"])
+        deterministic_spec = build_deterministic_spec(
+            methods_block,
+            plano_formal["selected_rules"],
+            declared_types,
+        )
         if deterministic_spec:
             print("   🧱 Spec determinística aplicada para padrão mecânico conhecido.")
             save_text(run_dir / "llm_spec_generation_status.json", json.dumps(

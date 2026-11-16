@@ -5,16 +5,26 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from core.contract_context import cvl_type
 
-def build_deterministic_spec(methods_block: str, selected_rules: list[dict[str, Any]]) -> str | None:
+
+def build_deterministic_spec(
+    methods_block: str,
+    selected_rules: list[dict[str, Any]],
+    declared_types: dict[str, str] | None = None,
+) -> str | None:
     if not selected_rules:
         return None
     if all(item.get("type") == "missing-zero-check" for item in selected_rules):
-        return _build_zero_check_spec(methods_block, selected_rules)
+        return _build_zero_check_spec(methods_block, selected_rules, declared_types)
     return None
 
 
-def _build_zero_check_spec(methods_block: str, selected_rules: list[dict[str, Any]]) -> str | None:
+def _build_zero_check_spec(
+    methods_block: str,
+    selected_rules: list[dict[str, Any]],
+    declared_types: dict[str, str] | None = None,
+) -> str | None:
     rules = []
     for item in selected_rules:
         parsed = _parse_signature(str(item.get("function") or ""))
@@ -35,7 +45,12 @@ def _build_zero_check_spec(methods_block: str, selected_rules: list[dict[str, An
                 args.append("x")
                 continue
             var_name = f"arg{index}"
-            declarations.append(f"  {_cvl_type(param_type)} {var_name};")
+            declared_type = _cvl_type(param_type, declared_types)
+            if declared_type is None:
+                # A struct or enum argument has no CVL spelling here; calling it an
+                # address would make the Prover reject the rule. Leave it to the LLM.
+                return None
+            declarations.append(f"  {declared_type} {var_name};")
             args.append(var_name)
 
         rule_name = _rule_name(item, name)
@@ -74,15 +89,9 @@ def _solidity_type(param: str) -> str:
     return " ".join(parts[:-1])
 
 
-def _cvl_type(param_type: str) -> str:
-    if param_type == "address payable":
-        return "address"
-    # CVL has no interface or contract types: "IERC20 token" is an address there.
-    if re.fullmatch(r"[A-Za-z_]\w*", param_type) and not re.fullmatch(
-        r"address|bool|string|bytes\d*|uint\d*|int\d*", param_type
-    ):
-        return "address"
-    return param_type
+def _cvl_type(param_type: str, declared_types: dict[str, str] | None = None) -> str | None:
+    """The CVL spelling of one argument type, or ``None`` when CVL has no name for it."""
+    return cvl_type(param_type, declared_types)
 
 
 def _rule_name(item: dict[str, Any], function_name: str) -> str:

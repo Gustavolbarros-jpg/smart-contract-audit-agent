@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 
 from core.call_expansion import build_call_context
+from core.import_context import NOT_AN_ADDRESS, declared_types_in_source
 
 
 def _parse_line_range(value: str) -> tuple[int, int] | None:
@@ -101,16 +102,40 @@ def _is_cvl_primitive_type(value: str) -> bool:
     )
 
 
-def _type_for_cvl(value: str) -> str:
-    cleaned = _clean_type(value)
+_ARRAY_SUFFIX_RE = re.compile(r"(\s*\[[^\]]*\])+$")
+_DATA_LOCATION_RE = re.compile(r"\b(memory|calldata|storage)\b")
+
+
+def cvl_type(value: str, declared: dict[str, str] | None = None) -> str | None:
+    """How CVL spells a Solidity type, or ``None`` when it cannot spell it at all.
+
+    CVL has no contract types: ``IERC20 token`` is an ``address`` there. A struct or an
+    enum is the opposite case -- it exists only under the qualified name of the contract
+    that declares it (``GovernorBravoDelegateStorageV1.Receipt``), so answering
+    ``address`` makes the Prover reject the entire spec with "Cannot merge address
+    with ...". Returning ``None`` drops that declaration instead, which costs nothing:
+    a methods entry is only needed to mark a function ``envfree`` or to summarize it.
+    """
+    raw = (value or "").strip()
+    cleaned = _clean_type(raw)
     if _is_cvl_primitive_type(cleaned):
         return cleaned
-    if re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", cleaned):
-        return "address"
-    return cleaned
+
+    element = _ARRAY_SUFFIX_RE.sub("", cleaned).strip()
+    if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", element):
+        return cleaned
+    if _is_cvl_primitive_type(element):
+        return cleaned
+    if (declared or {}).get(element) in NOT_AN_ADDRESS:
+        return None
+    # Solidity forbids a data location on a contract type, so one proves the type is a
+    # struct, an enum or an array -- even when the declaration is in a file we never read.
+    if _DATA_LOCATION_RE.search(raw):
+        return None
+    return "address" + cleaned[len(element):]
 
 
-def _state_getter_signature(line: str) -> str | None:
+def _state_getter_signature(line: str, declared: dict[str, str] | None = None) -> str | None:
     stripped = line.split("//", 1)[0].strip().rstrip(";")
     mapping_match = re.match(
         r"mapping\s*\(([^=]+?)\s*=>\s*([^)]+?)\)\s+public(?:\s+\w+)*\s+([A-Za-z_][A-Za-z0-9_]*)\b",
@@ -121,7 +146,10 @@ def _state_getter_signature(line: str) -> str | None:
         value_type = _clean_type(value_type)
         if not _is_cvl_primitive_type(value_type):
             return None
-        return f"  function {name}({_type_for_cvl(key_type)}) external returns({value_type}) envfree;"
+        key = cvl_type(key_type, declared)
+        if key is None:
+            return None
+        return f"  function {name}({key}) external returns({value_type}) envfree;"
 
     simple_match = re.match(
         r"([A-Za-z_][A-Za-z0-9_\[\]]*)\s+public(?:\s+\w+)*\s+([A-Za-z_][A-Za-z0-9_]*)\b",
@@ -137,7 +165,8 @@ def _state_getter_signature(line: str) -> str | None:
     return None
 
 
-def _split_params(params: str) -> list[str]:
+def _split_params(params: str, declared: dict[str, str] | None = None) -> list[str] | None:
+    """The CVL parameter list, or ``None`` when one parameter has no CVL spelling."""
     if not params.strip():
         return []
     normalized = []
@@ -145,11 +174,22 @@ def _split_params(params: str) -> list[str]:
         cleaned = _clean_type(param)
         parts = cleaned.split()
         if len(parts) <= 1:
-            normalized.append(_type_for_cvl(cleaned))
+            single = cvl_type(param, declared)
+            if single is None:
+                return None
+            normalized.append(single)
             continue
-        type_part = _type_for_cvl(" ".join(parts[:-1]))
+        type_part = cvl_type(" ".join(parts[:-1]) + _location_suffix(param), declared)
+        if type_part is None:
+            return None
         normalized.append(f"{type_part} {parts[-1]}")
     return normalized
+
+
+def _location_suffix(raw: str) -> str:
+    """Give the data location back to a type whose name was split off from it."""
+    match = _DATA_LOCATION_RE.search(raw or "")
+    return f" {match.group(1)}" if match else ""
 
 
 def _type_without_name(value: str) -> str:
@@ -164,11 +204,20 @@ def _type_without_name(value: str) -> str:
     return cleaned
 
 
-def _split_return_types(returns: str) -> list[str]:
-    return [_type_for_cvl(_type_without_name(item)) for item in returns.split(",") if item.strip()]
+def _split_return_types(returns: str, declared: dict[str, str] | None = None) -> list[str] | None:
+    """The CVL return types, or ``None`` when one of them has no CVL spelling."""
+    types = []
+    for item in returns.split(","):
+        if not item.strip():
+            continue
+        spelled = cvl_type(_type_without_name(item) + _location_suffix(item), declared)
+        if spelled is None:
+            return None
+        types.append(spelled)
+    return types
 
 
-def _function_method_signature(line: str) -> str | None:
+def _function_method_signature(line: str, declared: dict[str, str] | None = None) -> str | None:
     stripped = line.split("{", 1)[0].strip().rstrip(";")
     match = re.match(r"function\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]*)\)\s*(.*)", stripped)
     if not match:
@@ -182,11 +231,16 @@ def _function_method_signature(line: str) -> str | None:
     returns = ""
     returns_match = re.search(r"returns\s*\(([^)]*)\)", tail)
     if returns_match:
-        returns = f" returns({', '.join(_split_return_types(returns_match.group(1)))})"
+        return_types = _split_return_types(returns_match.group(1), declared)
+        if return_types is None:
+            return None
+        returns = f" returns({', '.join(return_types)})"
 
     envfree = " envfree" if re.search(r"\b(view|pure)\b", tail) else ""
-    params = ", ".join(_split_params(params))
-    return f"  function {name}({params}) external{returns}{envfree};"
+    param_types = _split_params(params, declared)
+    if param_types is None:
+        return None
+    return f"  function {name}({', '.join(param_types)}) external{returns}{envfree};"
 
 
 def _mask_comments_and_strings(source: str) -> str:
@@ -303,8 +357,12 @@ def extract_primary_contract_name(source: str, preferred: str = "") -> str:
     return names[-1] if names else ""
 
 
-def _function_method_signature_with_body(line: str, body: str = "") -> str | None:
-    signature = _function_method_signature(line)
+def _function_method_signature_with_body(
+    line: str,
+    body: str = "",
+    declared: dict[str, str] | None = None,
+) -> str | None:
+    signature = _function_method_signature(line, declared)
     if not signature or " envfree;" not in signature:
         return signature
     if body and _uses_restricted_environment(body):
@@ -371,15 +429,30 @@ def choose_auth_probe_function(source: str, contract_name: str = "") -> dict | N
     return functions[0]
 
 
-def build_methods_block(source: str, contract_name: str = "") -> str:
-    """Build a deterministic CVL methods{} block from public/external Solidity API."""
+def build_methods_block(
+    source: str,
+    contract_name: str = "",
+    declared_types: dict[str, str] | None = None,
+) -> str:
+    """Build a deterministic CVL methods{} block from public/external Solidity API.
+
+    ``declared_types`` carries the kinds found across the import closure (see
+    ``import_context.declared_type_kinds``); without it only this file's own
+    declarations are known, and a struct or enum coming from an import is recognised
+    solely by its data location.
+    """
+    declared = dict(declared_types or {})
+    for name, kind in declared_types_in_source(source).items():
+        previous = declared.get(name)
+        if previous is None or (kind in NOT_AN_ADDRESS and previous not in NOT_AN_ADDRESS):
+            declared[name] = kind
     interface = _extract_interface(source, contract_name)
     function_bodies = _function_bodies(source)
     entries = []
     seen = set()
 
     for line in interface["public_state"]:
-        signature = _state_getter_signature(line)
+        signature = _state_getter_signature(line, declared)
         if signature and signature not in seen:
             entries.append(signature)
             seen.add(signature)
@@ -387,7 +460,7 @@ def build_methods_block(source: str, contract_name: str = "") -> str:
     for line in interface["functions"]:
         info = _function_info(line)
         body = function_bodies.get(info["name"], "") if info else ""
-        signature = _function_method_signature_with_body(line, body)
+        signature = _function_method_signature_with_body(line, body, declared)
         if signature and signature not in seen:
             entries.append(signature)
             seen.add(signature)

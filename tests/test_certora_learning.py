@@ -11,6 +11,7 @@ sys.path.insert(0, str(AGENT))
 
 from core.certora_error_catalog import analyze_certora_errors, has_certora_blocking_error
 from core.contract_context import build_methods_block, extract_primary_contract_name
+from core.import_context import declared_type_kinds, declared_types_in_source
 from core.contract_registry import (
     BENCHMARK,
     EXPLORATORY,
@@ -1615,6 +1616,108 @@ contract C {
         self.assertIn("function predictEscrow(address user) external returns(address) envfree;", methods)
         self.assertNotIn("IEscrow predicted", methods)
 
+    def test_methods_block_drops_a_struct_return_from_an_unseen_file(self):
+        """CVL cannot name a struct, and calling it an address makes the Prover reject the spec.
+
+        GovernorBravoDelegateMaia declares ``Receipt`` in an imported file, so nothing in
+        this source says what the type is -- only the data location does, and Solidity
+        forbids one on a contract type.
+        """
+        source = """pragma solidity ^0.8.21;
+contract C {
+  function getReceipt(uint256 proposalId, address voter) external view returns (Receipt memory) {
+    proposalId; voter;
+  }
+  function castVote(uint256 proposalId, uint8 support) external {}
+}
+"""
+        methods = build_methods_block(source)
+
+        self.assertNotIn("getReceipt", methods)
+        self.assertNotIn("Receipt", methods)
+        self.assertIn("function castVote(uint256 proposalId, uint8 support) external;", methods)
+
+    def test_methods_block_drops_an_enum_return_declared_by_an_import(self):
+        """An enum carries no data location, so only the import closure identifies it."""
+        source = """pragma solidity ^0.8.21;
+contract C {
+  function state(uint256 proposalId) external view returns (ProposalState) {
+    proposalId;
+  }
+  function quorumVotes() external view returns (uint256) {
+    return 1;
+  }
+}
+"""
+        methods = build_methods_block(source, declared_types={"ProposalState": "enum"})
+
+        self.assertNotIn("state(", methods)
+        self.assertIn("function quorumVotes() external returns(uint256) envfree;", methods)
+
+    def test_methods_block_drops_a_struct_parameter(self):
+        source = """pragma solidity ^0.8.21;
+contract C {
+  struct Sale { address edition; uint96 price; }
+  function initialize(Sale memory _sale) public {
+    _sale;
+  }
+  function cancel() external {}
+}
+"""
+        methods = build_methods_block(source)
+
+        self.assertNotIn("initialize", methods)
+        self.assertNotIn("address _sale", methods)
+        self.assertIn("function cancel() external;", methods)
+
+    def test_methods_block_keeps_arrays_of_primitive_types(self):
+        source = """pragma solidity ^0.8.21;
+contract C {
+  function batch(uint256[] calldata ids, bytes[] calldata payloads) external returns (bytes32[] memory) {
+    ids; payloads;
+  }
+}
+"""
+        methods = build_methods_block(source)
+
+        self.assertIn(
+            "function batch(uint256[] ids, bytes[] payloads) external returns(bytes32[]);",
+            methods,
+        )
+
+    def test_declared_types_follow_a_relative_import(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / "Interfaces.sol").write_text(
+                "pragma solidity ^0.8.21;\n"
+                "interface ITimelock {}\n"
+                "contract Storage {\n"
+                "  struct Receipt { bool hasVoted; uint96 votes; }\n"
+                "  enum ProposalState { Pending, Active }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            contract = root / "Governor.sol"
+            contract.write_text(
+                'pragma solidity ^0.8.21;\nimport "./Interfaces.sol";\ncontract Governor {}\n',
+                encoding="utf-8",
+            )
+
+            kinds = declared_type_kinds(contract)
+
+        self.assertEqual(kinds.get("Receipt"), "struct")
+        self.assertEqual(kinds.get("ProposalState"), "enum")
+        self.assertEqual(kinds.get("ITimelock"), "interface")
+
+    def test_declared_types_ignore_commented_out_declarations(self):
+        kinds = declared_types_in_source(
+            "// struct Ghost { uint256 a; }\n"
+            "/* enum Phantom { A } */\n"
+            "interface IReal {}\n"
+        )
+
+        self.assertEqual(kinds, {"IReal": "interface"})
+
     def test_methods_block_ignores_top_level_interface_methods(self):
         source = """pragma solidity ^0.8.21;
 interface IERC20 {
@@ -1660,6 +1763,47 @@ contract C {
         self.assertIn("rule zero_address_reverts_setGov", spec)
         self.assertIn("setGov@withrevert(e, x);", spec)
         self.assertIn("setPauseGuardian@withrevert(e, x);", spec)
+
+    def test_deterministic_spec_keeps_an_interface_argument_as_an_address(self):
+        methods = """methods {
+  function setRouter(address router, address token) external;
+}"""
+        spec = build_deterministic_spec(
+            methods,
+            [
+                {
+                    "id": "VULN_001",
+                    "type": "missing-zero-check",
+                    "function": "setRouter(address,IERC20)",
+                    "rule_names": ["zero_address_reverts_setRouter"],
+                },
+            ],
+            {"IERC20": "interface"},
+        )
+
+        self.assertIsNotNone(spec)
+        self.assertIn("  address arg1;", spec)
+        self.assertIn("setRouter@withrevert(e, x, arg1);", spec)
+
+    def test_deterministic_spec_declines_a_rule_with_a_struct_argument(self):
+        """Declaring a struct argument as an address would make the Prover reject the rule."""
+        methods = """methods {
+  function setConfig(address newOwner) external;
+}"""
+        spec = build_deterministic_spec(
+            methods,
+            [
+                {
+                    "id": "VULN_001",
+                    "type": "missing-zero-check",
+                    "function": "setConfig(address,Config)",
+                    "rule_names": ["zero_address_reverts_setConfig"],
+                },
+            ],
+            {"Config": "struct"},
+        )
+
+        self.assertIsNone(spec)
 
     def test_solc_remappings_reads_foundry_remappings(self):
         with tempfile.TemporaryDirectory() as tmp:
