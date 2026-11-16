@@ -6,6 +6,7 @@ Runs Slither and returns deterministic normalized findings.
 import json
 import os
 import re
+import shlex
 import subprocess
 from pathlib import Path
 
@@ -106,7 +107,9 @@ def run_slither_raw(contract_path: str) -> dict:
         raise SlitherRunError(
             f"Slither nao produziu saida para {contract_path} (exit {result.returncode}).\n"
             f"{detail}\n"
-            f"Reproduza com: {' '.join(cmd)}"
+            # shlex.join keeps the quotes around --solc-remaps: every remapping travels in one
+            # argument, and a plain join turns the rest into stray arguments Slither rejects.
+            f"Reproduza com: {shlex.join(cmd)}"
         )
 
     try:
