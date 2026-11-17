@@ -1,0 +1,4122 @@
+[
+ {
+  "run": "20261117_oracle_defivault",
+  "total_mb": 1363.8,
+  "scratch_mb": 1360.6,
+  "evidencia_mb": 3.2,
+  "logs": 44,
+  "jsons": 3,
+  "specs": 0,
+  "sols": 0
+ },
+ {
+  "run": "static_only",
+  "total_mb": 572.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 572.3,
+  "logs": 0,
+  "jsons": 2332,
+  "specs": 0,
+  "sols": 697
+ },
+ {
+  "run": "20261117_arm_a2_deterministic",
+  "total_mb": 572.2,
+  "scratch_mb": 570.8,
+  "evidencia_mb": 1.3,
+  "logs": 18,
+  "jsons": 1,
+  "specs": 0,
+  "sols": 0
+ },
+ {
+  "run": "20261117_oracle_speccheck",
+  "total_mb": 30.5,
+  "scratch_mb": 30.4,
+  "evidencia_mb": 0.1,
+  "logs": 1,
+  "jsons": 1,
+  "specs": 0,
+  "sols": 0
+ },
+ {
+  "run": "20261109_200909_TalosBaseStrategy",
+  "total_mb": 4.9,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 4.9,
+  "logs": 4,
+  "jsons": 18,
+  "specs": 0,
+  "sols": 2
+ },
+ {
+  "run": "20261109_201756_TalosBaseStrategy",
+  "total_mb": 4.9,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 4.9,
+  "logs": 5,
+  "jsons": 20,
+  "specs": 0,
+  "sols": 3
+ },
+ {
+  "run": "20261109_201407_TalosBaseStrategy",
+  "total_mb": 4.8,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 4.8,
+  "logs": 3,
+  "jsons": 17,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261117_oracle_smoke",
+  "total_mb": 4.6,
+  "scratch_mb": 4.6,
+  "evidencia_mb": 0.0,
+  "logs": 2,
+  "jsons": 1,
+  "specs": 0,
+  "sols": 0
+ },
+ {
+  "run": "20260528_093346_Market",
+  "total_mb": 3.9,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 3.9,
+  "logs": 6,
+  "jsons": 24,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20260528_130103_Market",
+  "total_mb": 3.9,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 3.9,
+  "logs": 6,
+  "jsons": 24,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20261104_210236_ERC777-reentrancy",
+  "total_mb": 3.9,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 3.9,
+  "logs": 3,
+  "jsons": 21,
+  "specs": 0,
+  "sols": 2
+ },
+ {
+  "run": "20261105_135837_ERC777-reentrancy",
+  "total_mb": 3.9,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 3.9,
+  "logs": 3,
+  "jsons": 21,
+  "specs": 0,
+  "sols": 2
+ },
+ {
+  "run": "20260528_093140_Market",
+  "total_mb": 3.8,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 3.8,
+  "logs": 6,
+  "jsons": 23,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20261104_200906_Market",
+  "total_mb": 3.8,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 3.8,
+  "logs": 6,
+  "jsons": 24,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20260528_092616_Market",
+  "total_mb": 3.7,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 3.7,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260528_092832_Market",
+  "total_mb": 3.7,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 3.7,
+  "logs": 1,
+  "jsons": 14,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20260528_093003_Market",
+  "total_mb": 3.7,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 3.7,
+  "logs": 2,
+  "jsons": 16,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261104_200835_BaseV2Minter",
+  "total_mb": 3.6,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 3.6,
+  "logs": 2,
+  "jsons": 16,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261104_201548_BaseV2Minter",
+  "total_mb": 3.6,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 3.6,
+  "logs": 2,
+  "jsons": 16,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261104_203647_BaseV2Minter",
+  "total_mb": 3.6,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 3.6,
+  "logs": 6,
+  "jsons": 24,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20261104_211724_fee-on-transfer",
+  "total_mb": 3.6,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 3.6,
+  "logs": 4,
+  "jsons": 19,
+  "specs": 0,
+  "sols": 2
+ },
+ {
+  "run": "20261105_140200_UnsafeCall",
+  "total_mb": 3.6,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 3.6,
+  "logs": 14,
+  "jsons": 34,
+  "specs": 1,
+  "sols": 4
+ },
+ {
+  "run": "20261104_210752_fee-on-transfer",
+  "total_mb": 3.5,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 3.5,
+  "logs": 3,
+  "jsons": 18,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261105_140447_fee-on-transfer",
+  "total_mb": 3.5,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 3.5,
+  "logs": 3,
+  "jsons": 18,
+  "specs": 0,
+  "sols": 2
+ },
+ {
+  "run": "20261105_142600_fee-on-transfer",
+  "total_mb": 3.5,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 3.5,
+  "logs": 5,
+  "jsons": 21,
+  "specs": 0,
+  "sols": 4
+ },
+ {
+  "run": "20261104_211303_UnsafeCall",
+  "total_mb": 3.4,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 3.4,
+  "logs": 13,
+  "jsons": 31,
+  "specs": 1,
+  "sols": 3
+ },
+ {
+  "run": "20261105_140029_SignatureReplay",
+  "total_mb": 3.4,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 3.4,
+  "logs": 6,
+  "jsons": 24,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20261104_211908_first-deposit",
+  "total_mb": 3.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 3.3,
+  "logs": 5,
+  "jsons": 20,
+  "specs": 0,
+  "sols": 3
+ },
+ {
+  "run": "20261104_210303_Incorrect_sanity_checks",
+  "total_mb": 3.2,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 3.2,
+  "logs": 3,
+  "jsons": 21,
+  "specs": 0,
+  "sols": 2
+ },
+ {
+  "run": "20261104_210552_SignatureReplay",
+  "total_mb": 3.2,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 3.2,
+  "logs": 2,
+  "jsons": 16,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261104_210759_first-deposit",
+  "total_mb": 3.2,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 3.2,
+  "logs": 3,
+  "jsons": 18,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261104_211131_SignatureReplay",
+  "total_mb": 3.2,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 3.2,
+  "logs": 7,
+  "jsons": 23,
+  "specs": 1,
+  "sols": 3
+ },
+ {
+  "run": "20261105_135858_Incorrect_sanity_checks",
+  "total_mb": 3.2,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 3.2,
+  "logs": 3,
+  "jsons": 21,
+  "specs": 0,
+  "sols": 2
+ },
+ {
+  "run": "20261105_140502_first-deposit",
+  "total_mb": 3.2,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 3.2,
+  "logs": 0,
+  "jsons": 7,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261105_141109_gas-price",
+  "total_mb": 3.2,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 3.2,
+  "logs": 14,
+  "jsons": 34,
+  "specs": 1,
+  "sols": 4
+ },
+ {
+  "run": "20261105_141415_Storage-collision-audio",
+  "total_mb": 3.2,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 3.2,
+  "logs": 6,
+  "jsons": 24,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20261104_210251_Flashloan-flaw",
+  "total_mb": 3.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 3.1,
+  "logs": 3,
+  "jsons": 21,
+  "specs": 0,
+  "sols": 2
+ },
+ {
+  "run": "20261104_210323_Price_manipulation",
+  "total_mb": 3.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 3.1,
+  "logs": 3,
+  "jsons": 21,
+  "specs": 0,
+  "sols": 2
+ },
+ {
+  "run": "20261104_212107_recoverERC20",
+  "total_mb": 3.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 3.1,
+  "logs": 3,
+  "jsons": 21,
+  "specs": 0,
+  "sols": 2
+ },
+ {
+  "run": "20261104_210427_ReadOnlyReentrancy",
+  "total_mb": 3.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 3.0,
+  "logs": 3,
+  "jsons": 21,
+  "specs": 0,
+  "sols": 2
+ },
+ {
+  "run": "20261104_210500_Returnvalue",
+  "total_mb": 3.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 3.0,
+  "logs": 3,
+  "jsons": 21,
+  "specs": 0,
+  "sols": 2
+ },
+ {
+  "run": "20261104_210621_Storage-collision-audio",
+  "total_mb": 3.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 3.0,
+  "logs": 2,
+  "jsons": 16,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261104_210639_Uninitialized_variables",
+  "total_mb": 3.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 3.0,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261104_210700_UnsafeCall",
+  "total_mb": 3.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 3.0,
+  "logs": 2,
+  "jsons": 16,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261105_140134_Storage-collision-audio",
+  "total_mb": 3.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 3.0,
+  "logs": 2,
+  "jsons": 16,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261105_142507_txorigin",
+  "total_mb": 3.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 3.0,
+  "logs": 6,
+  "jsons": 23,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20261104_210141_ApproveScam",
+  "total_mb": 2.9,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.9,
+  "logs": 3,
+  "jsons": 21,
+  "specs": 0,
+  "sols": 2
+ },
+ {
+  "run": "20261104_210224_Delegatecall",
+  "total_mb": 2.9,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.9,
+  "logs": 3,
+  "jsons": 21,
+  "specs": 0,
+  "sols": 2
+ },
+ {
+  "run": "20261104_210447_Returnfalse",
+  "total_mb": 2.9,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.9,
+  "logs": 3,
+  "jsons": 21,
+  "specs": 0,
+  "sols": 2
+ },
+ {
+  "run": "20261104_210823_recoverERC20",
+  "total_mb": 2.9,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.9,
+  "logs": 3,
+  "jsons": 18,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261104_211521_Visibility",
+  "total_mb": 2.9,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.9,
+  "logs": 6,
+  "jsons": 24,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20261105_135851_Flashloan-flaw",
+  "total_mb": 2.9,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.9,
+  "logs": 0,
+  "jsons": 7,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261105_135917_Price_manipulation",
+  "total_mb": 2.9,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.9,
+  "logs": 0,
+  "jsons": 7,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261105_135945_ReadOnlyReentrancy",
+  "total_mb": 2.9,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.9,
+  "logs": 3,
+  "jsons": 21,
+  "specs": 0,
+  "sols": 2
+ },
+ {
+  "run": "20261105_140153_Uninitialized_variables",
+  "total_mb": 2.9,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.9,
+  "logs": 0,
+  "jsons": 7,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261105_140601_recoverERC20",
+  "total_mb": 2.9,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.9,
+  "logs": 0,
+  "jsons": 7,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261105_141333_Storage-collision",
+  "total_mb": 2.9,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.9,
+  "logs": 6,
+  "jsons": 24,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20261105_142355_phantom-permit",
+  "total_mb": 2.9,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.9,
+  "logs": 6,
+  "jsons": 24,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20261104_210341_Randomness",
+  "total_mb": 2.8,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.8,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261104_210512_Selfdestruct",
+  "total_mb": 2.8,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.8,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261104_210816_phantom-permit",
+  "total_mb": 2.8,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.8,
+  "logs": 0,
+  "jsons": 9,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261104_210830_txorigin",
+  "total_mb": 2.8,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.8,
+  "logs": 0,
+  "jsons": 9,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261104_211620_phantom-permit",
+  "total_mb": 2.8,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.8,
+  "logs": 2,
+  "jsons": 16,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261104_211629_txorigin",
+  "total_mb": 2.8,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.8,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261105_135923_Randomness",
+  "total_mb": 2.8,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.8,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261105_140004_Returnfalse",
+  "total_mb": 2.8,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.8,
+  "logs": 0,
+  "jsons": 7,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261105_140010_Returnvalue",
+  "total_mb": 2.8,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.8,
+  "logs": 0,
+  "jsons": 7,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261105_140406_Visibility",
+  "total_mb": 2.8,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.8,
+  "logs": 6,
+  "jsons": 24,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20261105_140544_phantom-permit",
+  "total_mb": 2.8,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.8,
+  "logs": 2,
+  "jsons": 16,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261105_140607_txorigin",
+  "total_mb": 2.8,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.8,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261105_141316_phantom-permit",
+  "total_mb": 2.8,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.8,
+  "logs": 2,
+  "jsons": 16,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261105_142444_Randomness",
+  "total_mb": 2.8,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.8,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261104_210159_Bypasscontract",
+  "total_mb": 2.7,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.7,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261104_210439_Reentrancy",
+  "total_mb": 2.7,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.7,
+  "logs": 0,
+  "jsons": 11,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261104_210530_Selfdestruct2",
+  "total_mb": 2.7,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.7,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261104_210630_Storage-collision",
+  "total_mb": 2.7,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.7,
+  "logs": 2,
+  "jsons": 16,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261104_210729_Visibility",
+  "total_mb": 2.7,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.7,
+  "logs": 2,
+  "jsons": 16,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261104_210807_gas-price",
+  "total_mb": 2.7,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.7,
+  "logs": 1,
+  "jsons": 14,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261104_211109_Bypasscontract",
+  "total_mb": 2.7,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.7,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261104_211657_gas-price",
+  "total_mb": 2.7,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.7,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261105_135817_ApproveScam",
+  "total_mb": 2.7,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.7,
+  "logs": 0,
+  "jsons": 7,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261105_135824_Bypasscontract",
+  "total_mb": 2.7,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.7,
+  "logs": 0,
+  "jsons": 7,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261105_135830_Delegatecall",
+  "total_mb": 2.7,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.7,
+  "logs": 0,
+  "jsons": 7,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261105_135957_Reentrancy",
+  "total_mb": 2.7,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.7,
+  "logs": 0,
+  "jsons": 7,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261105_140016_Selfdestruct",
+  "total_mb": 2.7,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.7,
+  "logs": 0,
+  "jsons": 7,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261105_140023_Selfdestruct2",
+  "total_mb": 2.7,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.7,
+  "logs": 0,
+  "jsons": 7,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261105_140145_Storage-collision",
+  "total_mb": 2.7,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.7,
+  "logs": 2,
+  "jsons": 16,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261105_140509_gas-price",
+  "total_mb": 2.7,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.7,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261104_200821_Factory",
+  "total_mb": 2.6,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.6,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261104_201023_PrivatePool",
+  "total_mb": 2.6,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.6,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261104_201532_Factory",
+  "total_mb": 2.6,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.6,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261104_201620_PrivatePool",
+  "total_mb": 2.6,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.6,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261104_203743_Factory",
+  "total_mb": 2.6,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.6,
+  "logs": 10,
+  "jsons": 28,
+  "specs": 1,
+  "sols": 3
+ },
+ {
+  "run": "20261104_204205_PrivatePool",
+  "total_mb": 2.6,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.6,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260527_104125_ForgottenRunesWarriorsMinter",
+  "total_mb": 2.5,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.5,
+  "logs": 6,
+  "jsons": 20,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20260527_104524_ForgottenRunesWarriorsMinter",
+  "total_mb": 2.5,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.5,
+  "logs": 7,
+  "jsons": 21,
+  "specs": 1,
+  "sols": 3
+ },
+ {
+  "run": "20260527_105008_ForgottenRunesWarriorsMinter",
+  "total_mb": 2.5,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.5,
+  "logs": 7,
+  "jsons": 22,
+  "specs": 1,
+  "sols": 4
+ },
+ {
+  "run": "20260527_105459_ForgottenRunesWarriorsMinter",
+  "total_mb": 2.5,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.5,
+  "logs": 6,
+  "jsons": 23,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20260527_104344_ForgottenRunesWarriorsMinter",
+  "total_mb": 2.4,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.4,
+  "logs": 6,
+  "jsons": 20,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20260527_103850_ForgottenRunesWarriorsMinter",
+  "total_mb": 2.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.3,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260527_104101_ForgottenRunesWarriorsMinter",
+  "total_mb": 2.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 2.3,
+  "logs": 0,
+  "jsons": 9,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261109_201023_GovernorBravoDelegateMaia",
+  "total_mb": 1.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 1.3,
+  "logs": 2,
+  "jsons": 16,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260527_095632_EnterpriseTreasury300",
+  "total_mb": 0.9,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.9,
+  "logs": 7,
+  "jsons": 23,
+  "specs": 1,
+  "sols": 4
+ },
+ {
+  "run": "20261104_191408_EnterpriseTreasury300",
+  "total_mb": 0.9,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.9,
+  "logs": 6,
+  "jsons": 23,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20261104_201720_CoreRootRouter",
+  "total_mb": 0.9,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.9,
+  "logs": 6,
+  "jsons": 23,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20261104_203906_CoreRootRouter",
+  "total_mb": 0.9,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.9,
+  "logs": 6,
+  "jsons": 23,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20261117_095428_OpenEdition",
+  "total_mb": 0.9,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.9,
+  "logs": 6,
+  "jsons": 23,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20261117_132849_OpenEdition",
+  "total_mb": 0.9,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.9,
+  "logs": 6,
+  "jsons": 23,
+  "specs": 1,
+  "sols": 3
+ },
+ {
+  "run": "20261104_201057_CoreRootRouter",
+  "total_mb": 0.8,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.8,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261109_201354_OpenEdition",
+  "total_mb": 0.8,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.8,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261109_201743_OpenEdition",
+  "total_mb": 0.8,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.8,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261109_202037_OpenEdition",
+  "total_mb": 0.8,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.8,
+  "logs": 1,
+  "jsons": 14,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20260525_002918_EnterpriseTreasury300",
+  "total_mb": 0.7,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.7,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260525_003134_EnterpriseTreasury300",
+  "total_mb": 0.7,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.7,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260525_003334_EnterpriseTreasury300",
+  "total_mb": 0.7,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.7,
+  "logs": 4,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260527_093646_EnterpriseTreasury300",
+  "total_mb": 0.7,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.7,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260523_145717_DeFiVault",
+  "total_mb": 0.6,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.6,
+  "logs": 11,
+  "jsons": 21,
+  "specs": 1,
+  "sols": 4
+ },
+ {
+  "run": "20260523_150236_DeFiVault",
+  "total_mb": 0.6,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.6,
+  "logs": 11,
+  "jsons": 22,
+  "specs": 1,
+  "sols": 4
+ },
+ {
+  "run": "20260523_105603_DeFiVault",
+  "total_mb": 0.5,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.5,
+  "logs": 4,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 4
+ },
+ {
+  "run": "20260523_113401_DeFiVault",
+  "total_mb": 0.5,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.5,
+  "logs": 4,
+  "jsons": 18,
+  "specs": 1,
+  "sols": 3
+ },
+ {
+  "run": "20260523_144730_DeFiVault",
+  "total_mb": 0.5,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.5,
+  "logs": 7,
+  "jsons": 17,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20260523_163319_DeFiVault",
+  "total_mb": 0.5,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.5,
+  "logs": 5,
+  "jsons": 16,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20260524_210746_DeFiVault",
+  "total_mb": 0.5,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.5,
+  "logs": 5,
+  "jsons": 19,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20260524_232148_DeFiVault",
+  "total_mb": 0.5,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.5,
+  "logs": 5,
+  "jsons": 19,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20260627_160734_DeFiVault",
+  "total_mb": 0.5,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.5,
+  "logs": 6,
+  "jsons": 23,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20260627_160757_DeFiVault",
+  "total_mb": 0.5,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.5,
+  "logs": 6,
+  "jsons": 23,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20260812_143030_DeFiVault_FIXED",
+  "total_mb": 0.5,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.5,
+  "logs": 14,
+  "jsons": 34,
+  "specs": 1,
+  "sols": 4
+ },
+ {
+  "run": "20261104_191221_DeFiVault",
+  "total_mb": 0.5,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.5,
+  "logs": 6,
+  "jsons": 23,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20260523_104545_DeFiVault_pipeline_test",
+  "total_mb": 0.4,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.4,
+  "logs": 0,
+  "jsons": 5,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20260523_104636_DeFiVault_pipeline_test",
+  "total_mb": 0.4,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.4,
+  "logs": 1,
+  "jsons": 6,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260523_104816_DeFiVault_pipeline_test",
+  "total_mb": 0.4,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.4,
+  "logs": 1,
+  "jsons": 6,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260523_104839_DeFiVault",
+  "total_mb": 0.4,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.4,
+  "logs": 1,
+  "jsons": 6,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260523_112056_DeFiVault",
+  "total_mb": 0.4,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.4,
+  "logs": 0,
+  "jsons": 9,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20260523_112925_DeFiVault",
+  "total_mb": 0.4,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.4,
+  "logs": 2,
+  "jsons": 11,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260523_113042_DeFiVault",
+  "total_mb": 0.4,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.4,
+  "logs": 2,
+  "jsons": 11,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260523_114522_DeFiVault",
+  "total_mb": 0.4,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.4,
+  "logs": 2,
+  "jsons": 11,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260523_115610_DeFiVault",
+  "total_mb": 0.4,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.4,
+  "logs": 2,
+  "jsons": 11,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260523_144611_DeFiVault",
+  "total_mb": 0.4,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.4,
+  "logs": 2,
+  "jsons": 11,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260523_160508_CrowdfundingVault",
+  "total_mb": 0.4,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.4,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260523_160657_CrowdfundingVault",
+  "total_mb": 0.4,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.4,
+  "logs": 5,
+  "jsons": 16,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20260524_150940_CrowdfundingVault",
+  "total_mb": 0.4,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.4,
+  "logs": 5,
+  "jsons": 18,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20260524_210914_CrowdfundingVault",
+  "total_mb": 0.4,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.4,
+  "logs": 5,
+  "jsons": 19,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20260524_212214_CrowdfundingVault",
+  "total_mb": 0.4,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.4,
+  "logs": 5,
+  "jsons": 19,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20260627_160558_SimpleBank",
+  "total_mb": 0.4,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.4,
+  "logs": 12,
+  "jsons": 35,
+  "specs": 1,
+  "sols": 4
+ },
+ {
+  "run": "20260627_161857_CrowdfundingVault",
+  "total_mb": 0.4,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.4,
+  "logs": 6,
+  "jsons": 22,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20260627_161924_CrowdfundingVault",
+  "total_mb": 0.4,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.4,
+  "logs": 6,
+  "jsons": 22,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20260812_142920_DeFiVault_FIXED",
+  "total_mb": 0.4,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.4,
+  "logs": 6,
+  "jsons": 23,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20261104_191126_CrowdfundingVault",
+  "total_mb": 0.4,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.4,
+  "logs": 6,
+  "jsons": 23,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20261108_155708_DeFiVault_FIXED",
+  "total_mb": 0.4,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.4,
+  "logs": 6,
+  "jsons": 23,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20261109_094906_DeFiVault_FIXED",
+  "total_mb": 0.4,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.4,
+  "logs": 14,
+  "jsons": 36,
+  "specs": 1,
+  "sols": 6
+ },
+ {
+  "run": "20261109_180453_DeFiVault_FIXED",
+  "total_mb": 0.4,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.4,
+  "logs": 7,
+  "jsons": 22,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20261109_180534_DeFiVault_FIXED",
+  "total_mb": 0.4,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.4,
+  "logs": 7,
+  "jsons": 22,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20261109_181011_DeFiVault_FIXED",
+  "total_mb": 0.4,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.4,
+  "logs": 7,
+  "jsons": 22,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20261117_094724_DeFiVault_FIXED",
+  "total_mb": 0.4,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.4,
+  "logs": 7,
+  "jsons": 22,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20261117_094856_DeFiVault_FIXED",
+  "total_mb": 0.4,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.4,
+  "logs": 7,
+  "jsons": 22,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20261117_095039_DeFiVault_FIXED",
+  "total_mb": 0.4,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.4,
+  "logs": 6,
+  "jsons": 23,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20260523_152750_SimpleBank",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 5,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20260525_002223_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260811_192406_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260811_192557_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260811_192807_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260811_192829_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260811_192851_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260811_192912_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260811_192935_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260811_192957_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260811_193047_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260811_193111_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260811_193150_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260811_195713_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 6,
+  "jsons": 22,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20260811_195752_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 6,
+  "jsons": 23,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20260811_195835_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260811_195858_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260811_195920_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260812_135726_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 6,
+  "jsons": 22,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20260812_135807_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 6,
+  "jsons": 23,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20260812_135844_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260812_135903_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260812_135923_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260812_142835_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 6,
+  "jsons": 22,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20260812_143005_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260812_143208_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261007_175302_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261007_175331_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261007_175407_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261007_175517_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261007_175551_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 1,
+  "jsons": 13,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261007_175606_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261007_175637_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 1,
+  "jsons": 13,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261007_175642_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261007_175714_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261007_175742_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261007_175747_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261007_175814_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261007_175844_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 6,
+  "jsons": 22,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20261008_071616_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261008_071635_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261008_071654_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261008_071712_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261008_071731_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261008_071749_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261008_071809_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 6,
+  "jsons": 22,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20261008_072950_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261008_073009_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261008_073028_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261008_073047_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261008_073106_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261008_073125_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261008_073144_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 6,
+  "jsons": 22,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20261008_075128_md_whitelist_mutant",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261008_075153_md_whitelist_mutant",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 7,
+  "jsons": 21,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20261104_190915_SimpleBank",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 6,
+  "jsons": 23,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20261104_200813_Fed",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 16,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261104_201453_Fed",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 6,
+  "jsons": 24,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20261108_155023_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 0,
+  "jsons": 9,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261108_155025_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 0,
+  "jsons": 9,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261108_155026_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 0,
+  "jsons": 9,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261108_155027_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 0,
+  "jsons": 9,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261108_155028_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 0,
+  "jsons": 9,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261108_155029_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 0,
+  "jsons": 9,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261108_155031_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 0,
+  "jsons": 9,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261108_155032_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 0,
+  "jsons": 9,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261108_155033_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 0,
+  "jsons": 9,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261108_155034_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 0,
+  "jsons": 9,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261108_155035_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 0,
+  "jsons": 9,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261108_155119_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261108_155126_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261108_155156_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261108_155233_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261108_155325_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261108_155407_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261108_155514_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261108_155545_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261108_155617_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261108_155826_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 6,
+  "jsons": 24,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20261108_174855_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261108_174918_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261108_174941_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261108_175021_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261108_175048_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261108_175129_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261108_175203_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261108_175252_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261108_175309_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261108_175404_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261108_175445_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 6,
+  "jsons": 23,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20261108_175537_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261109_094756_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261109_094822_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261109_094850_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261109_095317_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261109_095352_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261109_095441_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261109_095517_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 6,
+  "jsons": 23,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20261109_095617_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 6,
+  "jsons": 24,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20261109_095657_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261109_162441_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261109_162503_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261109_162600_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261109_180632_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 5,
+  "jsons": 18,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261109_180726_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 7,
+  "jsons": 22,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20261109_180900_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 7,
+  "jsons": 22,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20261109_181124_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261109_181141_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 6,
+  "jsons": 23,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20261109_181252_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261117_094427_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 1,
+  "jsons": 13,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261117_094434_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 1,
+  "jsons": 13,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261117_094458_DeFiVault_FIXED",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 1,
+  "jsons": 13,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261117_arm_a3_llm",
+  "total_mb": 0.3,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.3,
+  "logs": 4,
+  "jsons": 2,
+  "specs": 0,
+  "sols": 0
+ },
+ {
+  "run": "20260523_152511_SimpleBank",
+  "total_mb": 0.2,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.2,
+  "logs": 5,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20260523_153927_SimpleBank",
+  "total_mb": 0.2,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.2,
+  "logs": 5,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20260523_161639_King",
+  "total_mb": 0.2,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.2,
+  "logs": 5,
+  "jsons": 16,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20260627_095453_King",
+  "total_mb": 0.2,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.2,
+  "logs": 9,
+  "jsons": 27,
+  "specs": 1,
+  "sols": 3
+ },
+ {
+  "run": "20260627_100549_King",
+  "total_mb": 0.2,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.2,
+  "logs": 6,
+  "jsons": 23,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20260627_160238_King",
+  "total_mb": 0.2,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.2,
+  "logs": 6,
+  "jsons": 23,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20260627_161113_King",
+  "total_mb": 0.2,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.2,
+  "logs": 6,
+  "jsons": 23,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20260811_193023_DeFiVault_FIXED",
+  "total_mb": 0.2,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.2,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260812_140614_SimpleBank_FIXED",
+  "total_mb": 0.2,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.2,
+  "logs": 6,
+  "jsons": 23,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20260812_140647_SimpleBank_FIXED",
+  "total_mb": 0.2,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.2,
+  "logs": 6,
+  "jsons": 23,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20260812_143348_SimpleBank_FIXED",
+  "total_mb": 0.2,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.2,
+  "logs": 6,
+  "jsons": 22,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20260818_105615_SimpleBank_FIXED",
+  "total_mb": 0.2,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.2,
+  "logs": 6,
+  "jsons": 22,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20260822_083310_SimpleBank_FIXED",
+  "total_mb": 0.2,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.2,
+  "logs": 6,
+  "jsons": 23,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20260822_083359_SimpleBank_FIXED",
+  "total_mb": 0.2,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.2,
+  "logs": 6,
+  "jsons": 23,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20260823_143344_SimpleBank_FIXED",
+  "total_mb": 0.2,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.2,
+  "logs": 6,
+  "jsons": 23,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20260823_143420_SimpleBank_FIXED",
+  "total_mb": 0.2,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.2,
+  "logs": 6,
+  "jsons": 23,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20261104_191011_King",
+  "total_mb": 0.2,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.2,
+  "logs": 6,
+  "jsons": 23,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20261108_155030_DeFiVault_FIXED",
+  "total_mb": 0.2,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.2,
+  "logs": 0,
+  "jsons": 9,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261108_155441_DeFiVault_FIXED",
+  "total_mb": 0.2,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.2,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261109_181339_SimpleBank_FIXED",
+  "total_mb": 0.2,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.2,
+  "logs": 7,
+  "jsons": 22,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20261109_181432_SimpleBank_FIXED",
+  "total_mb": 0.2,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.2,
+  "logs": 7,
+  "jsons": 22,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20261109_181538_SimpleBank_FIXED",
+  "total_mb": 0.2,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.2,
+  "logs": 7,
+  "jsons": 22,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20261109_181645_SimpleBank_FIXED",
+  "total_mb": 0.2,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.2,
+  "logs": 7,
+  "jsons": 22,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20261109_181745_SimpleBank_FIXED",
+  "total_mb": 0.2,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.2,
+  "logs": 7,
+  "jsons": 22,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20261109_181848_SimpleBank_FIXED",
+  "total_mb": 0.2,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.2,
+  "logs": 7,
+  "jsons": 22,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20261109_181941_SimpleBank_FIXED",
+  "total_mb": 0.2,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.2,
+  "logs": 6,
+  "jsons": 23,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20261109_201035_Initializable",
+  "total_mb": 0.2,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.2,
+  "logs": 3,
+  "jsons": 17,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261109_201314_Initializable",
+  "total_mb": 0.2,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.2,
+  "logs": 3,
+  "jsons": 17,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261117_arm_a2_control",
+  "total_mb": 0.2,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.2,
+  "logs": 2,
+  "jsons": 1,
+  "specs": 0,
+  "sols": 0
+ },
+ {
+  "run": "probe_oracle_DeFiVault_FIXED",
+  "total_mb": 0.2,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.2,
+  "logs": 3,
+  "jsons": 1,
+  "specs": 0,
+  "sols": 0
+ },
+ {
+  "run": "20260523_161200_King",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260523_161320_King",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 1,
+  "jsons": 12,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260524_152657_ERC2771MulticallVulnerable",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 0,
+  "jsons": 7,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20260524_153031_ERC2771MulticallVulnerable",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 2,
+  "jsons": 16,
+  "specs": 0,
+  "sols": 2
+ },
+ {
+  "run": "20260524_160221_ERC2771MulticallVulnerable",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 2,
+  "jsons": 13,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20260524_160641_ERC2771MulticallVulnerable",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 0,
+  "sols": 2
+ },
+ {
+  "run": "20260524_163401_ERC2771MulticallVulnerable",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 4,
+  "jsons": 17,
+  "specs": 0,
+  "sols": 4
+ },
+ {
+  "run": "20260524_163845_ERC2771MulticallVulnerable",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 2,
+  "jsons": 19,
+  "specs": 0,
+  "sols": 4
+ },
+ {
+  "run": "20260524_192015_ERC2771MulticallVulnerable",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 2,
+  "jsons": 19,
+  "specs": 0,
+  "sols": 4
+ },
+ {
+  "run": "20260525_001709_VulnerableVault",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260525_001801_SimpleBank_FIXED",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260525_002026_SimpleBank_FIXED",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260528_092514_BorrowController",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260627_161903_ERC2771MulticallVulnerable",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 3,
+  "jsons": 22,
+  "specs": 0,
+  "sols": 4
+ },
+ {
+  "run": "20260627_162623_VulnerableSuicidal",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 12,
+  "jsons": 34,
+  "specs": 1,
+  "sols": 4
+ },
+ {
+  "run": "20260627_162633_VulnerableSuicidal",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 9,
+  "jsons": 28,
+  "specs": 1,
+  "sols": 3
+ },
+ {
+  "run": "20260812_140506_SimpleBank_FIXED",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 6,
+  "jsons": 22,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20260812_140539_SimpleBank_FIXED",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260812_140557_SimpleBank_FIXED",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260812_143431_SimpleBank_FIXED",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260812_143452_SimpleBank_FIXED",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 1,
+  "jsons": 14,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20260812_143454_SimpleBank_FIXED",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 0,
+  "jsons": 9,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20260812_145659_SimpleBank_FIXED",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 1,
+  "jsons": 14,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20260812_145701_SimpleBank_FIXED",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 0,
+  "jsons": 9,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20260812_145702_SimpleBank_FIXED",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 0,
+  "jsons": 9,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20260812_145703_SimpleBank_FIXED",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 0,
+  "jsons": 9,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20260812_145704_SimpleBank_FIXED",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 0,
+  "jsons": 9,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20260818_105753_SimpleBank_FIXED",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260818_105802_SimpleBank_FIXED",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260818_105811_SimpleBank_FIXED",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260818_105852_SimpleBank_FIXED",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260822_083136_SimpleBank_FIXED",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 6,
+  "jsons": 22,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20260822_083244_SimpleBank_FIXED",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260822_083304_SimpleBank_FIXED",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260823_143226_SimpleBank_FIXED",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 6,
+  "jsons": 22,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20260823_143304_SimpleBank_FIXED",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 2,
+  "jsons": 14,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260823_143323_SimpleBank_FIXED",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261008_082938_BorrowController",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261008_083201_BorrowController",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 6,
+  "jsons": 24,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20261008_083308_BorrowController",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 6,
+  "jsons": 24,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20261008_083448_BorrowController",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 14,
+  "jsons": 35,
+  "specs": 1,
+  "sols": 4
+ },
+ {
+  "run": "20261008_100615_BorrowController",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 14,
+  "jsons": 35,
+  "specs": 1,
+  "sols": 4
+ },
+ {
+  "run": "20261104_191402_ERC2771MulticallVulnerable",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 3,
+  "jsons": 22,
+  "specs": 0,
+  "sols": 4
+ },
+ {
+  "run": "20261104_191641_VulnerableSuicidal",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 6,
+  "jsons": 23,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20261104_200439_BorrowController",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261104_200557_BorrowController",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 10,
+  "jsons": 29,
+  "specs": 1,
+  "sols": 3
+ },
+ {
+  "run": "20261109_200904_GovTokenEscrow",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 2,
+  "jsons": 16,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261109_201228_SimpleERC20Escrow",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 7,
+  "jsons": 26,
+  "specs": 0,
+  "sols": 3
+ },
+ {
+  "run": "20261109_201301_GovTokenEscrow",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 2,
+  "jsons": 16,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261109_201724_GovTokenEscrow",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 5,
+  "jsons": 19,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261109_201741_Initializable",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 0,
+  "jsons": 7,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261117_095643_GovTokenEscrow",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 5,
+  "jsons": 19,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261117_100129_GovTokenEscrow",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 6,
+  "jsons": 21,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20261117_100413_GovTokenEscrow",
+  "total_mb": 0.1,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.1,
+  "logs": 8,
+  "jsons": 25,
+  "specs": 1,
+  "sols": 2
+ },
+ {
+  "run": "20260523_154309_TimelockVault",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 2,
+  "jsons": 12,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260523_154447_TimelockVault",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 5,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20260523_155941_WETH9",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 3,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20260523_160042_WETH9",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 3,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20260523_161048_LegacyEscrow07",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 3,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20260524_164422_VulnerableBankToken",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 7,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20260524_171859_VulnerableBankToken",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 7,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20260524_182037_TimelockVault",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 2,
+  "jsons": 17,
+  "specs": 0,
+  "sols": 2
+ },
+ {
+  "run": "20260524_184219_AnotherVulnerableBank",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 7,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20260524_192304_TimelockVault",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 7,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20260524_192853_TimelockVault",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 7,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20260524_195915_AnotherVulnerableBank",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 7,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20260524_234331_TreasuryVault",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 9,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20260525_001629_TreasuryVault",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 2,
+  "jsons": 15,
+  "specs": 1,
+  "sols": 1
+ },
+ {
+  "run": "20260525_002319_SafeBankToken",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 7,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20260525_002319_SafeBankToken2",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 7,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20260525_002319_SuperSecureBank",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 7,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20260525_002319_VulnerableBankTokenCorrected",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 7,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20260527_102842_WETH",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 7,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20260528_092003_FixedPrice",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 1,
+  "jsons": 14,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20260528_093456_FixedPrice",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 7,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20260528_101335_PrivatePool",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 7,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20260627_160600_AnotherVulnerableBank",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 7,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20260811_193149_DeFiVault_FIXED",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 2,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261007_175252_DeFiVault_FIXED",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 3,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261007_175253_DeFiVault_FIXED",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 3,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261007_175253_DeFiVault_FIXED_2",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 3,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261007_175253_DeFiVault_FIXED_3",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 3,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261007_175254_DeFiVault_FIXED",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 3,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261007_175254_DeFiVault_FIXED_2",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 3,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261007_175254_DeFiVault_FIXED_3",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 3,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261007_175842_DeFiVault_FIXED",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 2,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261104_190713_TimelockVault",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 7,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261104_190715_AnotherVulnerableBank",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 7,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261104_191726_TimelockVault",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 7,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261104_191727_AnotherVulnerableBank",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 7,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261104_191728_VulnerableBankToken",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 7,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261108_155008_DeFiVault_FIXED",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 3,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261108_155008_DeFiVault_FIXED_2",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 3,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261108_155009_DeFiVault_FIXED",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 3,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261108_155009_DeFiVault_FIXED_2",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 3,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261108_155009_DeFiVault_FIXED_3",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 3,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261108_155009_DeFiVault_FIXED_4",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 3,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261108_155009_DeFiVault_FIXED_5",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 3,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261108_155009_DeFiVault_FIXED_6",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 3,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261108_155010_DeFiVault_FIXED",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 3,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261108_155010_DeFiVault_FIXED_2",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 3,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261108_155010_DeFiVault_FIXED_3",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 3,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261108_155010_DeFiVault_FIXED_4",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 3,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261108_155010_DeFiVault_FIXED_5",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 3,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261108_155032_DeFiVault_FIXED_2",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 2,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261108_155616_DeFiVault_FIXED",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 2,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261108_175403_DeFiVault_FIXED",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 2,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261109_200858_OpenEdition",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 3,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261109_200859_SimpleERC20Escrow",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 3,
+  "jsons": 16,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "20261117_experiment_library",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 1,
+  "specs": 0,
+  "sols": 0
+ },
+ {
+  "run": "_demo",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 0,
+  "specs": 0,
+  "sols": 1
+ },
+ {
+  "run": "_probe_tmp",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 0,
+  "jsons": 0,
+  "specs": 0,
+  "sols": 2
+ },
+ {
+  "run": "oracle_validation_20261116",
+  "total_mb": 0.0,
+  "scratch_mb": 0.0,
+  "evidencia_mb": 0.0,
+  "logs": 2,
+  "jsons": 0,
+  "specs": 1,
+  "sols": 0
+ }
+]

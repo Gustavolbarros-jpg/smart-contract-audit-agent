@@ -155,9 +155,10 @@ Lote de contratos de produção rodado em 09/11:
 | GovernorBravoDelegateMaia (maia) | Spec já compila (bug de struct corrigido em `16b251c`); o que sobra é *stack too deep* |
 
 Pendências conhecidas:
-- Corpus recontado em 16/11: **294** arquivos reais sob `*/src` (323 − 22 artefatos
-  `*_AGENT_FIXED.sol` − 7 fora de escopo). Lote de 238: 185 ok, 28 import não resolvido,
-  19 *stack too deep*, 5 timeout, 1 crash do Slither. Substitui o "38 falhas" antigo.
+- Corpus limpo em 17/11: `find smart-audt/contracts/real/*/src -name '*.sol'` dá **321**
+  arquivos e **zero** artefato do agente — antes eram 343 com 22 `*_AGENT_FIXED.sol` no
+  meio, e a conta tinha de ser feita à mão toda vez. Lote de 238: 185 ok, 28 import não
+  resolvido, 19 *stack too deep*, 5 timeout, 1 crash do Slither.
 - O pipeline **não deixa mais** cópia de trabalho dentro de `src/`: ela ainda nasce ao
   lado do original (imports/remappings, e o Prover recusa arquivo de fora), mas no fim da
   rodada vai para `runs/<rodada>/<Contrato>_FIXED.sol` e a de `src/` sai — só quando foi
@@ -167,11 +168,12 @@ Pendências conhecidas:
 - A generalização real do LLM **ainda não foi demonstrada** — e agora existe o instrumento
   para demonstrar ou refutar.
 - `logs_antigos/` (1,4 GB, 156 entradas) ainda sem destino decidido.
-- `runs/` está em **2,9 GB**, dos quais **2,0 GB** são scratch do Prover (`emv-*`,
-  `.certora_internal`, `_prover`) e só **126 MB** são evidência (os `.log` de veredito,
-  `report.json`, specs, JSONs). Apagar o scratch não derruba nenhuma medição — os
-  vereditos ficam nos `.log`, fora dos `emv-*`. `--prune-prover-dirs` já evita o acúmulo
-  em rodadas novas; **nada é apagado sem pedir**.
+- `runs/`: 412 rodadas. Inventário completo em `docs/inventario-runs-20261117.md`
+  (+ o JSON por rodada ao lado). Era **2.912 MB**, dos quais **1.966 MB** de scratch do
+  Prover concentrado em **4 rodadas de 17/11**, e **945 MB** de evidência (11.899
+  arquivos; 572 MB só de `static_only`). O scratch foi podado em 17/11 com o usuário
+  pedindo; o hash da lista de evidência bate antes e depois. `--prune-prover-dirs` evita
+  o acúmulo em rodadas novas. **Nada mais é apagado sem pedir.**
 
 ---
 
