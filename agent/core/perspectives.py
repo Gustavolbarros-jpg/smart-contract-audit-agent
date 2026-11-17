@@ -139,6 +139,11 @@ DETECTOR_CLASS: dict[str, str] = {
     "arbitrary-send-eth": "unrestricted_transfer",
     "arbitrary-send-erc20": "unrestricted_transfer",
     "tx-origin": "unrestricted_write",
+    # O detector próprio do projeto: uma escrita de estado sem guarda de identidade é o
+    # arquétipo dessa classe. Faltava no mapa, então o achado mais frequente do plugin saía
+    # sem perspectiva — e a classificação de fix comparava "unrestricted_write" com
+    # "unrestricted-write" sem nunca casar.
+    "unrestricted-write": "unrestricted_write",
     "unprotected-upgrade": "unrestricted_write",
     "unprotected-critical-update": "unrestricted_write",
     "events-access": "missing_events",
