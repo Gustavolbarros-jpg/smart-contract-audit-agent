@@ -14,7 +14,7 @@ Pipeline de auditoria de contratos Solidity: **Slither → catálogo → correç
 | Pipeline completo (gasta cota) | `SOLC_VERSION=<ver> AUDIT_WITH_PLUGINS=1 AUDIT_LLM_MODEL=openai/gpt-oss-120b python3 agent/main.py --contract /caminho/absoluto/X.sol` |
 | Sem gastar nada (sem LLM, sem Certora) | `python3 agent/main.py --contract /caminho/absoluto/X.sol --static-only --with-plugins` |
 | Pipeline completo **sem cota de Certora** | `AUDIT_CERTORA_LOCAL=1 SOLC_VERSION=<ver> AUDIT_WITH_PLUGINS=1 AUDIT_LLM_MODEL=openai/gpt-oss-120b python3 agent/main.py --contract /caminho/absoluto/X.sol` |
-| Testes | `python3 -m pytest tests/ -q` → **420 passed, 1 skipped, ~10 s** |
+| Testes | `python3 -m pytest tests/ -q` → **426 passed, 1 skipped, ~10 s** |
 | Listar contratos | `python3 agent/main.py --list-contracts --contract-group benchmark` |
 | Medir generalização | `SOLC_VERSION=0.8.21 python3 agent/generalization_probe.py <X>_FIXED.sol --detectable-only` |
 | Ver o que o Slither enxerga de um mutante | `SOLC_VERSION=0.8.21 python3 agent/mutant_detection.py <X>_FIXED.sol` |
@@ -114,7 +114,8 @@ reparado por `restore_access_modifier` (só quando há **um** modificador de ide
 
 ## 5. Estado atual (2026-11-17)
 
-Branch `analysis/catalog-coverage`, **22 commits locais sem push**, PR #2 contra `develop`.
+Branch `analysis/catalog-coverage`, **tudo enviado** (`65e9958`), PR #2 contra `develop`
+com 76 commits e a descrição já cobrindo o oráculo e o experimento.
 
 **O que mudou em 17/11 — o oráculo formal local.** `certoraRun --compilation_steps_only`
 para antes de *enviar* o job, não antes de *verificar*: o `emv.jar` roda aqui e imprime
@@ -149,7 +150,7 @@ Lote de contratos de produção rodado em 09/11:
 | SimpleERC20Escrow (inverse) | **Resolvido 2/2**, aprovado pelo Certora na tentativa 2 |
 | Initializable (escher) | Sem achado real — eram 2 falsos positivos, já corrigidos no normalizador |
 | GovTokenEscrow (inverse) | **Fechado em 17/11**: 4/4, origem separada (2 determinísticos + 2 LLM), `zero_address_reverts` `Violated`→`Verified` e não vácuo, sem cota (`runs/20261117_100413_GovTokenEscrow/`) |
-| OpenEdition (escher) | **Fechado em 17/11**: pipeline completo com `AUDIT_CERTORA_LOCAL=1`, original `Violated` → corrigido `Verified` e não vácuo, 1/1, sem cota (`runs/20261117_095428_OpenEdition/`) |
+| OpenEdition (escher) | **Fechado em 17/11**: pipeline completo com `AUDIT_CERTORA_LOCAL=1`, original `Violated` → corrigido `Verified` e não vácuo, 1/1, sem cota (`runs/20261117_095428_OpenEdition/`). Rodado de novo em 13:28 para validar a limpeza do scratch: mesmo fix, byte a byte |
 | TalosBaseStrategy (maia) | LLM removeu funções públicas → barrado pelo patch guard |
 | GovernorBravoDelegateMaia (maia) | Spec já compila (bug de struct corrigido em `16b251c`); o que sobra é *stack too deep* |
 
@@ -157,13 +158,20 @@ Pendências conhecidas:
 - Corpus recontado em 16/11: **294** arquivos reais sob `*/src` (323 − 22 artefatos
   `*_AGENT_FIXED.sol` − 7 fora de escopo). Lote de 238: 185 ok, 28 import não resolvido,
   19 *stack too deep*, 5 timeout, 1 crash do Slither. Substitui o "38 falhas" antigo.
-- Os 22 `*_AGENT_FIXED.sol` dentro de `src/` de produção seguem lá: decidir entre apagar,
-  limpar no fim da rodada ou excluir da enumeração do corpus.
+- O pipeline **não deixa mais** cópia de trabalho dentro de `src/`: ela ainda nasce ao
+  lado do original (imports/remappings, e o Prover recusa arquivo de fora), mas no fim da
+  rodada vai para `runs/<rodada>/<Contrato>_FIXED.sol` e a de `src/` sai — só quando foi
+  aquela rodada que a criou. Verificado no OpenEdition
+  (`runs/20261117_132849_OpenEdition/`, 1/1, `src/minters/` limpo depois).
+  Os **22** arquivos de rodadas antigas seguem lá, sem destino decidido.
 - A generalização real do LLM **ainda não foi demonstrada** — e agora existe o instrumento
   para demonstrar ou refutar.
 - `logs_antigos/` (1,4 GB, 156 entradas) ainda sem destino decidido.
-- Uma varredura do oráculo deixa ~1,4 GB em `runs/<rodada>/_prover/`
-  (`--prune-prover-dirs` apaga; nada é apagado sem pedir).
+- `runs/` está em **2,9 GB**, dos quais **2,0 GB** são scratch do Prover (`emv-*`,
+  `.certora_internal`, `_prover`) e só **126 MB** são evidência (os `.log` de veredito,
+  `report.json`, specs, JSONs). Apagar o scratch não derruba nenhuma medição — os
+  vereditos ficam nos `.log`, fora dos `emv-*`. `--prune-prover-dirs` já evita o acúmulo
+  em rodadas novas; **nada é apagado sem pedir**.
 
 ---
 
