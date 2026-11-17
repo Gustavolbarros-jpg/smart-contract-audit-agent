@@ -1,0 +1,841 @@
+Reports in /home/gflb/TesteCertora/emv-14-certora-17-nov.--15-14/Reports
+Start Tue Nov 17 15:14:03 BRT 2026
+The scene contains 1 contracts:
+DeFiVault : 0xce4604a0000000000000000000000001
+Running initial transformations
+Has CVL checks.
+Checking CVL specs/oracle/DeFiVault_proposed.spec for contract DeFiVault
+Unrolling loops 1 time, unwinding condition is asserted
+Checking rule deposit_enforces_whitelist_msg_sender (6 out of 29)...
+Checking rule deposit_enforces_msg_value_0 (4 out of 29)...
+Checking rule deposit_never_credits_zero (2 out of 29)...
+Checking rule only_owner_calls_removeFromWhitelist (1 out of 29)...
+Checking rule deposit_enforces_paused (5 out of 29)...
+Checking rule withdraw_debits_totalDeposits_by_the_same_amount (8 out of 29)...
+Checking rule deposit_credits_totalDeposits_by_the_same_amount (3 out of 29)...
+Checking rule withdraw_debits_exactly (7 out of 29)...
+Starting to run on rule only_owner_calls_removeFromWhitelist
+Starting to run on rule deposit_enforces_paused
+Starting to run on rule deposit_never_credits_zero
+Starting to run on rule deposit_credits_totalDeposits_by_the_same_amount
+Starting to run on rule deposit_enforces_msg_value_0
+Starting to run on rule deposit_enforces_whitelist_msg_sender
+Starting to run on rule withdraw_debits_exactly
+Starting to run on rule withdraw_debits_totalDeposits_by_the_same_amount
+Checking rule withdraw_enforces_balances_msg_sender_amount (9 out of 29)...
+Checking rule withdraw_enforces_amount_0 (10 out of 29)...
+Checking rule withdraw_enforces_block_timestamp_lastwithdraw_msg_sender_lockperi (11 out of 29)...
+Checking rule withdraw_enforces_amount_maxwithdraw (12 out of 29)...
+Checking rule withdraw_enforces_paused (13 out of 29)...
+Checking rule withdraw_enforces_whitelist_msg_sender (14 out of 29)...
+Checking rule claimReward_enforces_paused (15 out of 29)...
+Checking rule claimReward_enforces_whitelist_msg_sender (16 out of 29)...
+Checking rule only_owner_calls_pause (17 out of 29)...
+Checking rule only_owner_calls_unpause (18 out of 29)...
+Checking rule only_owner_calls_setRewardRate (19 out of 29)...
+Verified: deposit_enforces_paused
+Verified: deposit_enforces_msg_value_0
+deposit_enforces_msg_value_0: Properties successfully verified on all inputs
+deposit_enforces_paused: Properties successfully verified on all inputs
+Checking rule only_owner_calls_setMaxWithdraw (20 out of 29)...
+Checking rule only_owner_calls_setLockPeriod (21 out of 29)...
+Checking rule only_owner_calls_transferOwnership (22 out of 29)...
+Checking rule transferOwnership_enforces_newowner_address_0 (23 out of 29)...
+Starting to run on rule withdraw_enforces_balances_msg_sender_amount
+Starting to run on rule withdraw_enforces_amount_0
+Checking rule only_pendingOwner_calls_acceptOwnership (24 out of 29)...
+Checking rule only_owner_calls_emergencyWithdraw (25 out of 29)...
+Checking rule emergencyWithdraw_enforces_to_address_0 (26 out of 29)...
+Checking rule emergencyWithdraw_enforces_to_owner (27 out of 29)...
+Checking rule only_owner_calls_destroy (28 out of 29)...
+Checking rule envfreeFuncsStaticCheck (29 out of 29)...
+Result for envfreeFuncsStaticCheck: envfreeFuncsStaticCheck: totalDeposits(): SUCCESS
+whitelist(address): SUCCESS
+lockPeriod(): SUCCESS
+paused(): SUCCESS
+owner(): SUCCESS
+maxWithdraw(): SUCCESS
+balances(address): SUCCESS
+lastWithdraw(address): SUCCESS
+pendingOwner(): SUCCESS
+Verified: withdraw_enforces_amount_0
+withdraw_enforces_amount_0: Properties successfully verified on all inputs
+Starting to run on rule withdraw_enforces_block_timestamp_lastwithdraw_msg_sender_lockperi
+Total time for deposit_never_credits_zero: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+Total time for deposit_enforces_whitelist_msg_sender: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+Total time for only_owner_calls_removeFromWhitelist: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+Verified: deposit_never_credits_zero
+deposit_never_credits_zero: Properties successfully verified on all inputs
+Verified: only_owner_calls_removeFromWhitelist
+only_owner_calls_removeFromWhitelist: Properties successfully verified on all inputs
+Verified: deposit_enforces_whitelist_msg_sender
+deposit_enforces_whitelist_msg_sender: Properties successfully verified on all inputs
+Total time for withdraw_debits_totalDeposits_by_the_same_amount: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+Verified: withdraw_debits_totalDeposits_by_the_same_amount
+withdraw_debits_totalDeposits_by_the_same_amount: Properties successfully verified on all inputs
+Total time for deposit_credits_totalDeposits_by_the_same_amount: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+Verified: deposit_credits_totalDeposits_by_the_same_amount
+deposit_credits_totalDeposits_by_the_same_amount: Properties successfully verified on all inputs
+Starting to run on rule withdraw_enforces_paused
+Starting to run on rule claimReward_enforces_whitelist_msg_sender
+Starting to run on rule withdraw_enforces_amount_maxwithdraw
+Starting to run on rule claimReward_enforces_paused
+Starting to run on rule withdraw_enforces_whitelist_msg_sender
+Total time for withdraw_debits_exactly: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+Verified: withdraw_debits_exactly
+withdraw_debits_exactly: Properties successfully verified on all inputs
+Starting to run on rule only_owner_calls_pause
+Verified: withdraw_enforces_paused
+withdraw_enforces_paused: Properties successfully verified on all inputs
+Verified: claimReward_enforces_paused
+claimReward_enforces_paused: Properties successfully verified on all inputs
+Starting to run on rule only_owner_calls_unpause
+Starting to run on rule only_owner_calls_setRewardRate
+Total time for withdraw_enforces_balances_msg_sender_amount: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+Verified: withdraw_enforces_balances_msg_sender_amount
+withdraw_enforces_balances_msg_sender_amount: Properties successfully verified on all inputs
+Starting to run on rule deposit_enforces_paused-rule_not_vacuous
+Total time for only_owner_calls_pause: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+Verified: only_owner_calls_pause
+only_owner_calls_pause: Properties successfully verified on all inputs
+Starting to run on rule deposit_enforces_msg_value_0-rule_not_vacuous
+Total time for only_owner_calls_setRewardRate: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+Verified: only_owner_calls_setRewardRate
+only_owner_calls_setRewardRate: Properties successfully verified on all inputs
+Total time for only_owner_calls_unpause: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+Verified: only_owner_calls_unpause
+only_owner_calls_unpause: Properties successfully verified on all inputs
+Starting to run on rule only_owner_calls_setMaxWithdraw
+Starting to run on rule only_owner_calls_setLockPeriod
+Total time for withdraw_enforces_block_timestamp_lastwithdraw_msg_sender_lockperi: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+Verified: withdraw_enforces_block_timestamp_lastwithdraw_msg_sender_lockperi
+withdraw_enforces_block_timestamp_lastwithdraw_msg_sender_lockperi: Properties successfully verified on all inputs
+Starting to run on rule only_owner_calls_transferOwnership
+Total time for withdraw_enforces_whitelist_msg_sender: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+Verified: withdraw_enforces_whitelist_msg_sender
+withdraw_enforces_whitelist_msg_sender: Properties successfully verified on all inputs
+Starting to run on rule transferOwnership_enforces_newowner_address_0
+Total time for withdraw_enforces_amount_maxwithdraw: 1 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 1 seconds
+Verified: withdraw_enforces_amount_maxwithdraw
+withdraw_enforces_amount_maxwithdraw: Properties successfully verified on all inputs
+Total time for deposit_enforces_msg_value_0-rule_not_vacuous: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+Total time for deposit_enforces_paused-rule_not_vacuous: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+Violated: deposit_enforces_msg_value_0-rule_not_vacuous
+deposit_enforces_msg_value_0-rule_not_vacuous: A property is violated
+Violated: deposit_enforces_paused-rule_not_vacuous
+deposit_enforces_paused-rule_not_vacuous: A property is violated
+Starting to run on rule only_pendingOwner_calls_acceptOwnership
+Total time for claimReward_enforces_whitelist_msg_sender: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+Verified: claimReward_enforces_whitelist_msg_sender
+claimReward_enforces_whitelist_msg_sender: Properties successfully verified on all inputs
+Starting to run on rule only_owner_calls_emergencyWithdraw
+Result for deposit_enforces_msg_value_0: deposit_enforces_msg_value_0: SUCCESS
+Result for deposit_enforces_paused: deposit_enforces_paused: SUCCESS
+Verified: transferOwnership_enforces_newowner_address_0
+transferOwnership_enforces_newowner_address_0: Properties successfully verified on all inputs
+Starting to run on rule only_owner_calls_destroy
+Starting to run on rule emergencyWithdraw_enforces_to_address_0
+Starting to run on rule emergencyWithdraw_enforces_to_owner
+Total time for only_owner_calls_setMaxWithdraw: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+Verified: only_owner_calls_setMaxWithdraw
+only_owner_calls_setMaxWithdraw: Properties successfully verified on all inputs
+Total time for only_owner_calls_transferOwnership: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+Verified: only_owner_calls_transferOwnership
+only_owner_calls_transferOwnership: Properties successfully verified on all inputs
+Total time for only_owner_calls_setLockPeriod: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+Verified: only_owner_calls_setLockPeriod
+only_owner_calls_setLockPeriod: Properties successfully verified on all inputs
+Starting to run on rule only_owner_calls_removeFromWhitelist-rule_not_vacuous
+Starting to run on rule withdraw_enforces_amount_0-rule_not_vacuous
+Starting to run on rule deposit_enforces_whitelist_msg_sender-rule_not_vacuous
+Total time for only_pendingOwner_calls_acceptOwnership: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+Verified: only_pendingOwner_calls_acceptOwnership
+only_pendingOwner_calls_acceptOwnership: Properties successfully verified on all inputs
+Verified: emergencyWithdraw_enforces_to_address_0
+emergencyWithdraw_enforces_to_address_0: Properties successfully verified on all inputs
+Starting to run on rule deposit_never_credits_zero-rule_not_vacuous
+Starting to run on rule withdraw_debits_totalDeposits_by_the_same_amount-rule_not_vacuous
+Total time for only_owner_calls_destroy: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+Verified: only_owner_calls_destroy
+only_owner_calls_destroy: Properties successfully verified on all inputs
+Starting to run on rule deposit_credits_totalDeposits_by_the_same_amount-rule_not_vacuous
+Total time for only_owner_calls_removeFromWhitelist-rule_not_vacuous: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+Violated: only_owner_calls_removeFromWhitelist-rule_not_vacuous
+only_owner_calls_removeFromWhitelist-rule_not_vacuous: A property is violated
+Total time for only_owner_calls_emergencyWithdraw: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+Verified: only_owner_calls_emergencyWithdraw
+only_owner_calls_emergencyWithdraw: Properties successfully verified on all inputs
+Result for only_owner_calls_removeFromWhitelist: only_owner_calls_removeFromWhitelist: SUCCESS
+Total time for emergencyWithdraw_enforces_to_owner: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+Verified: emergencyWithdraw_enforces_to_owner
+emergencyWithdraw_enforces_to_owner: Properties successfully verified on all inputs
+Total time for withdraw_enforces_amount_0-rule_not_vacuous: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+Violated: withdraw_enforces_amount_0-rule_not_vacuous
+withdraw_enforces_amount_0-rule_not_vacuous: A property is violated
+Starting to run on rule withdraw_enforces_paused-rule_not_vacuous
+Starting to run on rule withdraw_debits_exactly-rule_not_vacuous
+Total time for deposit_enforces_whitelist_msg_sender-rule_not_vacuous: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+Violated: deposit_enforces_whitelist_msg_sender-rule_not_vacuous
+deposit_enforces_whitelist_msg_sender-rule_not_vacuous: A property is violated
+Result for withdraw_enforces_amount_0: withdraw_enforces_amount_0: SUCCESS
+Starting to run on rule claimReward_enforces_paused-rule_not_vacuous
+Result for deposit_enforces_whitelist_msg_sender: deposit_enforces_whitelist_msg_sender: SUCCESS
+Starting to run on rule only_owner_calls_pause-rule_not_vacuous
+Starting to run on rule withdraw_enforces_balances_msg_sender_amount-rule_not_vacuous
+Total time for deposit_never_credits_zero-rule_not_vacuous: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+Violated: deposit_never_credits_zero-rule_not_vacuous
+deposit_never_credits_zero-rule_not_vacuous: A property is violated
+Result for deposit_never_credits_zero: deposit_never_credits_zero: SUCCESS
+Starting to run on rule only_owner_calls_setRewardRate-rule_not_vacuous
+Total time for withdraw_enforces_paused-rule_not_vacuous: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+Violated: withdraw_enforces_paused-rule_not_vacuous
+withdraw_enforces_paused-rule_not_vacuous: A property is violated
+Total time for deposit_credits_totalDeposits_by_the_same_amount-rule_not_vacuous: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+Total time for withdraw_debits_totalDeposits_by_the_same_amount-rule_not_vacuous: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+Violated: deposit_credits_totalDeposits_by_the_same_amount-rule_not_vacuous
+deposit_credits_totalDeposits_by_the_same_amount-rule_not_vacuous: A property is violated
+Violated: withdraw_debits_totalDeposits_by_the_same_amount-rule_not_vacuous
+withdraw_debits_totalDeposits_by_the_same_amount-rule_not_vacuous: A property is violated
+Total time for only_owner_calls_pause-rule_not_vacuous: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+Violated: only_owner_calls_pause-rule_not_vacuous
+only_owner_calls_pause-rule_not_vacuous: A property is violated
+Result for withdraw_enforces_paused: withdraw_enforces_paused: SUCCESS
+Result for deposit_credits_totalDeposits_by_the_same_amount: deposit_credits_totalDeposits_by_the_same_amount: SUCCESS
+Total time for claimReward_enforces_paused-rule_not_vacuous: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+Violated: claimReward_enforces_paused-rule_not_vacuous
+claimReward_enforces_paused-rule_not_vacuous: A property is violated
+Result for withdraw_debits_totalDeposits_by_the_same_amount: withdraw_debits_totalDeposits_by_the_same_amount: SUCCESS
+Starting to run on rule only_owner_calls_unpause-rule_not_vacuous
+Result for only_owner_calls_pause: only_owner_calls_pause: SUCCESS
+Result for claimReward_enforces_paused: claimReward_enforces_paused: SUCCESS
+Starting to run on rule withdraw_enforces_block_timestamp_lastwithdraw_msg_sender_lockperi-rule_not_vacuous
+Starting to run on rule withdraw_enforces_amount_maxwithdraw-rule_not_vacuous
+Starting to run on rule withdraw_enforces_whitelist_msg_sender-rule_not_vacuous
+Starting to run on rule claimReward_enforces_whitelist_msg_sender-rule_not_vacuous
+Total time for only_owner_calls_setRewardRate-rule_not_vacuous: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+Violated: only_owner_calls_setRewardRate-rule_not_vacuous
+only_owner_calls_setRewardRate-rule_not_vacuous: A property is violated
+Total time for withdraw_enforces_balances_msg_sender_amount-rule_not_vacuous: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+Violated: withdraw_enforces_balances_msg_sender_amount-rule_not_vacuous
+withdraw_enforces_balances_msg_sender_amount-rule_not_vacuous: A property is violated
+Result for only_owner_calls_setRewardRate: only_owner_calls_setRewardRate: SUCCESS
+Starting to run on rule transferOwnership_enforces_newowner_address_0-rule_not_vacuous
+Total time for withdraw_debits_exactly-rule_not_vacuous: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+Violated: withdraw_debits_exactly-rule_not_vacuous
+withdraw_debits_exactly-rule_not_vacuous: A property is violated
+Result for withdraw_enforces_balances_msg_sender_amount: withdraw_enforces_balances_msg_sender_amount: SUCCESS
+Starting to run on rule only_owner_calls_setMaxWithdraw-rule_not_vacuous
+Result for withdraw_debits_exactly: withdraw_debits_exactly: SUCCESS
+Total time for only_owner_calls_unpause-rule_not_vacuous: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+Violated: only_owner_calls_unpause-rule_not_vacuous
+only_owner_calls_unpause-rule_not_vacuous: A property is violated
+Starting to run on rule only_owner_calls_transferOwnership-rule_not_vacuous
+Result for only_owner_calls_unpause: only_owner_calls_unpause: SUCCESS
+Starting to run on rule only_owner_calls_setLockPeriod-rule_not_vacuous
+Total time for transferOwnership_enforces_newowner_address_0-rule_not_vacuous: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+Violated: transferOwnership_enforces_newowner_address_0-rule_not_vacuous
+transferOwnership_enforces_newowner_address_0-rule_not_vacuous: A property is violated
+Result for transferOwnership_enforces_newowner_address_0: transferOwnership_enforces_newowner_address_0: SUCCESS
+Starting to run on rule only_pendingOwner_calls_acceptOwnership-rule_not_vacuous
+Total time for withdraw_enforces_amount_maxwithdraw-rule_not_vacuous: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+Violated: withdraw_enforces_amount_maxwithdraw-rule_not_vacuous
+withdraw_enforces_amount_maxwithdraw-rule_not_vacuous: A property is violated
+Total time for only_owner_calls_setMaxWithdraw-rule_not_vacuous: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+Violated: only_owner_calls_setMaxWithdraw-rule_not_vacuous
+only_owner_calls_setMaxWithdraw-rule_not_vacuous: A property is violated
+Result for withdraw_enforces_amount_maxwithdraw: withdraw_enforces_amount_maxwithdraw: SUCCESS
+Total time for withdraw_enforces_whitelist_msg_sender-rule_not_vacuous: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+Violated: withdraw_enforces_whitelist_msg_sender-rule_not_vacuous
+withdraw_enforces_whitelist_msg_sender-rule_not_vacuous: A property is violated
+Result for only_owner_calls_setMaxWithdraw: only_owner_calls_setMaxWithdraw: SUCCESS
+Starting to run on rule emergencyWithdraw_enforces_to_address_0-rule_not_vacuous
+Total time for only_owner_calls_transferOwnership-rule_not_vacuous: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+Starting to run on rule only_owner_calls_destroy-rule_not_vacuous
+Violated: only_owner_calls_transferOwnership-rule_not_vacuous
+only_owner_calls_transferOwnership-rule_not_vacuous: A property is violated
+Total time for withdraw_enforces_block_timestamp_lastwithdraw_msg_sender_lockperi-rule_not_vacuous: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+Violated: withdraw_enforces_block_timestamp_lastwithdraw_msg_sender_lockperi-rule_not_vacuous
+Total time for only_owner_calls_setLockPeriod-rule_not_vacuous: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+withdraw_enforces_block_timestamp_lastwithdraw_msg_sender_lockperi-rule_not_vacuous: A property is violated
+Result for withdraw_enforces_whitelist_msg_sender: withdraw_enforces_whitelist_msg_sender: SUCCESS
+Violated: only_owner_calls_setLockPeriod-rule_not_vacuous
+only_owner_calls_setLockPeriod-rule_not_vacuous: A property is violated
+Result for only_owner_calls_transferOwnership: only_owner_calls_transferOwnership: SUCCESS
+Result for only_owner_calls_setLockPeriod: only_owner_calls_setLockPeriod: SUCCESS
+Starting to run on rule only_owner_calls_emergencyWithdraw-rule_not_vacuous
+Starting to run on rule emergencyWithdraw_enforces_to_owner-rule_not_vacuous
+Result for withdraw_enforces_block_timestamp_lastwithdraw_msg_sender_lockperi: withdraw_enforces_block_timestamp_lastwithdraw_msg_sender_lockperi: SUCCESS
+Total time for claimReward_enforces_whitelist_msg_sender-rule_not_vacuous: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+Violated: claimReward_enforces_whitelist_msg_sender-rule_not_vacuous
+claimReward_enforces_whitelist_msg_sender-rule_not_vacuous: A property is violated
+Result for claimReward_enforces_whitelist_msg_sender: claimReward_enforces_whitelist_msg_sender: SUCCESS
+Total time for only_pendingOwner_calls_acceptOwnership-rule_not_vacuous: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+Violated: only_pendingOwner_calls_acceptOwnership-rule_not_vacuous
+only_pendingOwner_calls_acceptOwnership-rule_not_vacuous: A property is violated
+Total time for emergencyWithdraw_enforces_to_address_0-rule_not_vacuous: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+Violated: emergencyWithdraw_enforces_to_address_0-rule_not_vacuous
+emergencyWithdraw_enforces_to_address_0-rule_not_vacuous: A property is violated
+Result for only_pendingOwner_calls_acceptOwnership: only_pendingOwner_calls_acceptOwnership: SUCCESS
+Result for emergencyWithdraw_enforces_to_address_0: emergencyWithdraw_enforces_to_address_0: SUCCESS
+Total time for only_owner_calls_destroy-rule_not_vacuous: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+Violated: only_owner_calls_destroy-rule_not_vacuous
+only_owner_calls_destroy-rule_not_vacuous: A property is violated
+Result for only_owner_calls_destroy: only_owner_calls_destroy: SUCCESS
+Total time for emergencyWithdraw_enforces_to_owner-rule_not_vacuous: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+Violated: emergencyWithdraw_enforces_to_owner-rule_not_vacuous
+emergencyWithdraw_enforces_to_owner-rule_not_vacuous: A property is violated
+Total time for only_owner_calls_emergencyWithdraw-rule_not_vacuous: 0 seconds ; Split time: 0 seconds ; Number of problems: 1 ; Solver time : 0 seconds
+Violated: only_owner_calls_emergencyWithdraw-rule_not_vacuous
+only_owner_calls_emergencyWithdraw-rule_not_vacuous: A property is violated
+Result for emergencyWithdraw_enforces_to_owner: emergencyWithdraw_enforces_to_owner: SUCCESS
+Result for only_owner_calls_emergencyWithdraw: only_owner_calls_emergencyWithdraw: SUCCESS
+Results for envfreeFuncsStaticCheck:
+*---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*
+|Rule name                               |Verified     |Time (sec)|Description                                                 |Local vars                                        |
+|----------------------------------------|-------------|----------|------------------------------------------------------------|--------------------------------------------------|
+|totalDeposits()                         |Not violated |0         |                                                            |no local variables                                |
+|                                        |(unsat)      |          |                                                            |                                                  |
+|whitelist(address)                      |Not violated |0         |                                                            |no local variables                                |
+|                                        |(unsat)      |          |                                                            |                                                  |
+|lockPeriod()                            |Not violated |0         |                                                            |no local variables                                |
+|                                        |(unsat)      |          |                                                            |                                                  |
+|paused()                                |Not violated |0         |                                                            |no local variables                                |
+|                                        |(unsat)      |          |                                                            |                                                  |
+|owner()                                 |Not violated |0         |                                                            |no local variables                                |
+|                                        |(unsat)      |          |                                                            |                                                  |
+|maxWithdraw()                           |Not violated |0         |                                                            |no local variables                                |
+|                                        |(unsat)      |          |                                                            |                                                  |
+|balances(address)                       |Not violated |0         |                                                            |no local variables                                |
+|                                        |(unsat)      |          |                                                            |                                                  |
+|lastWithdraw(address)                   |Not violated |0         |                                                            |no local variables                                |
+|                                        |(unsat)      |          |                                                            |                                                  |
+|pendingOwner()                          |Not violated |0         |                                                            |no local variables                                |
+|                                        |(unsat)      |          |                                                            |                                                  |
+*---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*
+
+Results for all:
+*---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*
+|Rule name                               |Verified     |Time (sec)|Description                                                 |Local vars                                        |
+|----------------------------------------|-------------|----------|------------------------------------------------------------|--------------------------------------------------|
+|deposit_enforces_msg_value_0            |Not violated |0         |                                                            |no local variables                                |
+|                                        |(unsat)      |          |                                                            |                                                  |
+|deposit_enforces_paused                 |Not violated |0         |                                                            |no local variables                                |
+|                                        |(unsat)      |          |                                                            |                                                  |
+|envfreeFuncsStaticCheck                 |Not violated |0         |                                                            |no local variables                                |
+|                                        |(unsat)      |          |                                                            |                                                  |
+|withdraw_enforces_amount_0              |Not violated |0         |                                                            |no local variables                                |
+|                                        |(unsat)      |          |                                                            |                                                  |
+|only_owner_calls_removeFromWhitelist    |Not violated |2         |                                                            |no local variables                                |
+|                                        |(unsat)      |          |                                                            |                                                  |
+|deposit_enforces_whitelist_msg_sender   |Not violated |2         |                                                            |no local variables                                |
+|                                        |(unsat)      |          |                                                            |                                                  |
+|deposit_never_credits_zero              |Not violated |1         |                                                            |no local variables                                |
+|                                        |(unsat)      |          |                                                            |                                                  |
+|withdraw_debits_totalDeposits_by_the_sam|Not violated |1         |                                                            |no local variables                                |
+|e_amount                                |(unsat)      |          |                                                            |                                                  |
+|deposit_credits_totalDeposits_by_the_sam|Not violated |1         |                                                            |no local variables                                |
+|e_amount                                |(unsat)      |          |                                                            |                                                  |
+|withdraw_debits_exactly                 |Not violated |1         |                                                            |no local variables                                |
+|                                        |(unsat)      |          |                                                            |                                                  |
+|withdraw_enforces_paused                |Not violated |0         |                                                            |no local variables                                |
+|                                        |(unsat)      |          |                                                            |                                                  |
+|claimReward_enforces_paused             |Not violated |0         |                                                            |no local variables                                |
+|                                        |(unsat)      |          |                                                            |                                                  |
+|withdraw_enforces_balances_msg_sender_am|Not violated |2         |                                                            |no local variables                                |
+|ount                                    |(unsat)      |          |                                                            |                                                  |
+|only_owner_calls_pause                  |Not violated |0         |                                                            |no local variables                                |
+|                                        |(unsat)      |          |                                                            |                                                  |
+|only_owner_calls_setRewardRate          |Not violated |0         |                                                            |no local variables                                |
+|                                        |(unsat)      |          |                                                            |                                                  |
+|only_owner_calls_unpause                |Not violated |0         |                                                            |no local variables                                |
+|                                        |(unsat)      |          |                                                            |                                                  |
+|withdraw_enforces_block_timestamp_lastwi|Not violated |2         |                                                            |no local variables                                |
+|thdraw_msg_sender_lockperi              |(unsat)      |          |                                                            |                                                  |
+|withdraw_enforces_whitelist_msg_sender  |Not violated |1         |                                                            |no local variables                                |
+|                                        |(unsat)      |          |                                                            |                                                  |
+|withdraw_enforces_amount_maxwithdraw    |Not violated |2         |                                                            |no local variables                                |
+|                                        |(unsat)      |          |                                                            |                                                  |
+|claimReward_enforces_whitelist_msg_sende|Not violated |2         |                                                            |no local variables                                |
+|r                                       |(unsat)      |          |                                                            |                                                  |
+|rule_not_vacuous                        |Not violated |0         |Assert message: sanity check for rule deposit_enforces_m... |DeFiVault=10040                                   |
+|                                        |(sat)        |          |                                                            |e.block.basefee=0                                 |
+|                                        |             |          |                                                            |e.block.blobbasefee=0                             |
+|                                        |             |          |                                                            |e.block.coinbase=0x0                              |
+|                                        |             |          |                                                            |e.block.difficulty=0                              |
+|                                        |             |          |                                                            |e.block.gaslimit=0                                |
+|                                        |             |          |                                                            |e.block.number=0                                  |
+|                                        |             |          |                                                            |e.block.timestamp=0                               |
+|                                        |             |          |                                                            |e.msg.sender=0x2737                               |
+|                                        |             |          |                                                            |e.msg.value=0                                     |
+|                                        |             |          |                                                            |e.tx.origin=0x0                                   |
+|rule_not_vacuous                        |Not violated |1         |Assert message: sanity check for rule deposit_enforces_p... |DeFiVault=10001                                   |
+|                                        |(sat)        |          |                                                            |e.block.basefee=0                                 |
+|                                        |             |          |                                                            |e.block.blobbasefee=0                             |
+|                                        |             |          |                                                            |e.block.coinbase=0x0                              |
+|                                        |             |          |                                                            |e.block.difficulty=0                              |
+|                                        |             |          |                                                            |e.block.gaslimit=0                                |
+|                                        |             |          |                                                            |e.block.number=0                                  |
+|                                        |             |          |                                                            |e.block.timestamp=0                               |
+|                                        |             |          |                                                            |e.msg.sender=DeFiVault                            |
+|                                        |             |          |                                                            |e.msg.value=0                                     |
+|                                        |             |          |                                                            |e.tx.origin=0x0                                   |
+|transferOwnership_enforces_newowner_addr|Not violated |0         |                                                            |no local variables                                |
+|ess_0                                   |(unsat)      |          |                                                            |                                                  |
+|only_owner_calls_setMaxWithdraw         |Not violated |0         |                                                            |no local variables                                |
+|                                        |(unsat)      |          |                                                            |                                                  |
+|only_owner_calls_transferOwnership      |Not violated |0         |                                                            |no local variables                                |
+|                                        |(unsat)      |          |                                                            |                                                  |
+|only_owner_calls_setLockPeriod          |Not violated |0         |                                                            |no local variables                                |
+|                                        |(unsat)      |          |                                                            |                                                  |
+|only_pendingOwner_calls_acceptOwnership |Not violated |0         |                                                            |no local variables                                |
+|                                        |(unsat)      |          |                                                            |                                                  |
+|emergencyWithdraw_enforces_to_address_0 |Not violated |0         |                                                            |no local variables                                |
+|                                        |(unsat)      |          |                                                            |                                                  |
+|only_owner_calls_destroy                |Not violated |0         |                                                            |no local variables                                |
+|                                        |(unsat)      |          |                                                            |                                                  |
+|rule_not_vacuous                        |Not violated |0         |Assert message: sanity check for rule only_owner_calls_r... |DeFiVault=17720                                   |
+|                                        |(sat)        |          |                                                            |e.block.basefee=0                                 |
+|                                        |             |          |                                                            |e.block.blobbasefee=0                             |
+|                                        |             |          |                                                            |e.block.coinbase=0x0                              |
+|                                        |             |          |                                                            |e.block.difficulty=0                              |
+|                                        |             |          |                                                            |e.block.gaslimit=0                                |
+|                                        |             |          |                                                            |e.block.number=0                                  |
+|                                        |             |          |                                                            |e.block.timestamp=0                               |
+|                                        |             |          |                                                            |e.msg.sender=DeFiVault                            |
+|                                        |             |          |                                                            |e.msg.value=1                                     |
+|                                        |             |          |                                                            |e.tx.origin=0x0                                   |
+|                                        |             |          |                                                            |user=0x2be5                                       |
+|only_owner_calls_emergencyWithdraw      |Not violated |1         |                                                            |no local variables                                |
+|                                        |(unsat)      |          |                                                            |                                                  |
+|emergencyWithdraw_enforces_to_owner     |Not violated |1         |                                                            |no local variables                                |
+|                                        |(unsat)      |          |                                                            |                                                  |
+|rule_not_vacuous                        |Not violated |0         |Assert message: sanity check for rule withdraw_enforces_... |DeFiVault=17721                                   |
+|                                        |(sat)        |          |                                                            |amount=0                                          |
+|                                        |             |          |                                                            |e.block.basefee=0                                 |
+|                                        |             |          |                                                            |e.block.blobbasefee=0                             |
+|                                        |             |          |                                                            |e.block.coinbase=0x0                              |
+|                                        |             |          |                                                            |e.block.difficulty=0                              |
+|                                        |             |          |                                                            |e.block.gaslimit=0                                |
+|                                        |             |          |                                                            |e.block.number=0                                  |
+|                                        |             |          |                                                            |e.block.timestamp=0                               |
+|                                        |             |          |                                                            |e.msg.sender=0x4538                               |
+|                                        |             |          |                                                            |e.msg.value=0                                     |
+|                                        |             |          |                                                            |e.tx.origin=0x0                                   |
+|rule_not_vacuous                        |Not violated |1         |Assert message: sanity check for rule deposit_enforces_w... |DeFiVault=21799                                   |
+|                                        |(sat)        |          |                                                            |e.block.basefee=0                                 |
+|                                        |             |          |                                                            |e.block.blobbasefee=0                             |
+|                                        |             |          |                                                            |e.block.coinbase=0x0                              |
+|                                        |             |          |                                                            |e.block.difficulty=0                              |
+|                                        |             |          |                                                            |e.block.gaslimit=0                                |
+|                                        |             |          |                                                            |e.block.number=0                                  |
+|                                        |             |          |                                                            |e.block.timestamp=1                               |
+|                                        |             |          |                                                            |e.msg.sender=DeFiVault                            |
+|                                        |             |          |                                                            |e.msg.value=2                                     |
+|                                        |             |          |                                                            |e.tx.origin=0x0                                   |
+|rule_not_vacuous                        |Not violated |1         |Assert message: sanity check for rule deposit_never_cred... |DeFiVault=12438                                   |
+|                                        |(sat)        |          |                                                            |antes=0                                           |
+|                                        |             |          |                                                            |depois=1                                          |
+|                                        |             |          |                                                            |e.block.basefee=0                                 |
+|                                        |             |          |                                                            |e.block.blobbasefee=0                             |
+|                                        |             |          |                                                            |e.block.coinbase=0x0                              |
+|                                        |             |          |                                                            |e.block.difficulty=0                              |
+|                                        |             |          |                                                            |e.block.gaslimit=0                                |
+|                                        |             |          |                                                            |e.block.number=0                                  |
+|                                        |             |          |                                                            |e.block.timestamp=0                               |
+|                                        |             |          |                                                            |e.msg.sender=DeFiVault                            |
+|                                        |             |          |                                                            |e.msg.value=1                                     |
+|                                        |             |          |                                                            |e.tx.origin=0x0                                   |
+|rule_not_vacuous                        |Not violated |0         |Assert message: sanity check for rule withdraw_enforces_... |DeFiVault=10001                                   |
+|                                        |(sat)        |          |                                                            |amount=0                                          |
+|                                        |             |          |                                                            |e.block.basefee=0                                 |
+|                                        |             |          |                                                            |e.block.blobbasefee=0                             |
+|                                        |             |          |                                                            |e.block.coinbase=0x0                              |
+|                                        |             |          |                                                            |e.block.difficulty=0                              |
+|                                        |             |          |                                                            |e.block.gaslimit=0                                |
+|                                        |             |          |                                                            |e.block.number=0                                  |
+|                                        |             |          |                                                            |e.block.timestamp=0                               |
+|                                        |             |          |                                                            |e.msg.sender=0x2712                               |
+|                                        |             |          |                                                            |e.msg.value=0                                     |
+|                                        |             |          |                                                            |e.tx.origin=0x0                                   |
+|rule_not_vacuous                        |Not violated |1         |Assert message: sanity check for rule deposit_credits_to... |DeFiVault=12438                                   |
+|                                        |(sat)        |          |                                                            |antes_conta=0                                     |
+|                                        |             |          |                                                            |antes_total=0                                     |
+|                                        |             |          |                                                            |depois_conta=1                                    |
+|                                        |             |          |                                                            |depois_total=1                                    |
+|                                        |             |          |                                                            |e.block.basefee=0                                 |
+|                                        |             |          |                                                            |e.block.blobbasefee=0                             |
+|                                        |             |          |                                                            |e.block.coinbase=0x0                              |
+|                                        |             |          |                                                            |e.block.difficulty=0                              |
+|                                        |             |          |                                                            |e.block.gaslimit=0                                |
+|                                        |             |          |                                                            |e.block.number=0                                  |
+|                                        |             |          |                                                            |e.block.timestamp=0                               |
+|                                        |             |          |                                                            |e.msg.sender=DeFiVault                            |
+|                                        |             |          |                                                            |e.msg.value=1                                     |
+|                                        |             |          |                                                            |e.tx.origin=0x0                                   |
+|rule_not_vacuous                        |Not violated |1         |Assert message: sanity check for rule withdraw_debits_to... |DeFiVault=12438                                   |
+|                                        |(sat)        |          |                                                            |amount=1                                          |
+|                                        |             |          |                                                            |antes=1                                           |
+|                                        |             |          |                                                            |depois=0                                          |
+|                                        |             |          |                                                            |e.block.basefee=0                                 |
+|                                        |             |          |                                                            |e.block.blobbasefee=0                             |
+|                                        |             |          |                                                            |e.block.coinbase=0x0                              |
+|                                        |             |          |                                                            |e.block.difficulty=0                              |
+|                                        |             |          |                                                            |e.block.gaslimit=0                                |
+|                                        |             |          |                                                            |e.block.number=0                                  |
+|                                        |             |          |                                                            |e.block.timestamp=0                               |
+|                                        |             |          |                                                            |e.msg.sender=DeFiVault                            |
+|                                        |             |          |                                                            |e.msg.value=0                                     |
+|                                        |             |          |                                                            |e.tx.origin=0x0                                   |
+|rule_not_vacuous                        |Not violated |0         |Assert message: sanity check for rule only_owner_calls_p... |DeFiVault=10001                                   |
+|                                        |(sat)        |          |                                                            |e.block.basefee=0                                 |
+|                                        |             |          |                                                            |e.block.blobbasefee=0                             |
+|                                        |             |          |                                                            |e.block.coinbase=0x0                              |
+|                                        |             |          |                                                            |e.block.difficulty=0                              |
+|                                        |             |          |                                                            |e.block.gaslimit=0                                |
+|                                        |             |          |                                                            |e.block.number=0                                  |
+|                                        |             |          |                                                            |e.block.timestamp=0                               |
+|                                        |             |          |                                                            |e.msg.sender=DeFiVault                            |
+|                                        |             |          |                                                            |e.msg.value=1                                     |
+|                                        |             |          |                                                            |e.tx.origin=0x0                                   |
+|rule_not_vacuous                        |Not violated |0         |Assert message: sanity check for rule claimReward_enforc... |DeFiVault=10001                                   |
+|                                        |(sat)        |          |                                                            |e.block.basefee=0                                 |
+|                                        |             |          |                                                            |e.block.blobbasefee=0                             |
+|                                        |             |          |                                                            |e.block.coinbase=0x0                              |
+|                                        |             |          |                                                            |e.block.difficulty=0                              |
+|                                        |             |          |                                                            |e.block.gaslimit=0                                |
+|                                        |             |          |                                                            |e.block.number=0                                  |
+|                                        |             |          |                                                            |e.block.timestamp=0                               |
+|                                        |             |          |                                                            |e.msg.sender=0x2712                               |
+|                                        |             |          |                                                            |e.msg.value=0                                     |
+|                                        |             |          |                                                            |e.tx.origin=0x0                                   |
+|rule_not_vacuous                        |Not violated |0         |Assert message: sanity check for rule only_owner_calls_s... |DeFiVault=10001                                   |
+|                                        |(sat)        |          |                                                            |e.block.basefee=0                                 |
+|                                        |             |          |                                                            |e.block.blobbasefee=0                             |
+|                                        |             |          |                                                            |e.block.coinbase=0x0                              |
+|                                        |             |          |                                                            |e.block.difficulty=0                              |
+|                                        |             |          |                                                            |e.block.gaslimit=0                                |
+|                                        |             |          |                                                            |e.block.number=0                                  |
+|                                        |             |          |                                                            |e.block.timestamp=0                               |
+|                                        |             |          |                                                            |e.msg.sender=DeFiVault                            |
+|                                        |             |          |                                                            |e.msg.value=1                                     |
+|                                        |             |          |                                                            |e.tx.origin=0x0                                   |
+|                                        |             |          |                                                            |newRate=0                                         |
+|rule_not_vacuous                        |Not violated |1         |Assert message: sanity check for rule withdraw_enforces_... |DeFiVault=10001                                   |
+|                                        |(sat)        |          |                                                            |amount=1                                          |
+|                                        |             |          |                                                            |e.block.basefee=0                                 |
+|                                        |             |          |                                                            |e.block.blobbasefee=0                             |
+|                                        |             |          |                                                            |e.block.coinbase=0x0                              |
+|                                        |             |          |                                                            |e.block.difficulty=0                              |
+|                                        |             |          |                                                            |e.block.gaslimit=0                                |
+|                                        |             |          |                                                            |e.block.number=0                                  |
+|                                        |             |          |                                                            |e.block.timestamp=0                               |
+|                                        |             |          |                                                            |e.msg.sender=DeFiVault                            |
+|                                        |             |          |                                                            |e.msg.value=0                                     |
+|                                        |             |          |                                                            |e.tx.origin=0x0                                   |
+|rule_not_vacuous                        |Not violated |1         |Assert message: sanity check for rule withdraw_debits_ex... |DeFiVault=12438                                   |
+|                                        |(sat)        |          |                                                            |amount=1                                          |
+|                                        |             |          |                                                            |antes=8366                                        |
+|                                        |             |          |                                                            |depois=8365                                       |
+|                                        |             |          |                                                            |e.block.basefee=0                                 |
+|                                        |             |          |                                                            |e.block.blobbasefee=0                             |
+|                                        |             |          |                                                            |e.block.coinbase=0x0                              |
+|                                        |             |          |                                                            |e.block.difficulty=0                              |
+|                                        |             |          |                                                            |e.block.gaslimit=0                                |
+|                                        |             |          |                                                            |e.block.number=0                                  |
+|                                        |             |          |                                                            |e.block.timestamp=0                               |
+|                                        |             |          |                                                            |e.msg.sender=DeFiVault                            |
+|                                        |             |          |                                                            |e.msg.value=0                                     |
+|                                        |             |          |                                                            |e.tx.origin=0x0                                   |
+|rule_not_vacuous                        |Not violated |0         |Assert message: sanity check for rule only_owner_calls_u... |DeFiVault=10001                                   |
+|                                        |(sat)        |          |                                                            |e.block.basefee=0                                 |
+|                                        |             |          |                                                            |e.block.blobbasefee=0                             |
+|                                        |             |          |                                                            |e.block.coinbase=0x0                              |
+|                                        |             |          |                                                            |e.block.difficulty=0                              |
+|                                        |             |          |                                                            |e.block.gaslimit=0                                |
+|                                        |             |          |                                                            |e.block.number=0                                  |
+|                                        |             |          |                                                            |e.block.timestamp=0                               |
+|                                        |             |          |                                                            |e.msg.sender=DeFiVault                            |
+|                                        |             |          |                                                            |e.msg.value=1                                     |
+|                                        |             |          |                                                            |e.tx.origin=0x0                                   |
+|rule_not_vacuous                        |Not violated |0         |Assert message: sanity check for rule transferOwnership_... |DeFiVault=10002                                   |
+|                                        |(sat)        |          |                                                            |e.block.basefee=0                                 |
+|                                        |             |          |                                                            |e.block.blobbasefee=0                             |
+|                                        |             |          |                                                            |e.block.coinbase=0x0                              |
+|                                        |             |          |                                                            |e.block.difficulty=0                              |
+|                                        |             |          |                                                            |e.block.gaslimit=0                                |
+|                                        |             |          |                                                            |e.block.number=0                                  |
+|                                        |             |          |                                                            |e.block.timestamp=0                               |
+|                                        |             |          |                                                            |e.msg.sender=0x2711                               |
+|                                        |             |          |                                                            |e.msg.value=0                                     |
+|                                        |             |          |                                                            |e.tx.origin=0x0                                   |
+|                                        |             |          |                                                            |newOwner=0x0                                      |
+|rule_not_vacuous                        |Not violated |1         |Assert message: sanity check for rule withdraw_enforces_... |DeFiVault=10001                                   |
+|                                        |(sat)        |          |                                                            |amount=1                                          |
+|                                        |             |          |                                                            |e.block.basefee=0                                 |
+|                                        |             |          |                                                            |e.block.blobbasefee=0                             |
+|                                        |             |          |                                                            |e.block.coinbase=0x0                              |
+|                                        |             |          |                                                            |e.block.difficulty=0                              |
+|                                        |             |          |                                                            |e.block.gaslimit=0                                |
+|                                        |             |          |                                                            |e.block.number=0                                  |
+|                                        |             |          |                                                            |e.block.timestamp=0                               |
+|                                        |             |          |                                                            |e.msg.sender=DeFiVault                            |
+|                                        |             |          |                                                            |e.msg.value=0                                     |
+|                                        |             |          |                                                            |e.tx.origin=0x0                                   |
+|rule_not_vacuous                        |Not violated |0         |Assert message: sanity check for rule only_owner_calls_s... |DeFiVault=10001                                   |
+|                                        |(sat)        |          |                                                            |e.block.basefee=0                                 |
+|                                        |             |          |                                                            |e.block.blobbasefee=0                             |
+|                                        |             |          |                                                            |e.block.coinbase=0x0                              |
+|                                        |             |          |                                                            |e.block.difficulty=0                              |
+|                                        |             |          |                                                            |e.block.gaslimit=0                                |
+|                                        |             |          |                                                            |e.block.number=0                                  |
+|                                        |             |          |                                                            |e.block.timestamp=0                               |
+|                                        |             |          |                                                            |e.msg.sender=DeFiVault                            |
+|                                        |             |          |                                                            |e.msg.value=1                                     |
+|                                        |             |          |                                                            |e.tx.origin=0x0                                   |
+|                                        |             |          |                                                            |newMax=0                                          |
+|rule_not_vacuous                        |Not violated |1         |Assert message: sanity check for rule withdraw_enforces_... |DeFiVault=10001                                   |
+|                                        |(sat)        |          |                                                            |amount=1                                          |
+|                                        |             |          |                                                            |e.block.basefee=0                                 |
+|                                        |             |          |                                                            |e.block.blobbasefee=0                             |
+|                                        |             |          |                                                            |e.block.coinbase=0x0                              |
+|                                        |             |          |                                                            |e.block.difficulty=0                              |
+|                                        |             |          |                                                            |e.block.gaslimit=0                                |
+|                                        |             |          |                                                            |e.block.number=0                                  |
+|                                        |             |          |                                                            |e.block.timestamp=0                               |
+|                                        |             |          |                                                            |e.msg.sender=DeFiVault                            |
+|                                        |             |          |                                                            |e.msg.value=0                                     |
+|                                        |             |          |                                                            |e.tx.origin=0x0                                   |
+|rule_not_vacuous                        |Not violated |0         |Assert message: sanity check for rule only_owner_calls_t... |DeFiVault=1                                       |
+|                                        |(sat)        |          |                                                            |e.block.basefee=0                                 |
+|                                        |             |          |                                                            |e.block.blobbasefee=0                             |
+|                                        |             |          |                                                            |e.block.coinbase=0x0                              |
+|                                        |             |          |                                                            |e.block.difficulty=0                              |
+|                                        |             |          |                                                            |e.block.gaslimit=0                                |
+|                                        |             |          |                                                            |e.block.number=0                                  |
+|                                        |             |          |                                                            |e.block.timestamp=0                               |
+|                                        |             |          |                                                            |e.msg.sender=0x2711                               |
+|                                        |             |          |                                                            |e.msg.value=1                                     |
+|                                        |             |          |                                                            |e.tx.origin=0x0                                   |
+|                                        |             |          |                                                            |newOwner=0x0                                      |
+|rule_not_vacuous                        |Not violated |0         |Assert message: sanity check for rule only_owner_calls_s... |DeFiVault=10001                                   |
+|                                        |(sat)        |          |                                                            |e.block.basefee=0                                 |
+|                                        |             |          |                                                            |e.block.blobbasefee=0                             |
+|                                        |             |          |                                                            |e.block.coinbase=0x0                              |
+|                                        |             |          |                                                            |e.block.difficulty=0                              |
+|                                        |             |          |                                                            |e.block.gaslimit=0                                |
+|                                        |             |          |                                                            |e.block.number=0                                  |
+|                                        |             |          |                                                            |e.block.timestamp=0                               |
+|                                        |             |          |                                                            |e.msg.sender=DeFiVault                            |
+|                                        |             |          |                                                            |e.msg.value=1                                     |
+|                                        |             |          |                                                            |e.tx.origin=0x0                                   |
+|                                        |             |          |                                                            |newPeriod=0                                       |
+|rule_not_vacuous                        |Not violated |1         |Assert message: sanity check for rule withdraw_enforces_... |DeFiVault=10001                                   |
+|                                        |(sat)        |          |                                                            |amount=1                                          |
+|                                        |             |          |                                                            |e.block.basefee=0                                 |
+|                                        |             |          |                                                            |e.block.blobbasefee=0                             |
+|                                        |             |          |                                                            |e.block.coinbase=0x0                              |
+|                                        |             |          |                                                            |e.block.difficulty=0                              |
+|                                        |             |          |                                                            |e.block.gaslimit=0                                |
+|                                        |             |          |                                                            |e.block.number=0                                  |
+|                                        |             |          |                                                            |e.block.timestamp=0                               |
+|                                        |             |          |                                                            |e.msg.sender=DeFiVault                            |
+|                                        |             |          |                                                            |e.msg.value=0                                     |
+|                                        |             |          |                                                            |e.tx.origin=0x0                                   |
+|rule_not_vacuous                        |Not violated |2         |Assert message: sanity check for rule claimReward_enforc... |DeFiVault=10001                                   |
+|                                        |(sat)        |          |                                                            |e.block.basefee=0                                 |
+|                                        |             |          |                                                            |e.block.blobbasefee=0                             |
+|                                        |             |          |                                                            |e.block.coinbase=0x0                              |
+|                                        |             |          |                                                            |e.block.difficulty=0                              |
+|                                        |             |          |                                                            |e.block.gaslimit=0                                |
+|                                        |             |          |                                                            |e.block.number=0                                  |
+|                                        |             |          |                                                            |e.block.timestamp=0                               |
+|                                        |             |          |                                                            |e.msg.sender=DeFiVault                            |
+|                                        |             |          |                                                            |e.msg.value=0                                     |
+|                                        |             |          |                                                            |e.tx.origin=0x0                                   |
+|rule_not_vacuous                        |Not violated |0         |Assert message: sanity check for rule only_pendingOwner_... |DeFiVault=1                                       |
+|                                        |(sat)        |          |                                                            |e.block.basefee=0                                 |
+|                                        |             |          |                                                            |e.block.blobbasefee=0                             |
+|                                        |             |          |                                                            |e.block.coinbase=0x0                              |
+|                                        |             |          |                                                            |e.block.difficulty=0                              |
+|                                        |             |          |                                                            |e.block.gaslimit=0                                |
+|                                        |             |          |                                                            |e.block.number=0                                  |
+|                                        |             |          |                                                            |e.block.timestamp=0                               |
+|                                        |             |          |                                                            |e.msg.sender=0x2711                               |
+|                                        |             |          |                                                            |e.msg.value=1                                     |
+|                                        |             |          |                                                            |e.tx.origin=0x0                                   |
+|rule_not_vacuous                        |Not violated |0         |Assert message: sanity check for rule emergencyWithdraw_... |DeFiVault=10002                                   |
+|                                        |(sat)        |          |                                                            |amount=0                                          |
+|                                        |             |          |                                                            |e.block.basefee=0                                 |
+|                                        |             |          |                                                            |e.block.blobbasefee=0                             |
+|                                        |             |          |                                                            |e.block.coinbase=0x0                              |
+|                                        |             |          |                                                            |e.block.difficulty=0                              |
+|                                        |             |          |                                                            |e.block.gaslimit=0                                |
+|                                        |             |          |                                                            |e.block.number=0                                  |
+|                                        |             |          |                                                            |e.block.timestamp=0                               |
+|                                        |             |          |                                                            |e.msg.sender=0x2711                               |
+|                                        |             |          |                                                            |e.msg.value=0                                     |
+|                                        |             |          |                                                            |e.tx.origin=0x0                                   |
+|                                        |             |          |                                                            |to=0x0                                            |
+|rule_not_vacuous                        |Not violated |0         |Assert message: sanity check for rule only_owner_calls_d... |DeFiVault=10001                                   |
+|                                        |(sat)        |          |                                                            |e.block.basefee=0                                 |
+|                                        |             |          |                                                            |e.block.blobbasefee=0                             |
+|                                        |             |          |                                                            |e.block.coinbase=0x0                              |
+|                                        |             |          |                                                            |e.block.difficulty=0                              |
+|                                        |             |          |                                                            |e.block.gaslimit=0                                |
+|                                        |             |          |                                                            |e.block.number=0                                  |
+|                                        |             |          |                                                            |e.block.timestamp=0                               |
+|                                        |             |          |                                                            |e.msg.sender=0x2712                               |
+|                                        |             |          |                                                            |e.msg.value=1                                     |
+|                                        |             |          |                                                            |e.tx.origin=0x0                                   |
+|rule_not_vacuous                        |Not violated |0         |Assert message: sanity check for rule emergencyWithdraw_... |DeFiVault=10002                                   |
+|                                        |(sat)        |          |                                                            |amount=0                                          |
+|                                        |             |          |                                                            |e.block.basefee=0                                 |
+|                                        |             |          |                                                            |e.block.blobbasefee=0                             |
+|                                        |             |          |                                                            |e.block.coinbase=0x0                              |
+|                                        |             |          |                                                            |e.block.difficulty=0                              |
+|                                        |             |          |                                                            |e.block.gaslimit=0                                |
+|                                        |             |          |                                                            |e.block.number=0                                  |
+|                                        |             |          |                                                            |e.block.timestamp=0                               |
+|                                        |             |          |                                                            |e.msg.sender=0x2713                               |
+|                                        |             |          |                                                            |e.msg.value=0                                     |
+|                                        |             |          |                                                            |e.tx.origin=0x0                                   |
+|                                        |             |          |                                                            |to=0x2711                                         |
+|rule_not_vacuous                        |Not violated |0         |Assert message: sanity check for rule only_owner_calls_e... |DeFiVault=10002                                   |
+|                                        |(sat)        |          |                                                            |amount=0                                          |
+|                                        |             |          |                                                            |e.block.basefee=0                                 |
+|                                        |             |          |                                                            |e.block.blobbasefee=0                             |
+|                                        |             |          |                                                            |e.block.coinbase=0x0                              |
+|                                        |             |          |                                                            |e.block.difficulty=0                              |
+|                                        |             |          |                                                            |e.block.gaslimit=0                                |
+|                                        |             |          |                                                            |e.block.number=0                                  |
+|                                        |             |          |                                                            |e.block.timestamp=0                               |
+|                                        |             |          |                                                            |e.msg.sender=0x2711                               |
+|                                        |             |          |                                                            |e.msg.value=0                                     |
+|                                        |             |          |                                                            |e.tx.origin=0x0                                   |
+|                                        |             |          |                                                            |to=0x2713                                         |
+*---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*
+
+Failures summary:
+Failed on rule_not_vacuous:
+Assert message: sanity check for rule deposit_enforces_m...
+
+sanity check (vacuity of rule) for rule deposit_enforces_msg_value_0
+Failed on rule_not_vacuous:
+Assert message: sanity check for rule deposit_enforces_p...
+
+sanity check (vacuity of rule) for rule deposit_enforces_paused
+Failed on rule_not_vacuous:
+Assert message: sanity check for rule only_owner_calls_r...
+
+sanity check (vacuity of rule) for rule only_owner_calls_removeFromWhitelist
+Failed on rule_not_vacuous:
+Assert message: sanity check for rule withdraw_enforces_...
+
+sanity check (vacuity of rule) for rule withdraw_enforces_amount_0
+Failed on rule_not_vacuous:
+Assert message: sanity check for rule deposit_enforces_w...
+
+sanity check (vacuity of rule) for rule deposit_enforces_whitelist_msg_sender
+Failed on rule_not_vacuous:
+Assert message: sanity check for rule deposit_never_cred...
+
+sanity check (vacuity of rule) for rule deposit_never_credits_zero
+Failed on rule_not_vacuous:
+Assert message: sanity check for rule withdraw_enforces_...
+
+sanity check (vacuity of rule) for rule withdraw_enforces_paused
+Failed on rule_not_vacuous:
+Assert message: sanity check for rule deposit_credits_to...
+
+sanity check (vacuity of rule) for rule deposit_credits_totalDeposits_by_the_same_amount
+Failed on rule_not_vacuous:
+Assert message: sanity check for rule withdraw_debits_to...
+
+sanity check (vacuity of rule) for rule withdraw_debits_totalDeposits_by_the_same_amount
+Failed on rule_not_vacuous:
+Assert message: sanity check for rule only_owner_calls_p...
+
+sanity check (vacuity of rule) for rule only_owner_calls_pause
+Failed on rule_not_vacuous:
+Assert message: sanity check for rule claimReward_enforc...
+
+sanity check (vacuity of rule) for rule claimReward_enforces_paused
+Failed on rule_not_vacuous:
+Assert message: sanity check for rule only_owner_calls_s...
+
+sanity check (vacuity of rule) for rule only_owner_calls_setRewardRate
+Failed on rule_not_vacuous:
+Assert message: sanity check for rule withdraw_enforces_...
+
+sanity check (vacuity of rule) for rule withdraw_enforces_balances_msg_sender_amount
+Failed on rule_not_vacuous:
+Assert message: sanity check for rule withdraw_debits_ex...
+
+sanity check (vacuity of rule) for rule withdraw_debits_exactly
+Failed on rule_not_vacuous:
+Assert message: sanity check for rule only_owner_calls_u...
+
+sanity check (vacuity of rule) for rule only_owner_calls_unpause
+Failed on rule_not_vacuous:
+Assert message: sanity check for rule transferOwnership_...
+
+sanity check (vacuity of rule) for rule transferOwnership_enforces_newowner_address_0
+Failed on rule_not_vacuous:
+Assert message: sanity check for rule withdraw_enforces_...
+
+sanity check (vacuity of rule) for rule withdraw_enforces_amount_maxwithdraw
+Failed on rule_not_vacuous:
+Assert message: sanity check for rule only_owner_calls_s...
+
+sanity check (vacuity of rule) for rule only_owner_calls_setMaxWithdraw
+Failed on rule_not_vacuous:
+Assert message: sanity check for rule withdraw_enforces_...
+
+sanity check (vacuity of rule) for rule withdraw_enforces_whitelist_msg_sender
+Failed on rule_not_vacuous:
+Assert message: sanity check for rule only_owner_calls_t...
+
+sanity check (vacuity of rule) for rule only_owner_calls_transferOwnership
+Failed on rule_not_vacuous:
+Assert message: sanity check for rule only_owner_calls_s...
+
+sanity check (vacuity of rule) for rule only_owner_calls_setLockPeriod
+Failed on rule_not_vacuous:
+Assert message: sanity check for rule withdraw_enforces_...
+
+sanity check (vacuity of rule) for rule withdraw_enforces_block_timestamp_lastwithdraw_msg_sender_lockperi
+Failed on rule_not_vacuous:
+Assert message: sanity check for rule claimReward_enforc...
+
+sanity check (vacuity of rule) for rule claimReward_enforces_whitelist_msg_sender
+Failed on rule_not_vacuous:
+Assert message: sanity check for rule only_pendingOwner_...
+
+sanity check (vacuity of rule) for rule only_pendingOwner_calls_acceptOwnership
+Failed on rule_not_vacuous:
+Assert message: sanity check for rule emergencyWithdraw_...
+
+sanity check (vacuity of rule) for rule emergencyWithdraw_enforces_to_address_0
+Failed on rule_not_vacuous:
+Assert message: sanity check for rule only_owner_calls_d...
+
+sanity check (vacuity of rule) for rule only_owner_calls_destroy
+Failed on rule_not_vacuous:
+Assert message: sanity check for rule emergencyWithdraw_...
+
+sanity check (vacuity of rule) for rule emergencyWithdraw_enforces_to_owner
+Failed on rule_not_vacuous:
+Assert message: sanity check for rule only_owner_calls_e...
+
+sanity check (vacuity of rule) for rule only_owner_calls_emergencyWithdraw
+
+Done 0m
+Event reporter: all events were sent without errors
+Reports in file:///home/gflb/TesteCertora/emv-14-certora-17-nov.--15-14/Reports
+Final report in emv-14-certora-17-nov.--15-14/Reports/FinalResults.html
+Compiling smart-audt/contracts/DeFiVault_FIXED.sol...
+Compiling smart-audt/contracts/DeFiVault_FIXED.sol to expose internal function information and local variables...
+Verifier run command:
+ java -jar /home/gflb/.local/certora/emv.jar -buildDirectory .certora_internal/26_11_17_15_14_00_718
+[32mFinished running verifier:[0m
+	java -jar /home/gflb/.local/certora/emv.jar -buildDirectory .certora_internal/26_11_17_15_14_00_718

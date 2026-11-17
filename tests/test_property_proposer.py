@@ -184,3 +184,70 @@ class TestCLI(unittest.TestCase):
         import propose_properties
 
         self.assertEqual(propose_properties.main(["/nao/existe/X.sol"]), 1)
+
+
+class TestGuardsDoProprioContrato(unittest.TestCase):
+    """Todo `require` é um invariante que o autor escreveu; a regra é que violá-lo reverta.
+
+    É a forma que cobre teto, lock, whitelist, pausa e endereço zero sem uma regra por
+    assunto. Traduzir errado custa caro dos dois lados: uma condição mal traduzida vira
+    regra que falha em código correto, e recusar demais deixa o contrato sem propriedade.
+    """
+
+    DECLS = {
+        "balances": ("address", "uint256"),
+        "whitelist": ("address", "bool"),
+        "lastWithdraw": ("address", "uint256"),
+        "lockPeriod": ("", "uint256"),
+        "maxWithdraw": ("", "uint256"),
+        "paused": ("", "bool"),
+        "owner": ("", "address"),
+    }
+    PARAMS = {"amount": "uint256", "to": "address"}
+
+    def traduz(self, cond):
+        from core.property_proposer import translate_condition
+
+        return translate_condition(cond, self.PARAMS, self.DECLS)
+
+    def test_estado_publico_vira_chamada_de_getter(self):
+        self.assertEqual(self.traduz("amount <= maxWithdraw"), "amount <= maxWithdraw()")
+        self.assertEqual(self.traduz("!paused"), "!paused()")
+
+    def test_mapping_indexado_por_msg_sender(self):
+        self.assertEqual(self.traduz("balances[msg.sender] >= amount"), "balances(e.msg.sender) >= amount")
+        self.assertEqual(self.traduz("whitelist[msg.sender]"), "whitelist(e.msg.sender)")
+
+    def test_janela_de_tempo_com_soma(self):
+        self.assertEqual(
+            self.traduz("block.timestamp >= lastWithdraw[msg.sender] + lockPeriod"),
+            "e.block.timestamp >= lastWithdraw(e.msg.sender) + lockPeriod()",
+        )
+
+    def test_endereco_zero(self):
+        self.assertEqual(self.traduz("to != address(0)"), "to != 0")
+
+    def test_variavel_local_e_recusada(self):
+        """`success` é local: traduzir viraria uma regra que falha em código correto."""
+        self.assertIsNone(self.traduz("success"))
+
+    def test_chamada_desconhecida_e_recusada(self):
+        self.assertIsNone(self.traduz("foo(bar) > 0"))
+
+    def test_address_this_e_recusado(self):
+        self.assertIsNone(self.traduz("amount <= address(this).balance"))
+
+    def test_guard_de_identidade_nao_duplica_a_regra_de_portao(self):
+        nomes = [c.name for c in propose(COFRE)]
+        self.assertIn("only_dono_calls_liberar", nomes)
+        self.assertNotIn("liberar_enforces_msg_sender_dono", nomes)
+
+    def test_o_guard_vira_regra_de_reversao(self):
+        fonte = COFRE.replace(
+            "function sacar(uint256 quantia) external {",
+            "function sacar(uint256 quantia) external {\n        require(quantia <= total, \"acima do total\");",
+        )
+        regra = next(c for c in propose(fonte) if c.shape == "guard")
+        self.assertIn("require !(quantia <= total());", regra.cvl)
+        self.assertIn("@withrevert", regra.cvl)
+        self.assertIn("assert lastReverted", regra.cvl)

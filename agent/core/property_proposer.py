@@ -80,6 +80,7 @@ class _FnShape:
     total_credits: list[str] = field(default_factory=list)
     total_debits: list[str] = field(default_factory=list)
     gates: list[str] = field(default_factory=list)                 # identity variables
+    guards: list[str] = field(default_factory=list)                # condições de require
 
 
 def contract_like_names(source: str) -> frozenset[str]:
@@ -216,6 +217,10 @@ def _shape_of(d: Definition, modifier_bodies: dict[str, str], refs: frozenset[st
     for nome in _modifiers(d.signature, set(modifier_bodies)):
         shape.gates.extend(_identity_vars(modifier_bodies[nome]))
     shape.gates.extend(_identity_vars(corpo))
+    shape.guards.extend(_require_conditions(corpo))
+    for nome in _modifiers(d.signature, set(modifier_bodies)):
+        shape.guards.extend(_require_conditions(mask_comments_and_strings(modifier_bodies[nome])))
+    shape.guards = list(dict.fromkeys(shape.guards))
     return shape
 
 
@@ -253,6 +258,7 @@ def propose(source: str, contract: str = "") -> list[PropertyCandidate]:
         candidatos.extend(_credit_rules(shape, decls))
         candidatos.extend(_debit_rules(shape, decls))
         candidatos.extend(_gate_rules(shape, decls))
+        candidatos.extend(_guard_rules(shape, decls))
 
     vistos: set[str] = set()
     unicos = []
@@ -480,3 +486,180 @@ def build_spec(source: str, candidates: list[PropertyCandidate], header: str = "
     for c in candidates:
         partes.append(f"// {c.shape}: {c.rationale}\n{c.cvl}")
     return "\n\n".join(partes) + "\n"
+
+
+# ── forma 4: o guard que o próprio contrato escreveu ────────────────────────
+#
+# Um `require` numa função externa (ou no modificador dela) é um invariante que o autor
+# declarou em código. A propriedade correspondente não precisa saber o que o invariante
+# significa: *violar a condição tem de reverter*. É a forma que cobre teto, período de
+# lock, lista de permissão, pausa e endereço zero sem uma regra por assunto -- e é a que
+# um mutante de comparação (`>=` virando `>`) quebra, porque a condição deixa de valer e a
+# chamada passa assim mesmo.
+
+_REQUIRE = re.compile(r"\brequire\s*\(")
+_SLUG = re.compile(r"[^a-z0-9]+")
+_IDENTITY_ONLY = re.compile(r"\s*(?:msg\.sender\s*==\s*[A-Za-z_]\w*|[A-Za-z_]\w*\s*==\s*msg\.sender)\s*")
+# `address(0)`, `address(this)`, chamadas, membros
+_ADDR_ZERO = re.compile(r"\baddress\s*\(\s*0\s*\)")
+_CALL = re.compile(r"\b([A-Za-z_]\w*)\s*\(")
+_MEMBER = re.compile(r"\b([A-Za-z_]\w*)\s*\.\s*([A-Za-z_]\w*)")
+_INDEX = re.compile(r"\b([A-Za-z_]\w*)\s*\[\s*([^\[\]]+?)\s*\]")
+# os marcadores @SENDER@ / @TIME@ são atômicos: sem excluir o "@" das bordas, a
+# tradução recursiva de `balances[msg.sender]` recusa a própria chave que ela criou
+_WORD = re.compile(r"(?<![\w.@])([A-Za-z_]\w*)(?![\w(\[@])")
+
+
+def _require_conditions(corpo: str) -> list[str]:
+    """A condição de cada `require` do corpo, sem a mensagem."""
+    fora = []
+    for m in _REQUIRE.finditer(corpo):
+        abre = m.end() - 1
+        fecha = _matching_paren_local(corpo, abre)
+        if fecha < 0:
+            continue
+        dentro = corpo[abre + 1: fecha]
+        cond = _split_top_level_comma(dentro)[0].strip()
+        if cond:
+            fora.append(" ".join(cond.split()))
+    return fora
+
+
+def _matching_paren_local(texto: str, abre: int) -> int:
+    nivel = 0
+    for i in range(abre, len(texto)):
+        if texto[i] == "(":
+            nivel += 1
+        elif texto[i] == ")":
+            nivel -= 1
+            if nivel == 0:
+                return i
+    return -1
+
+
+def _split_top_level_comma(texto: str) -> list[str]:
+    partes, atual, nivel = [], "", 0
+    for ch in texto:
+        if ch in "([":
+            nivel += 1
+        elif ch in ")]":
+            nivel -= 1
+        if ch == "," and nivel == 0:
+            partes.append(atual)
+            atual = ""
+        else:
+            atual += ch
+    partes.append(atual)
+    return partes
+
+
+def translate_condition(
+    cond: str,
+    params: dict[str, str],
+    decls: dict[str, tuple[str, str]],
+) -> str | None:
+    """Fachada: traduz e troca os marcadores por `e.msg.sender` e companhia."""
+    nucleo = _translate_core(cond, params, decls)
+    if nucleo is None:
+        return None
+    return (nucleo.replace("@SENDER@", "e.msg.sender").replace("@VALUE@", "e.msg.value")
+                  .replace("@TIME@", "e.block.timestamp").replace("@BLOCK@", "e.block.number"))
+
+
+def _translate_core(
+    cond: str,
+    params: dict[str, str],
+    decls: dict[str, tuple[str, str]],
+) -> str | None:
+    """A condição em CVL, ou None quando alguma parte dela não é expressável.
+
+    Só é traduzido o que pode ser dito com certeza: parâmetros da função, estado público
+    (que vira chamada do getter), `msg.sender`, `msg.value`, `block.timestamp`,
+    `address(0)` e literais. Qualquer outro identificador -- estado privado, variável
+    local, chamada a função -- faz a condição ser recusada, porque uma tradução
+    aproximada vira uma regra que falha em código correto.
+    """
+    texto = _ADDR_ZERO.sub("0", cond)
+    if "address(this)" in texto or "this." in texto:
+        return None
+
+    texto = texto.replace("msg.sender", "@SENDER@").replace("msg.value", "@VALUE@")
+    texto = texto.replace("block.timestamp", "@TIME@").replace("block.number", "@BLOCK@")
+    if _MEMBER.search(texto):
+        return None
+
+    # mapping[chave] -> mapping(chave), só para estado público
+    def _idx(m):
+        nome, chave = m.group(1), m.group(2)
+        if nome not in decls or decls[nome][0] == "":
+            return "@REJECT@"
+        traduzida = _translate_core(chave, params, decls)
+        return "@REJECT@" if traduzida is None else f"{nome}({traduzida})"
+
+    texto = _INDEX.sub(_idx, texto)
+    if "@REJECT@" in texto:
+        return None
+
+    # a checagem vem depois da substituição de índice, então o getter que acabamos de
+    # criar (`balances(...)`) é legítimo; qualquer outra chamada não é traduzível
+    for m in _CALL.finditer(texto):
+        if m.group(1) not in ("uint256", "uint", "int256", "to_mathint") and m.group(1) not in decls:
+            return None
+
+    def _ident(m):
+        nome = m.group(1)
+        if nome in params or nome in ("true", "false"):
+            return nome
+        if nome in decls and decls[nome][0] == "":
+            return f"{nome}()"
+        return "@REJECT@"
+
+    texto = _WORD.sub(_ident, texto)
+    if "@REJECT@" in texto:
+        return None
+
+    return texto
+
+
+def _slugify(cond: str) -> str:
+    return _SLUG.sub("_", cond.lower()).strip("_")[:48] or "guard"
+
+
+def _guard_rules(shape: _FnShape, decls: dict[str, tuple[str, str]]) -> list[PropertyCandidate]:
+    d = shape.definition
+    params = {n: t for t, n in _params(d.signature, shape.refs)}
+    decl = _decl_args(d, shape.refs)
+    chamada = _call_args(d, shape.refs)
+    chamada = f"e, {chamada}" if chamada else "e"
+
+    regras = []
+    for cond in shape.guards:
+        if _IDENTITY_ONLY.fullmatch(cond.strip()):
+            continue  # `_gate_rules` já diz isso, e melhor: nomeia o dono
+        cvl_cond = translate_condition(cond, params, decls)
+        if cvl_cond is None:
+            continue
+        usados = {n for n in _WORD.findall(cvl_cond)}
+        getters = tuple((n, decls[n][0]) for n in sorted(usados) if n in decls)
+        getters += tuple((n, decls[n][0]) for n in sorted(decls) if f"{n}(" in cvl_cond)
+        getters = tuple(dict.fromkeys(getters))
+        nome = f"{d.name}_enforces_{_slugify(cond)}"
+        cvl = f"""rule {nome}({decl}) {{
+    env e;
+    require !({cvl_cond});
+
+    {d.name}@withrevert({chamada});
+
+    assert lastReverted, "{d.name} went through although `{cond}` does not hold";
+}}"""
+        regras.append(PropertyCandidate(
+            name=nome,
+            shape="guard",
+            contract=d.contract,
+            function=d.name,
+            cvl=cvl,
+            rationale=f"{d.name} requires `{cond}`; a call that breaks it must revert",
+            reads=tuple(n for n, _a in getters),
+            getters=getters,
+        ))
+    return regras
