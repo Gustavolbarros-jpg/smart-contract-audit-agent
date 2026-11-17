@@ -74,10 +74,17 @@ Já conhecidos: DeFiVault → `0.8.21`; OpenEdition (escher) → `0.8.17`; Inver
   já remove `DISPLAY`/`WAYLAND_DISPLAY` do ambiente de propósito. Leia o JSON/log.
 
 **LLM (Groq)**
-- `400` = JSON inválido/validação; `413` = prompt grande demais; `429` = cota
-  diária (TPD) estourada. Nenhum dos três é bug do pipeline.
-- Se a cota acabar: ou espere o reset, ou troque para um modelo com cota separada
-  — **avisando que o resultado deixa de ser comparável** com as rodadas anteriores.
+- `413` = prompt grande demais. `429` vem em dois sabores: **TPM** (8000 tokens por
+  minuto no tier on_demand — um prompt de diagnóstico já usa metade) e **TPD** (cota
+  diária). O cliente agora **espera o tempo que a própria mensagem informa e repete**
+  (até 2 vezes, espera máxima de 60 s), então um TPM não derruba mais a rodada.
+- `400 json_validate_failed` com `failed_generation` **vazio** não é prompt inválido: é
+  modelo de raciocínio gastando o `max_tokens` pensando e não sobrando nada para a
+  resposta. O cliente repete com 4× o orçamento e `reasoning_effort: low`. Foi isso que
+  travava o GovTokenEscrow desde 09/11.
+- Se a **cota diária** acabar: ou espere o reset, ou troque para um modelo com cota
+  separada — **avisando que o resultado deixa de ser comparável** com as rodadas
+  anteriores.
 - Patch determinístico é calculado **antes** da diagnose do LLM, justamente para
   que uma falha de LLM não bloqueie o que já era mecânico.
 
