@@ -17,7 +17,15 @@ What the numbers mean:
 Repairs that are all copied/adapted do not demonstrate generalization, however green
 the benchmark looks. Needs GROQ_API_KEY and a real CERTORAKEY.
 
+With ``--oracle-spec``, a repair is not taken at its word: the repaired contract is checked
+against a spec frozen from the original by the local verifier (no cloud job, no quota), and
+a rule that passed *without being reachable* counts as vacuous, not as a repair. That is
+the success criterion of ``docs/experimento-generalizacao-pre-registro.md`` §4 -- "Slither
+stopped reporting it" is a much weaker oracle than "the property still holds".
+
     python agent/generalization_probe.py smart-audt/contracts/DeFiVault_FIXED.sol
+    python agent/generalization_probe.py smart-audt/contracts/DeFiVault_FIXED.sol \
+        --oracle-spec specs/oracle/DeFiVault.spec
 """
 
 from __future__ import annotations
@@ -36,6 +44,7 @@ from core.contract_context import extract_primary_contract_name
 from core.generalization import classify_fix, report
 from core.import_context import has_imports
 from core.mutation import OPERATORS, mutate, summarize
+from tools.certora_cli import verify_locally
 
 
 def _library_patterns() -> list[dict]:
@@ -97,8 +106,43 @@ def _detectable_only(contract: Path, source: str, operators: tuple[str, ...], li
     return kept
 
 
+def _oracle_check(
+    fixed_path: Path, oracle_spec: Path, contract_name: str, timeout: int, log_path: Path | None
+) -> dict:
+    """O critério de sucesso do pré-registro, aplicado ao contrato reparado."""
+    # Absoluto antes de trocar o cwd: sem imports o patch sai em `agent_outputs/`, que é
+    # relativo ao cwd do processo, e o Prover deixaria de encontrar o arquivo.
+    fixed_path = fixed_path.resolve()
+    verdict = verify_locally(
+        str(fixed_path),
+        str(oracle_spec),
+        contract_name=contract_name,
+        timeout=timeout,
+        log_path=str(log_path) if log_path else None,
+        cwd=str(fixed_path.parent),
+        allow_path=str(REPO_ROOT),
+        msg="probe oracle",
+    )
+    if verdict.status == "verified" and verdict.vacuous_rules:
+        status = "vacuous"
+    else:
+        status = verdict.status
+    return {
+        "status": status,
+        "violated": verdict.violated_rules,
+        "vacuous": verdict.vacuous_rules,
+        "detail": verdict.detail[:200],
+    }
+
+
 def run_probe(
-    contract: Path, operators: tuple[str, ...], limit: int, dry_run: bool, detectable_only: bool = False
+    contract: Path,
+    operators: tuple[str, ...],
+    limit: int,
+    dry_run: bool,
+    detectable_only: bool = False,
+    oracle_spec: Path | None = None,
+    oracle_timeout: int = 600,
 ) -> int:
     source = contract.read_text(encoding="utf-8")
     if detectable_only:
@@ -125,6 +169,14 @@ def run_probe(
     probe_tmp_root = REPO_ROOT / "runs" / "_probe_tmp"
     probe_tmp_root.mkdir(parents=True, exist_ok=True)
 
+    oracle_counts: dict[str, int] = {}
+    oracle_results: list[dict] = []
+    oracle_dir = None
+    if oracle_spec is not None:
+        oracle_dir = REPO_ROOT / "runs" / f"probe_oracle_{contract.stem}"
+        oracle_dir.mkdir(parents=True, exist_ok=True)
+        print(f"Oraculo       : {oracle_spec} (logs em {oracle_dir})\n")
+
     for index, mutation in enumerate(mutations, start=1):
         print(f"\n=== [{index}/{len(mutations)}] {mutation.label}: {mutation.description}")
         with tempfile.TemporaryDirectory(dir=probe_tmp_root) as workdir:
@@ -147,6 +199,13 @@ def run_probe(
                 continue
 
             produced = fix_path.read_text(encoding="utf-8")
+            oracle = None
+            if oracle_spec is not None:
+                primary = extract_primary_contract_name(mutation.source, contract.stem) or contract.stem
+                oracle = _oracle_check(
+                    fix_path, oracle_spec, primary, oracle_timeout,
+                    oracle_dir / f"{mutation.label.replace('@', '_at_')}.log" if oracle_dir else None,
+                )
             fix_path.unlink()
 
         repaired += 1
@@ -154,13 +213,30 @@ def run_probe(
             _extract_fix_lines(mutation.source, produced), library, vuln_type=mutation.expected_class
         )
         verdicts.append(verdict)
-        print(f"    corrigido -> {verdict.kind} (sim={verdict.similarity})")
+        if oracle is None:
+            print(f"    corrigido -> {verdict.kind} (sim={verdict.similarity})")
+        else:
+            oracle_counts[oracle["status"]] = oracle_counts.get(oracle["status"], 0) + 1
+            oracle_results.append({"label": mutation.label, "classification": verdict.kind, **oracle})
+            print(
+                f"    corrigido -> {verdict.kind} (sim={verdict.similarity}) | "
+                f"oraculo: {oracle['status']}"
+                + (f" {oracle['violated'] or oracle['vacuous']}" if oracle["status"] != "verified" else "")
+            )
 
     summary = report(verdicts)
     print("\n" + "=" * 60)
     print(f"reparados      : {repaired}/{len(mutations)}  (falhas: {failed})")
     print(f"classificacao  : {summary['counts']}")
     print(f"taxa de novos  : {summary['novel_rate']}")
+    if oracle_spec is not None:
+        confirmed = oracle_counts.get("verified", 0)
+        print(f"oraculo        : {oracle_counts}")
+        print(f"confirmados    : {confirmed}/{repaired} reparos passam a spec congelada sem vacuidade")
+        (oracle_dir / "probe_oracle.json").write_text(
+            json.dumps({"counts": oracle_counts, "results": oracle_results}, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
     print("=" * 60)
     novel = summary["counts"].get("novel", 0)
     if repaired == 0:
@@ -193,6 +269,12 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Keep only mutants that Slither/plugins flag (runs the detection check first).",
     )
+    parser.add_argument(
+        "--oracle-spec",
+        default=None,
+        help="Spec CVL congelada: o reparo só conta se ela continuar valendo e não ficar vácua.",
+    )
+    parser.add_argument("--oracle-timeout", type=int, default=600)
     args = parser.parse_args(argv)
 
     contract = Path(args.contract).resolve()
@@ -200,7 +282,22 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Contrato nao encontrado: {contract}")
         return 1
 
-    return run_probe(contract, tuple(args.operators), args.limit, args.dry_run, args.detectable_only)
+    oracle_spec = None
+    if args.oracle_spec:
+        oracle_spec = Path(args.oracle_spec).resolve()
+        if not oracle_spec.is_file():
+            print(f"Spec de oraculo nao encontrada: {oracle_spec}")
+            return 1
+
+    return run_probe(
+        contract,
+        tuple(args.operators),
+        args.limit,
+        args.dry_run,
+        args.detectable_only,
+        oracle_spec,
+        args.oracle_timeout,
+    )
 
 
 if __name__ == "__main__":
