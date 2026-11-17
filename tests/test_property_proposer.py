@@ -161,3 +161,26 @@ class TestMontagemDaSpec(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestCLI(unittest.TestCase):
+    """A CLI é o que torna o propositor utilizável; um import quebrado passa despercebido."""
+
+    def test_roda_e_grava_a_spec(self):
+        import tempfile
+
+        sys.path.insert(0, str(ROOT / "agent"))
+        import propose_properties
+
+        with tempfile.TemporaryDirectory() as tmp:
+            destino = Path(tmp) / "saida.spec"
+            codigo = propose_properties.main([str(POOL), "--contract-name", "Pool", "--out", str(destino)])
+            self.assertEqual(codigo, 0)
+            spec = destino.read_text(encoding="utf-8")
+            self.assertIn("rule deposit_never_credits_zero", spec)
+            self.assertIn("methods {", spec)
+
+    def test_contrato_inexistente_devolve_erro(self):
+        import propose_properties
+
+        self.assertEqual(propose_properties.main(["/nao/existe/X.sol"]), 1)

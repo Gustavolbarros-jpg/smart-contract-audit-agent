@@ -112,8 +112,8 @@ contract DeFiVault {
         require(reward > 0, "no reward");
         require(totalRewards >= reward, "insufficient rewards");
 
-        rewards[msg.sender]  += reward; // FIX: Atualização do estado antes da call
-        totalRewards         += reward;
+        rewards[msg.sender]  -= reward; // FIX: Atualização do estado antes da call
+        totalRewards         -= reward;
 
         (bool success, ) = payable(msg.sender).call{value: reward}("");
         require(success, "transfer failed");
