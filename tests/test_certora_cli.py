@@ -214,6 +214,13 @@ class VerifyLocallyTests(unittest.TestCase):
             self.assertEqual(verdict.status, "verified")
             self.assertIn("Verified: withdraw_debits_exactly", log.read_text(encoding="utf-8"))
 
+    def test_the_log_folder_is_created_when_it_does_not_exist(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            log = Path(tmp) / "nested" / "run" / "oracle.log"
+            verdict, _ = self._run(tmp, VERIFIED_LOG, log_path=str(log))
+            self.assertEqual(verdict.status, "verified")
+            self.assertTrue(log.is_file())
+
     def test_a_timeout_keeps_what_the_prover_had_already_printed(self):
         with tempfile.TemporaryDirectory() as tmp:
             source = Path(tmp) / "Vault.sol"

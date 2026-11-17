@@ -262,6 +262,9 @@ def verify_locally(
     )
     seconds = int(os.getenv("AUDIT_ORACLE_TIMEOUT", "300")) if timeout is None else timeout
 
+    if log_path:
+        # A pasta do log pode não existir ainda: o chamador escolhe o nome, não a árvore.
+        os.makedirs(os.path.dirname(os.path.abspath(log_path)), exist_ok=True)
     handle, temporary = (log_path, False) if log_path else (
         tempfile.mkstemp(prefix="certora_oracle_", suffix=".log")[1], True
     )
