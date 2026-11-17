@@ -163,6 +163,20 @@ class LocalVerdict:
         return sorted(name for name, verdict in self.rules.items() if verdict == "violated")
 
     @property
+    def vacuous_rules(self) -> list[str]:
+        """Regras que passaram porque deixaram de ser alcançáveis.
+
+        O Prover reporta ``<regra>-rule_not_vacuous`` **Violated** quando a regra É
+        alcançável. Se esse sanity check vira Verified, a regra passou sem ser exercitada —
+        é assim que um "reparo" que faz a função reverter sempre satisfaz a spec sem
+        consertar nada, e é por isso que o veredito sozinho não basta.
+        """
+        return sorted(
+            name for name, verdict in self.rules.items()
+            if verdict == "verified" and self.sanity.get(name + VACUITY_SUFFIX) == "verified"
+        )
+
+    @property
     def conclusive(self) -> bool:
         """Só um veredito de regra distingue original de mutante; erro e timeout não."""
         return self.status in ("verified", "violated")

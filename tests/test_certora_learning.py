@@ -2134,9 +2134,14 @@ contract SimpleBank {
 
     def test_contract_registry_covers_known_contract_files(self):
         registered_paths = {entry.path for entry in contract_entries()}
+        # A mutant is written beside the original on purpose -- the Prover and Slither both
+        # need the relative imports to keep resolving -- and removed right after. One in
+        # flight (mutant_detection.py, mutant_oracle.py) is not a corpus contract.
+        transient = ("__mut", "__oracle")
         actual_paths = {
             str(path.relative_to(ROOT))
             for path in (ROOT / "smart-audt" / "contracts").glob("*.sol")
+            if not any(marker in path.name for marker in transient)
         }
         groups = {entry.group for entry in contract_entries()}
 

@@ -154,6 +154,25 @@ class VerdictParsingTests(unittest.TestCase):
         self.assertFalse(verdict.conclusive)
         self.assertIn("cvl", verdict.detail)
 
+    def test_a_rule_that_passed_unreachable_is_flagged_as_vacuous(self):
+        # A repair that makes withdraw always revert satisfies the rule without fixing
+        # anything: the Prover then verifies the sanity check instead of violating it.
+        log = (
+            "Verified: withdraw_debits_exactly\n"
+            "Verified: withdraw_debits_exactly-rule_not_vacuous\n"
+        )
+        verdict = certora_cli.parse_local_verdict(log)
+        self.assertEqual(verdict.status, "verified")
+        self.assertEqual(verdict.vacuous_rules, ["withdraw_debits_exactly"])
+
+    def test_a_reachable_rule_is_not_vacuous(self):
+        verdict = certora_cli.parse_local_verdict(VERIFIED_LOG)
+        self.assertEqual(verdict.vacuous_rules, [])
+
+    def test_a_violated_rule_is_never_called_vacuous(self):
+        verdict = certora_cli.parse_local_verdict(VIOLATED_LOG)
+        self.assertEqual(verdict.vacuous_rules, [])
+
     def test_an_empty_log_is_an_error_with_a_reason(self):
         verdict = certora_cli.parse_local_verdict("")
         self.assertEqual(verdict.status, "error")

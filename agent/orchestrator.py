@@ -33,6 +33,7 @@ from core.diagnosis_context import (
     sanitize_diagnosis_ids,
 )
 from core.deterministic_patch import apply_deterministic_patches
+from core.repair_origin import repair_origins, stamp_origins
 from core.deterministic_spec import build_deterministic_spec
 from core.formal_candidate import build_formal_candidates
 from core.formal_plan import build_planner_input, build_spec_plan_input, sanitize_formal_plan
@@ -397,7 +398,11 @@ def certora_tem_erro(log: str) -> bool:
     return has_certora_blocking_error(log)
 
 
-def comparar_resultados(vulns_confirmadas_original: list, analise_pos: dict) -> dict:
+def comparar_resultados(
+    vulns_confirmadas_original: list,
+    analise_pos: dict,
+    repair_origin: dict | None = None,
+) -> dict:
     def normalizar_rule(nome):
         return nome.split('-rule_not_vacuous')[0].split('-sanity')[0].strip()
 
@@ -429,13 +434,18 @@ def comparar_resultados(vulns_confirmadas_original: list, analise_pos: dict) -> 
         else:
             inconclusivas.append({"id": vuln_id, "status": status, "motivo": res.get("evidencia", "inconclusive/erro")})
 
-    return {
+    comparacao = {
         "total_original": len(ids_orig),
         "resolvidas": resolvidas,
         "persistentes": persistentes,
         "inconclusivas": inconclusivas,
         "taxa_resolucao": f"{len(resolvidas)}/{len(ids_orig)}"
     }
+    # Sem a origem, "resolveu 6 de 9" não diz se foi o patch mecânico ou a LLM, que é
+    # exatamente a pergunta do experimento de generalização.
+    if repair_origin:
+        stamp_origins(comparacao, repair_origin)
+    return comparacao
 
 
 def imprimir_comparacao(comparacao: dict):
@@ -966,6 +976,16 @@ def executar_pipeline(contract_path: str, copy_final: bool = True):
 
         codigo_fix = limpar_strings_solidity(limpar_codigo_solidity(fix_bruto))
 
+    # Origem do reparo por achado, escrita pelo caminho de código em vez de inferida dos
+    # artefatos depois. É o campo que o experimento de generalização precisa para separar
+    # "o patch mecânico resolveu" de "a LLM resolveu".
+    repair_origin = repair_origins(
+        ids_confirmadas,
+        deterministic_patch_ids,
+        ids_confirmadas - deterministic_patch_ids,
+    )
+    save_json(run_dir / "repair_origin.json", repair_origin)
+
     if has_imports(contract_source):
         caminho_fix_temp = Path(contract_path).parent / f"{nome_contrato}_AGENT_FIXED.sol"
     else:
@@ -1030,7 +1050,7 @@ def executar_pipeline(contract_path: str, copy_final: bool = True):
                        json.dumps(analise_fix, indent=2, ensure_ascii=False))
         save_json(run_dir / f"analysis_fixed_t{tentativa}.json", analise_fix)
 
-        comparacao = comparar_resultados(vulns_confirmadas, analise_fix)
+        comparacao = comparar_resultados(vulns_confirmadas, analise_fix, repair_origin)
         salvar_arquivo(str(pasta_output / f"comparacao_t{tentativa}.json"),
                        json.dumps(comparacao, indent=2, ensure_ascii=False))
         save_json(run_dir / f"comparison_t{tentativa}.json", comparacao)

@@ -39,6 +39,7 @@ from tools.certora_cli import verify_locally
 # O veredito do Prover, traduzido para o vocabulário de mutação.
 KILLED = "killed"        # Violated: a spec pegou o defeito
 SURVIVED = "survived"    # Verified: a spec não fala sobre esse defeito
+VACUOUS = "vacuous"      # Verified, mas alguma regra deixou de ser alcançável
 _STATUS = {"violated": KILLED, "verified": SURVIVED, "error": "error", "timeout": "timeout"}
 
 
@@ -81,9 +82,16 @@ def _check_one(
         if source is not None:
             target.unlink(missing_ok=True)
 
+    status = _STATUS.get(verdict.status, verdict.status)
+    if status == SURVIVED and verdict.vacuous_rules:
+        # Passou sem ser exercitado: o mutante tornou a regra inalcançável (um PKR que
+        # tira `payable`, por exemplo). Não é sobrevivência honesta nem morte.
+        status = VACUOUS
+
     return {
         "label": label,
-        "status": _STATUS.get(verdict.status, verdict.status),
+        "status": status,
+        "vacuous": verdict.vacuous_rules,
         "prover_status": verdict.status,
         "rules": verdict.rules,
         "violated": verdict.violated_rules,
@@ -205,13 +213,13 @@ def main(argv: list[str] | None = None) -> int:
         print(f"\nAbortado: {report['aborted']}  (veja {run_dir / 'original.log'})")
         return 2
 
-    print(f"\n{'operador':<10}{'mortos':>8}{'sobrevivem':>12}{'erro':>7}{'timeout':>9}")
+    print(f"\n{'operador':<10}{'mortos':>8}{'sobrevivem':>12}{'vacuo':>7}{'erro':>7}{'timeout':>9}")
     for op, counts in report["by_operator"].items():
         print(f"{op:<10}{counts.get(KILLED, 0):>8}{counts.get(SURVIVED, 0):>12}"
-              f"{counts.get('error', 0):>7}{counts.get('timeout', 0):>9}")
+              f"{counts.get(VACUOUS, 0):>7}{counts.get('error', 0):>7}{counts.get('timeout', 0):>9}")
     totals = report["totals"]
     print(f"{'total':<10}{totals.get(KILLED, 0):>8}{totals.get(SURVIVED, 0):>12}"
-          f"{totals.get('error', 0):>7}{totals.get('timeout', 0):>9}")
+          f"{totals.get(VACUOUS, 0):>7}{totals.get('error', 0):>7}{totals.get('timeout', 0):>9}")
     print(f"\nRelatorio: {run_dir}")
     return 0
 
