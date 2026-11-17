@@ -296,6 +296,7 @@ def preparar_spec(
     rule_name_by_id: dict[str, str] | None = None,
     auth_probe: dict | None = None,
     rule_context_by_id: dict[str, dict] | None = None,
+    contract_source: str = "",
 ) -> str:
     """Remove vazias, deduplica, autocorrige, valida e salva o spec."""
     rule_name_by_id = rule_name_by_id or {}
@@ -726,6 +727,7 @@ def executar_pipeline(contract_path: str, copy_final: bool = True):
             rule_name_by_id,
             auth_probe,
             rule_context_by_id,
+            contract_source,
         )
         save_text(run_dir / "generated.spec", spec_corrigido)
 
