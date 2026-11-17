@@ -42,6 +42,7 @@ sys.path.insert(0, str(AGENT_DIR))
 
 from core.contract_context import extract_primary_contract_name
 from core.generalization import classify_fix, report
+from core.perspectives import classify_detector
 from core.import_context import has_imports
 from core.mutation import OPERATORS, mutate, summarize
 from tools.certora_cli import verify_locally
@@ -104,6 +105,27 @@ def _detectable_only(contract: Path, source: str, operators: tuple[str, ...], li
         per_operator[mutation.operator] = per_operator.get(mutation.operator, 0) + 1
         kept.append(mutation)
     return kept
+
+
+def library_for(expected_class: str, library: list[dict]) -> list[dict]:
+    """Os padrões da biblioteca que são da mesma classe que o mutante.
+
+    ``Mutation.expected_class`` fala o vocabulário das perspectivas
+    (``unrestricted_write``), e a biblioteca guarda o nome do detector do Slither
+    (``unrestricted-write``, ``tx-origin``). Comparar os dois crus nunca casa, e um
+    conjunto vazio faz **qualquer** fix sair "novel" por construção — o mesmo viés de
+    instrumento que já invalidou a leitura do "1 de 7". ``classify_detector`` traduz o nome
+    do detector para a perspectiva, que é onde a comparação tem sentido.
+    """
+    if not expected_class:
+        return library
+    same = [
+        entry
+        for entry in library
+        if entry.get("vuln_type") == expected_class
+        or classify_detector(str(entry.get("vuln_type") or "")) == expected_class
+    ]
+    return same
 
 
 def _oracle_check(
@@ -217,8 +239,11 @@ def run_probe(
             fix_path.unlink()
 
         repaired += 1
+        # Pré-filtra por perspectiva e então compara sem tipo: filtrar por `vuln_type` cru
+        # dentro de classify_fix compararia vocabulários diferentes e zeraria o conjunto.
         verdict = classify_fix(
-            _extract_fix_lines(mutation.source, produced), library, vuln_type=mutation.expected_class
+            _extract_fix_lines(mutation.source, produced),
+            library_for(mutation.expected_class, library),
         )
         verdicts.append(verdict)
         if oracle is None:

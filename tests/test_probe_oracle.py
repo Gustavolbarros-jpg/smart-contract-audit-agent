@@ -52,3 +52,27 @@ class OracleCheckTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LibraryForClassTests(unittest.TestCase):
+    """A classificação compara perspectivas, não vocabulários diferentes."""
+
+    LIBRARY = [
+        {"vuln_type": "tx-origin", "fix_snippet": "require(msg.sender == owner);"},
+        {"vuln_type": "missing-zero-check", "fix_snippet": 'require(to != address(0), "zero");'},
+        {"vuln_type": "unrestricted-write", "fix_snippet": "onlyOwner"},
+    ]
+
+    def test_a_perspective_name_matches_the_detectors_of_that_perspective(self):
+        # Mutation.expected_class diz "unrestricted_write"; a biblioteca guarda nomes de
+        # detector, e `tx-origin` é dessa perspectiva.
+        kept = {e["vuln_type"] for e in probe.library_for("unrestricted_write", self.LIBRARY)}
+        self.assertIn("tx-origin", kept)
+        self.assertNotIn("missing-zero-check", kept)
+
+    def test_a_detector_name_still_matches_itself(self):
+        kept = [e["vuln_type"] for e in probe.library_for("missing-zero-check", self.LIBRARY)]
+        self.assertEqual(kept, ["missing-zero-check"])
+
+    def test_without_a_class_the_whole_library_is_compared(self):
+        self.assertEqual(len(probe.library_for("", self.LIBRARY)), 3)
