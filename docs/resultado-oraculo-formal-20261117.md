@@ -278,6 +278,81 @@ simples (`missing-zero-check`, `tx-origin`, `suicidal`, `arbitrary-send-eth`, ov
 flow). Enquanto a formalização for indexada pelo achado do Slither, o alcance do pipeline
 é o alcance do Slither, por melhor que o oráculo seja.
 
+## 4.7 A spec escrita pela máquina contra a spec escrita à mão
+
+A §4.6 termina dizendo que, enquanto a formalização for indexada pelo achado do Slither, o
+alcance do pipeline é o alcance do Slither. `agent/core/property_proposer.py` é a tentativa
+de sair disso: lê o fonte e reconhece **formas de contabilidade** — função que credita um
+mapping por endereço e um total, função que debita os dois, função guardada por modificador
+que compara algo a `msg.sender`. Cada forma implica uma propriedade que vale em qualquer
+implementação correta dela, e é por isso que a propriedade pode ser escrita **sem saber o
+que está errado**. Sem LLM, sem Slither, sem rede.
+
+### Primeiro, o teste que podia afundar a ideia
+
+14 regras geradas do `DeFiVault_FIXED.sol`, rodadas contra o próprio contrato:
+**14/14 Verified, nenhuma vácua**. Zero alarme falso num contrato já tido como bom. Uma
+propriedade que falha em código correto custa mais que uma propriedade que ninguém
+escreveu, e isso aqui não acontece.
+
+### A comparação, nos mesmos 46 mutantes
+
+| | regras | mortes | das quais o Slither não vê |
+|---|---|---|---|
+| spec escrita à mão (eu, lendo o contrato) | 19 | **18** | 15 |
+| spec gerada do fonte (0,2 s, nenhum humano) | 14 | **14** | **6** |
+| união das duas | — | 23 | — |
+
+As duas são **complementares, não aninhadas**. A gerada mata 5 que a minha não pega:
+
+```
+MD@60   onlyOwner removido de removeFromWhitelist
+MD@132  onlyOwner removido de unpause
+MD@144  onlyOwner removido de setLockPeriod
+MD@150  onlyOwner removido de transferOwnership
+MD@164  onlyOwner removido de emergencyWithdraw
+```
+
+Todas funções para as quais eu simplesmente **esqueci de escrever regra**. O gerador é
+exaustivo onde a pessoa é seletiva: emitiu `only_owner_calls_X` para as 10 funções com
+portão, não para as 4 que me pareceram importantes.
+
+E alcança sozinho a classe semântica:
+
+```
+AOR@68, AOR@69, AOR@91, AOR@92   += virou -= e vice-versa
+BOR@39, BOR@156                  == virou !=
+```
+
+Seis defeitos que **nenhum detector nomeia**, pegos por uma spec que ninguém escreveu.
+
+### O que ela não pega, e a ressalva que o número esconde
+
+As 9 que só a escrita à mão pega são regras de domínio, não formas de contabilidade: o
+teto de saque, o período de lock, a whitelist, o pause, a conservação do pool de
+recompensa, o endereço zero, o destinatário do `emergencyWithdraw`. O propositor tem três
+formas; nada nele sabe que existe um teto.
+
+E a ressalva honesta: **somada ao Slither, a spec gerada não acrescenta nada ao total.**
+
+| | cobertura em 44 mutantes |
+|---|---|
+| Slither sozinho | 9 |
+| Slither + spec gerada | 15 |
+| Slither + spec à mão | 24 |
+| Slither + as duas | **24** |
+
+Os 5 que a gerada acrescenta sobre a minha spec são exatamente modificadores removidos, que
+o detector `unrestricted-write` do projeto já sinaliza. Então o ganho dela **sobre a
+combinação existente** é zero, hoje.
+
+O resultado não é "a máquina escreve spec melhor que a pessoa". É: **78% das mortes da
+spec escrita à mão, de graça, em qualquer contrato, sem ninguém ler o código** — e 6 delas
+na classe que a análise estática não alcança por natureza. A spec à mão custou uma tarde de
+leitura e só existe para um contrato; esta roda em 320 arquivos do corpus e produz
+propriedade em 32 deles (90 propriedades: 52 portão de identidade, 29 de contabilidade, 9
+de totais).
+
 ## 5. Custo
 
 | | |

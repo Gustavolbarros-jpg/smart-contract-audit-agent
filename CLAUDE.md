@@ -168,6 +168,15 @@ Pendências conhecidas:
   Os **22** arquivos de rodadas antigas seguem lá, sem destino decidido.
 - A generalização real do LLM **ainda não foi demonstrada** — e agora existe o instrumento
   para demonstrar ou refutar.
+- **Propositor de propriedades** (`agent/core/property_proposer.py`, CLI
+  `agent/propose_properties.py`): lê o fonte e emite CVL sem detector e sem LLM. Mede-se em
+  `docs/resultado-oraculo-formal-20261117.md` §4.7 — 14 regras geradas do DeFiVault matam
+  **14 dos 46** mutantes contra 18 da spec escrita à mão, 14/14 verificam no contrato
+  correto (zero alarme falso), e 6 das mortes são da classe semântica que detector nenhum
+  nomeia. Ressalva: somada ao Slither não muda o total (24/44), porque as 5 que ela
+  acrescenta sobre a spec à mão são modificadores removidos que o `unrestricted-write` já
+  vê. Três formas só (crédito, débito, portão de identidade): produz propriedade em 32 de
+  320 arquivos do corpus real.
 - `logs_antigos/` (1,4 GB, 156 entradas) ainda sem destino decidido.
 - `runs/`: 412 rodadas. Inventário completo em `docs/inventario-runs-20261117.md`
   (+ o JSON por rodada ao lado). Era **2.912 MB**, dos quais **1.966 MB** de scratch do
