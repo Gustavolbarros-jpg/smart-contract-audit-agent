@@ -143,12 +143,20 @@ def run_probe(
     detectable_only: bool = False,
     oracle_spec: Path | None = None,
     oracle_timeout: int = 600,
+    only_labels: set[str] | None = None,
 ) -> int:
     source = contract.read_text(encoding="utf-8")
     if detectable_only:
         mutations = _detectable_only(contract, source, operators, limit)
     else:
         mutations = mutate(source, operators=operators, limit_per_operator=limit)
+    if only_labels:
+        # A população mensurável do experimento: fora dela não existe critério de "reparado"
+        # (docs/experimento-generalizacao-pre-registro.md §3).
+        mutations = [
+            m for m in mutations
+            if m.label in only_labels or m.label.replace("@", "_at_") in only_labels
+        ]
 
     print(f"Contrato base : {contract}")
     print(f"Mutantes      : {len(mutations)} {summarize(mutations)}")
@@ -275,6 +283,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Spec CVL congelada: o reparo só conta se ela continuar valendo e não ficar vácua.",
     )
     parser.add_argument("--oracle-timeout", type=int, default=600)
+    parser.add_argument(
+        "--only-labels",
+        default=None,
+        help="Lista de labels (AOR@91,MD@78) ou um report.json do mutant_oracle: mede só esses mutantes.",
+    )
     args = parser.parse_args(argv)
 
     contract = Path(args.contract).resolve()
@@ -289,14 +302,29 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Spec de oraculo nao encontrada: {oracle_spec}")
             return 1
 
+    only_labels = None
+    if args.only_labels:
+        candidate = Path(args.only_labels)
+        if candidate.is_file():
+            previous = json.loads(candidate.read_text(encoding="utf-8"))
+            only_labels = {item["label"] for item in previous["mutants"] if item["status"] == "killed"}
+        else:
+            only_labels = {part.strip() for part in args.only_labels.split(",") if part.strip()}
+        print(f"Populacao     : {len(only_labels)} label(s) selecionado(s)")
+
+    # O limite por operador corta ANTES do filtro: com o default de 2, um label de linha
+    # mais abaixo (MD@78) nunca entraria na lista para ser selecionado.
+    limit = max(args.limit, 1000) if only_labels else args.limit
+
     return run_probe(
         contract,
         tuple(args.operators),
-        args.limit,
+        limit,
         args.dry_run,
         args.detectable_only,
         oracle_spec,
         args.oracle_timeout,
+        only_labels,
     )
 
 
