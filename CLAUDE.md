@@ -90,7 +90,8 @@ Já conhecidos: DeFiVault → `0.8.21`; OpenEdition (escher) → `0.8.17`; Inver
 4. Candidatos formais → `formal_candidate.py` / `formal_plan.py`
 5. Spec CVL: determinística (`deterministic_spec.py`) ou LLM, depois
    **sempre** por `tools/spec_validator.py`
-6. Certora → `tools/certora_cli.py`
+6. Certora → `tools/certora_cli.py` (`run_certora` manda para a nuvem;
+   `verify_locally` roda só o verificador local, sem cota)
 7. Correção: `core/deterministic_patch.py` primeiro, LLM só no resto
 8. `core/patch_guard.py` barra patch não-mínimo (assinatura pública alterada,
    string literal mexida, variável de estado removida)
@@ -102,9 +103,35 @@ reparado por `restore_access_modifier` (só quando há **um** modificador de ide
 
 ---
 
-## 5. Estado atual (2026-11-11)
+## 5. Estado atual (2026-11-17)
 
-Branch `analysis/catalog-coverage`, **7 commits locais sem push**, PR #2 contra `develop`.
+Branch `analysis/catalog-coverage`, **22 commits locais sem push**, PR #2 contra `develop`.
+
+**O que mudou em 17/11 — o oráculo formal local.** `certoraRun --compilation_steps_only`
+para antes de *enviar* o job, não antes de *verificar*: o `emv.jar` roda aqui e imprime
+vereditos reais, sem cota. Está em `tools/certora_cli.verify_locally`, e
+`AUDIT_CERTORA_LOCAL=1` faz o pipeline inteiro rodar assim.
+
+Medição com `specs/oracle/DeFiVault.spec` (19 regras, todas verificadas e nenhuma vácua no
+original) sobre os 46 mutantes — `runs/20261117_oracle_defivault/`, detalhe em
+`docs/resultado-oraculo-formal-20261117.md`:
+
+| Slither \ oráculo | mata | sobrevive | erro |
+|---|---|---|---|
+| **detecta** (9) | 3 | 6 | 0 |
+| **não vê** (35) | **15** | 20 | 0 |
+| não compila (2) | 0 | 0 | 2 |
+
+Dos 44 que compilam: Slither sozinho pega 9 (20%), Slither + oráculo pegam 24 (54%). Os
+instrumentos são **complementares**: 6 mutantes o Slither vê e a spec não cobre (lacuna
+registrada, não corrigida depois do fato).
+
+Experimento de generalização **pré-registrado** em
+`docs/experimento-generalizacao-pre-registro.md` (pergunta, população, critério de sucesso,
+5 braços, predição declarada). Peças de controle já no código: `repair_origin.json` escrito
+pelo caminho de código, `AUDIT_NO_DETERMINISTIC_PATCH` (braço só-LLM),
+`AUDIT_FIX_LIBRARY` (biblioteca congelada por braço), guarda de vacuidade
+(`LocalVerdict.vacuous_rules`) e `generalization_probe.py --oracle-spec`.
 
 Lote de contratos de produção rodado em 09/11:
 
@@ -113,16 +140,21 @@ Lote de contratos de produção rodado em 09/11:
 | SimpleERC20Escrow (inverse) | **Resolvido 2/2**, aprovado pelo Certora na tentativa 2 |
 | Initializable (escher) | Sem achado real — eram 2 falsos positivos, já corrigidos no normalizador |
 | GovTokenEscrow (inverse) | Spec compila, Certora confirma 4 achados; parou no `400` do Groq |
-| OpenEdition (escher) | Correção do `owner() envfree` escrita, **não verificada** (cota) |
+| OpenEdition (escher) | Correção do `owner() envfree` escrita, **não verificada** (cota) — agora verificável de graça |
 | TalosBaseStrategy (maia) | LLM removeu funções públicas → barrado pelo patch guard |
-| GovernorBravoDelegateMaia (maia) | *Stack too deep* — limite sem solução no momento |
+| GovernorBravoDelegateMaia (maia) | Spec já compila (bug de struct corrigido em `16b251c`); o que sobra é *stack too deep* |
 
 Pendências conhecidas:
-- 38 arquivos de produção em que o Slither falha, não investigados.
-- A generalização real do LLM **ainda não foi demonstrada**: todos os reparos
-  medidos no probe até agora foram determinísticos.
-- Discrepância "63 vs 66" arquivos não analisáveis no relatório PIBIC.
+- Corpus recontado em 16/11: **294** arquivos reais sob `*/src` (323 − 22 artefatos
+  `*_AGENT_FIXED.sol` − 7 fora de escopo). Lote de 238: 185 ok, 28 import não resolvido,
+  19 *stack too deep*, 5 timeout, 1 crash do Slither. Substitui o "38 falhas" antigo.
+- Os 22 `*_AGENT_FIXED.sol` dentro de `src/` de produção seguem lá: decidir entre apagar,
+  limpar no fim da rodada ou excluir da enumeração do corpus.
+- A generalização real do LLM **ainda não foi demonstrada** — e agora existe o instrumento
+  para demonstrar ou refutar.
 - `logs_antigos/` (1,4 GB, 156 entradas) ainda sem destino decidido.
+- Uma varredura do oráculo deixa ~1,4 GB em `runs/<rodada>/_prover/`
+  (`--prune-prover-dirs` apaga; nada é apagado sem pedir).
 
 ---
 
@@ -151,6 +183,9 @@ artefato, nao codigo: nao procure respostas ali e nao edite nada la dentro.
 | Orquestração ponta a ponta | `agent/orchestrator.py` |
 | Política por classe de vulnerabilidade | `agent/core/vulnerability_catalog.py` |
 | Lições de CVL/Certora acumuladas | `docs/certora-cookbook.md`, `docs/certora-lessons.md` |
+| Oráculo formal local: o que mede e quanto custa | `docs/resultado-oraculo-formal-20261117.md` |
+| Experimento de generalização (pré-registro) | `docs/experimento-generalizacao-pre-registro.md` |
+| Spec congelada de oráculo | `specs/oracle/DeFiVault.spec` |
 | Detector próprio | `docs/unrestricted-write-detector.md` |
 | Relatório PIBIC (entregável) | `docs/relatorio-final-pibic-2026.md` |
 | Histórico longo do projeto | `docs/session-context.md` (**desatualizado**, ver banner) |
