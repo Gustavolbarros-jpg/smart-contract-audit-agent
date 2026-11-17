@@ -148,7 +148,7 @@ Lote de contratos de produção rodado em 09/11:
 |---|---|
 | SimpleERC20Escrow (inverse) | **Resolvido 2/2**, aprovado pelo Certora na tentativa 2 |
 | Initializable (escher) | Sem achado real — eram 2 falsos positivos, já corrigidos no normalizador |
-| GovTokenEscrow (inverse) | Spec compila, Certora confirma 4 achados; parou no `400` do Groq |
+| GovTokenEscrow (inverse) | **Fechado em 17/11**: 4/4, origem separada (2 determinísticos + 2 LLM), `zero_address_reverts` `Violated`→`Verified` e não vácuo, sem cota (`runs/20261117_100413_GovTokenEscrow/`) |
 | OpenEdition (escher) | **Fechado em 17/11**: pipeline completo com `AUDIT_CERTORA_LOCAL=1`, original `Violated` → corrigido `Verified` e não vácuo, 1/1, sem cota (`runs/20261117_095428_OpenEdition/`) |
 | TalosBaseStrategy (maia) | LLM removeu funções públicas → barrado pelo patch guard |
 | GovernorBravoDelegateMaia (maia) | Spec já compila (bug de struct corrigido em `16b251c`); o que sobra é *stack too deep* |
