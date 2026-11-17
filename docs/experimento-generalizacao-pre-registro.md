@@ -3,8 +3,9 @@
 **Data:** 2026-11-17
 **Status:** pré-registro — escrito **antes** de rodar qualquer braço.
 **Commits congelados:**
-`2c57bd0` (última mudança na biblioteca de moldes determinísticos — recongelada ao
-acrescentar `incorrect-exp`, antes de qualquer braço rodar),
+`e8673f6` (última mudança na biblioteca de moldes determinísticos — recongelada duas vezes
+em 17/11, ao acrescentar `incorrect-exp` e `incorrect-shift`; a segunda **depois** dos
+braços A2 e A3, e nenhuma das duas classes aparece na população deles),
 `e9eac64` (spec de oráculo `specs/oracle/DeFiVault.spec`),
 `24a353e` (chaves de braço: `AUDIT_NO_DETERMINISTIC_PATCH`, `AUDIT_FIX_LIBRARY`).
 
@@ -114,11 +115,11 @@ desacreditada):
 - **A3 repara no máximo 1 dos 3 mutantes de E1∩E2** (a população que o pipeline atual
   consegue alcançar). Declarado em 17/11, antes de rodar o braço.
 - **A3 repara no máximo 30% de E1** quando a fase 2 tornar E1 inteiro alcançável.
-- Nas classes **ausentes** da biblioteca de moldes (as 11 presentes são
+- Nas classes **ausentes** da biblioteca de moldes (as 12 presentes são
   `missing-zero-check`, `tx-origin`, `suicidal`, `unrestricted-write`, `unchecked-send`,
   `unchecked-lowlevel`, `unchecked-transfer`, `arbitrary-send-erc20`,
-  `divide-before-multiply`, `encode-packed-collision`, `incorrect-exp`), prevejo **no
-  máximo 1** reparo bem-sucedido.
+  `divide-before-multiply`, `encode-packed-collision`, `incorrect-exp`,
+  `incorrect-shift`), prevejo **no máximo 1** reparo bem-sucedido.
 
 Acrescentar um molde depois do pré-registro **recongela** a biblioteca e tem de ser
 registrado aqui, com o commit. Depois de o primeiro braço rodar, a biblioteca não muda
