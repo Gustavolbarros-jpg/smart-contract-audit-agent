@@ -54,6 +54,31 @@ A **população mensurável do experimento é E1**. A interseção E1∩E2 e a d
 reportadas separadamente: é a diferença que diz quanto do espaço de defeito o pipeline
 nunca é cobrado hoje.
 
+### 3.1 Medido em 17/11 (antes de qualquer braço de reparo)
+
+| estrato | tamanho |
+|---|---|
+| mutantes que compilam | 44 (2 PKR não compilam) |
+| **E1** — o oráculo mata | **18** |
+| **E2** — o Slither vê | **9** |
+| **E1 ∩ E2** | **3** — `MD@136`, `MD@140`, `FXR@39` |
+| E1 \ E2 (só o oráculo pega) | 15 |
+
+**Duas bibliotecas diferentes, e a distinção importa.**
+
+- A **biblioteca de moldes** (patch determinístico, 11 classes) cobre `unrestricted-write`
+  e `tx-origin` — as classes dos 3 mutantes de E1∩E2.
+- A **biblioteca de exemplos** (`runs/fix_library.json`, few-shot da LLM) tem 36 padrões de
+  **3 classes só**: `missing-zero-check` (28), `arbitrary-send-eth` (7),
+  `erc2771-multicall-context` (1). Snapshot congelado em
+  `runs/20261117_experiment_library/fix_library_frozen_2c57bd0.json`.
+
+A recuperação é por `vuln_type` exato, então os 3 mutantes de E1∩E2 **não recebem exemplo
+nenhum**: no braço A3 a LLM repara uma classe sobre a qual não viu exemplo, que é a
+definição de generalização usada por `core/generalization.py`. O que esse braço **não** mede
+é generalização para classe ausente do *molde determinístico* — isso exigiria a fase 2
+(§9.3).
+
 ## 4. Critério de sucesso de um reparo
 
 Um reparo conta como bem-sucedido **se e somente se**, no contrato reparado:
@@ -86,7 +111,9 @@ congelada em `f2ca0a8`, para que um braço não ensine o seguinte.
 Declarada como **aposta**, não derivada de medição anterior (a derivação do "1/7" está
 desacreditada):
 
-- **A3 repara no máximo 30% de E1.**
+- **A3 repara no máximo 1 dos 3 mutantes de E1∩E2** (a população que o pipeline atual
+  consegue alcançar). Declarado em 17/11, antes de rodar o braço.
+- **A3 repara no máximo 30% de E1** quando a fase 2 tornar E1 inteiro alcançável.
 - Nas classes **ausentes** da biblioteca de moldes (as 11 presentes são
   `missing-zero-check`, `tx-origin`, `suicidal`, `unrestricted-write`, `unchecked-send`,
   `unchecked-lowlevel`, `unchecked-transfer`, `arbitrary-send-erc20`,
@@ -121,10 +148,13 @@ mais até a rodada terminar.
 2. **Um contrato só.** DeFiVault tem validade externa limitada. Estender exige uma spec
    congelada por contrato (SimpleBank é o próximo candidato).
 3. **O pipeline só repara o que o Slither acha.** Para as classes de detectabilidade zero,
-   o pipeline não produz achado nenhum, logo A3 nem chega ao estágio de reparo. Isso limita
-   A3 à interseção E1∩E2 **nesta fase**. A fase 2 — diagnóstico guiado pelo contraexemplo
-   do oráculo em vez do achado do Slither — é o que removeria o limite, e está fora deste
-   pré-registro.
+   o pipeline não produz achado nenhum, logo A3 nem chega ao estágio de reparo. Medido:
+   isso limita A3 a **3 mutantes** de 18 em E1 — os 15 restantes, que só o oráculo pega,
+   são inalcançáveis pela arquitetura atual, por mais capaz que a LLM seja. A fase 2 —
+   diagnóstico guiado pelo **contraexemplo do oráculo** em vez do achado do Slither — é o
+   que removeria o limite, e está fora deste pré-registro. Com N=3, qualquer resultado de
+   A3 é indício, não demonstração: é o teto que a arquitetura permite hoje, e dizer isso é
+   parte do resultado.
 4. **Não determinismo da LLM.** Uma amostra por mutante: a estimativa é ruidosa. Repetir
    k=3 custa 3× a cota e fica para depois de A3 existir.
 5. **Mutante equivalente.** Um mutante pode ser semanticamente equivalente ao original; o
@@ -137,5 +167,9 @@ mais até a rodada terminar.
 - [x] `AUDIT_NO_DETERMINISTIC_PATCH` (`24a353e`)
 - [x] oráculo + guarda de vacuidade (`e9eac64`, `a8273cc`)
 - [x] A0 e A1 medidos (`runs/20261117_oracle_defivault/`)
-- [ ] script que roda um braço inteiro e grava `arm_<nome>.json`
-- [ ] cópia congelada de `runs/fix_library.json` por braço
+- [x] A2 rodando com `mutant_oracle.py --repair static --only-from`
+- [x] cópia congelada de `runs/fix_library.json`
+      (`runs/20261117_experiment_library/fix_library_frozen_2c57bd0.json`)
+- [x] seleção da população no probe (`--only-labels`)
+- [ ] A3 rodado nos 3 mutantes de E1∩E2
+- [ ] fase 2: diagnóstico a partir do contraexemplo do oráculo
