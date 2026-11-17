@@ -210,6 +210,74 @@ indetectáveis estaticamente por natureza**. Crescer o catálogo continua valend
 é o caminho para a maior parte do espaço de defeito — o caminho é a fase 2, diagnosticar a
 partir do contraexemplo do oráculo.
 
+## 4.6 E as vulnerabilidades complexas?
+
+A §4.5 mostra que 11 das 18 mortes estão fora do alcance de qualquer catálogo. A pergunta
+seguinte é a que interessa para o relatório: **onde o pipeline está contra defeito
+complexo de verdade** — inflação do primeiro depositante, manipulação de preço spot,
+oráculo desatualizado, reentrância read-only, token com taxa na transferência?
+
+### Onde estávamos: o pipeline fecha o contrato sem tocar na vulnerabilidade
+
+O corpus tem 57 contratos do `defivulnlabs`, cada um escrito para demonstrar uma classe
+dessas. Somando o que o Slither reporta em 15 deles:
+
+```
+19 naming-convention   14 immutable-states   10 constable-states
+ 9 pragma               9 solc-version        6 unchecked-transfer
+```
+
+Nenhum desses nomes é a vulnerabilidade do arquivo. Das 15 classes, o Slither nomeia **2**
+(`controlled-delegatecall`, `divide-before-multiply`); as outras 13 passam em branco. E o
+efeito é pior do que não achar:
+
+| rodada | o pipeline declarou | o que de fato reparou | a vulnerabilidade do arquivo |
+|---|---|---|---|
+| `20261105_135945_ReadOnlyReentrancy` | **2/2 resolvidas** | 2× `unchecked-transfer` | reentrância read-only, intacta |
+| `20261105_142355_phantom-permit` | **1/1 resolvida** | 1× `missing-zero-check` | permit fantasma, intacto |
+
+Um relatório de sucesso num contrato cuja falha continua lá. Isso não é um bug do
+pipeline — é o teto de um instrumento que só enxerga o que o detector nomeia.
+
+### Onde estamos: o oráculo separa os dois, o Slither não
+
+Demonstração em `tests/fixtures/certora/first_deposit_inflation/`, logs em
+`runs/20261117_oracle_first_deposit/`. `Pool.sol` é o `SimplePool` do corpus;
+`PoolFixed.sol` difere por **um argumento** — `tokenToShares` passa a arredondar para
+cima, flag que a própria função já aceita.
+
+A propriedade: *um depósito de valor não nulo tem de deixar o depositante com mais shares
+do que antes.*
+
+| | oráculo | Slither |
+|---|---|---|
+| `Pool.sol` | **Violated**, com contraexemplo | 10 achados |
+| `PoolFixed.sol` | **Verified**, não vácuo | 10 achados |
+
+O Slither devolve **os mesmos dez achados para os dois arquivos**, com as mesmas
+contagens. Não distingue o cofre vulnerável do reparado, e nenhum dos dez é o defeito.
+Não há o que catalogar: as duas versões são Solidity válido com a mesma forma sintática e
+o mesmo fluxo de dados.
+
+O token não é ligado, é sumarizado: `balanceOf` é `NONDET` — o Prover escolhe qualquer
+saldo de pool, que é exatamente o efeito da doação do atacante — e `transfer`/
+`transferFrom` são `ALWAYS(true)`, para que um token que falha não mascare a propriedade.
+
+**Ressalva, porque ela importa:** o que ficou provado é a metade de arredondamento do
+first-deposit — a que deixa alguém entregar tokens e não receber share nenhuma. A doação
+continua mexendo no preço; arredondar para cima só impede o truncamento a zero. A
+mitigação do Uniswap V2 (queimar liquidez mínima no primeiro depósito) é a outra metade e
+não está modelada.
+
+### O que isso diz sobre o caminho
+
+O instrumento alcança a classe complexa — a prova está acima, de graça e em segundos. O
+que **não** existe ainda é o pipeline chegar nela sozinho: a spec foi escrita à mão, e a
+ETAPA 2 só propõe propriedade para as 6 classes `formalizable` do catálogo, todas
+simples (`missing-zero-check`, `tx-origin`, `suicidal`, `arbitrary-send-eth`, over/under
+flow). Enquanto a formalização for indexada pelo achado do Slither, o alcance do pipeline
+é o alcance do Slither, por melhor que o oráculo seja.
+
 ## 5. Custo
 
 | | |

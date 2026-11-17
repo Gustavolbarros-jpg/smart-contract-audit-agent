@@ -110,3 +110,27 @@ administra e que a whitelist barra deposito e saque. Nenhuma regra fala de um de
 especifico — e isso que permite rodar a mesma spec em todo mutante. **Regra congelada:**
 nenhuma regra pode ser adicionada, apertada ou afrouxada depois de se conhecer o resultado
 de um mutante.
+
+## `ALWAYS(v)` não leva `expect`
+
+Um summary de função exige a cláusula (`=> recordTransferFrom(from) expect bool;`), e por
+analogia é natural escrever o mesmo para um valor constante. É erro de sintaxe:
+
+```
+function _.transferFrom(address, address, uint256) external => ALWAYS(true) expect bool;
+                                                                             ^
+Error in spec file (inflation.spec:8:81): Syntax error: unexpected token near `expect`
+```
+
+O certo é `=> ALWAYS(true);`. Custou uma rodada inteira do verificador local — que agora é
+barata justamente por isso: o erro de CVL aparece em segundos, aqui, sem job na nuvem.
+
+Sumarizar um token em vez de ligá-lo, quando a propriedade depende do saldo dele:
+
+```cvl
+function _.balanceOf(address) external => NONDET;        // qualquer saldo: a doação do atacante
+function _.transfer(address, uint256) external => ALWAYS(true);
+function _.transferFrom(address, address, uint256) external => ALWAYS(true);
+```
+
+Ver `tests/fixtures/certora/first_deposit_inflation/`.

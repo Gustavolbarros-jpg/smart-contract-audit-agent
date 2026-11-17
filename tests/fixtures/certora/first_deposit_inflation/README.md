@@ -1,0 +1,62 @@
+# first-deposit inflation: a defect class the catalog cannot reach
+
+`Pool.sol` is `SimplePool` from the corpus (`defivulnlabs/src/first-deposit.sol`), reduced
+to `deposit`/`withdraw`. `PoolFixed.sol` differs by **one argument**: `tokenToShares` is
+asked to round up, a flag the function already accepts.
+
+```solidity
+-  _shares = tokenToShares(amount, loanToken.balanceOf(address(this)), totalShares, false);
++  _shares = tokenToShares(amount, loanToken.balanceOf(address(this)), totalShares, true);
+```
+
+## What the two instruments say
+
+Run with the project's own local oracle (`tools/certora_cli.verify_locally`, certora-cli
+8.1.1, `--compilation_steps_only`, no cloud quota), logs in
+`runs/20261117_oracle_first_deposit/`:
+
+| | oracle (`deposit_never_mints_zero_shares`) | Slither (`SOLC_VERSION=0.8.21`) |
+|---|---|---|
+| `Pool.sol` | **Violated** — counterexample found | 10 findings |
+| `PoolFixed.sol` | **Verified**, and non-vacuous | 10 findings |
+
+Slither returns the **same ten findings for both files**, with the same counts:
+`divide-before-multiply` 1, `incorrect-equality` 2, `reentrancy-no-eth` 1,
+`reentrancy-benign` 1, `solc-version` 1, `naming-convention` 3, `immutable-states` 1. It
+cannot tell the vulnerable pool from the repaired one, and none of the ten names the
+defect. There is nothing here for a catalog entry to key on: both versions are valid
+Solidity with the same shape and the same data flow.
+
+Non-vacuity, read the usual inverted way: `deposit_never_mints_zero_shares-rule_not_vacuous`
+comes back **Violated** on `PoolFixed`, which means the rule is reachable — the Prover
+found a witness that exercises it. A vacuous rule would show it Verified.
+
+## What is proven, and what is not
+
+The rule states: **a deposit of a nonzero amount must leave the depositor holding more
+shares than before**. That is the rounding half of the first-deposit bug — the half that
+lets a depositor hand over tokens and receive nothing, leaving a surplus in the pool with
+no claim attached to it.
+
+It is *not* a proof that the pool is safe from the full inflation attack. A donation still
+moves the share price; rounding up only stops the price from truncating a depositor to
+zero. The Uniswap-V2 mitigation (burn a minimum liquidity on the first deposit) addresses
+the other half and is not modelled here.
+
+## How the token is handled
+
+The pool's share price depends on the balance of a token it does not control. The spec
+summarises the token instead of linking it: `balanceOf` is `NONDET`, so the Prover is free
+to pick any pool balance — which is exactly what an attacker's donation produces — and
+`transfer`/`transferFrom` are `ALWAYS(true)` so a failing token cannot mask the property.
+No `--link` and no token source are needed, which is how the pipeline runs Certora.
+
+CVL note: `ALWAYS(v)` takes no `expect` clause. `=> ALWAYS(true) expect bool;` is a syntax
+error (`unexpected token near 'expect'`), unlike a function summary, which requires it.
+
+## Reproducing
+
+```
+SOLC_VERSION=0.8.21 certoraRun Pool.sol:Pool --verify Pool:inflation.spec --compilation_steps_only
+SOLC_VERSION=0.8.21 certoraRun PoolFixed.sol:PoolFixed --verify PoolFixed:inflation.spec --compilation_steps_only
+```
