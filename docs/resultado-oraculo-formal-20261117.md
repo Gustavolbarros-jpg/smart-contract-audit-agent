@@ -192,3 +192,17 @@ oráculo que cobra o agente por 15 defeitos que o Slither não vê, de graça.
 
 O desenho do experimento que pode falsificar a generalização está em
 `docs/experimento-generalizacao-pre-registro.md`, com a predição declarada antes da rodada.
+
+## 7. O que destravou na prática
+
+Duas coisas, no mesmo dia e pelo mesmo motivo (a verificação deixou de custar cota):
+
+- **OpenEdition (escher) fechado.** Pendência desde 09/11 — "correção escrita, não
+  verificada (cota)". Rodada completa com `AUDIT_CERTORA_LOCAL=1`: original `Violated`,
+  reparo mínimo (`finalize()` ganhou `onlyOwner`), corrigido `Verified` com as duas regras
+  ainda alcançáveis, 1/1, **sem job na nuvem**. `runs/20261117_095428_OpenEdition/`.
+- **Um bug que travava toda rodada completa desde `ffa56ee`.** `preparar_spec` chamava
+  `declarar_owner_envfree(spec, contract_source)` sem receber `contract_source`, então
+  **qualquer** pipeline completo morria na ETAPA 3 com `NameError`. Nenhum teste chamava a
+  função inteira. Corrigido em `7fca2d5`, com teste da função ponta a ponta — e o que
+  revelou o bug foi justamente a primeira rodada completa depois dele, hoje.
