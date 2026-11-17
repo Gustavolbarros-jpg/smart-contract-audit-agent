@@ -457,3 +457,94 @@ class DisableSwitchTests(unittest.TestCase):
         with mock.patch.dict(os.environ, {"AUDIT_NO_DETERMINISTIC_PATCH": "0"}):
             _, applied = apply_deterministic_patches(self.SOURCE, self.FINDINGS)
         self.assertEqual(len(applied), 1)
+
+
+class IncorrectExponentiationTests(unittest.TestCase):
+    """`^` is XOR in Solidity: `2 ^ 256` is 258, not 2**256."""
+
+    def _patch(self, source, function="f"):
+        finding = {"id": "V1", "type": "incorrect-exp", "function": f"{function}()"}
+        patched, applied = apply_deterministic_patches(source, [finding])
+        return patched, bool(applied)
+
+    def test_a_literal_base_becomes_exponentiation(self):
+        source = """contract A {
+    function f() external pure returns (uint256) {
+        return 2 ^ 256 - 1;
+    }
+}
+"""
+        patched, changed = self._patch(source)
+        self.assertTrue(changed)
+        self.assertIn("2 ** 256 - 1", patched)
+        self.assertIn("// FIX V1", patched)
+
+    def test_a_call_as_the_exponent_is_kept(self):
+        source = """contract A {
+    function decimals() public pure returns (uint8) { return 18; }
+    function f(uint256 amount) external pure returns (uint256) {
+        return amount * 10 ^ decimals();
+    }
+}
+"""
+        patched, changed = self._patch(source)
+        self.assertTrue(changed)
+        self.assertIn("10 ** decimals()", patched)
+
+    def test_xor_between_identifiers_is_left_alone(self):
+        source = """contract A {
+    function f(bytes32 a, bytes32 b) external pure returns (bytes32) {
+        return a ^ b;
+    }
+}
+"""
+        patched, changed = self._patch(source)
+        self.assertFalse(changed)
+        self.assertIn("a ^ b", patched)
+
+    def test_a_hex_mask_is_left_alone(self):
+        source = """contract A {
+    function f(uint256 value) external pure returns (uint256) {
+        return value ^ 0x1f;
+    }
+}
+"""
+        _, changed = self._patch(source)
+        self.assertFalse(changed)
+
+    def test_a_compound_xor_assignment_is_left_alone(self):
+        source = """contract A {
+    uint256 public flags;
+    function f() external {
+        flags ^= 2;
+    }
+}
+"""
+        _, changed = self._patch(source)
+        self.assertFalse(changed)
+
+    def test_only_the_reported_function_is_touched(self):
+        source = """contract A {
+    function g() external pure returns (uint256) {
+        return 2 ^ 8;
+    }
+    function f() external pure returns (uint256) {
+        return 2 ^ 16;
+    }
+}
+"""
+        patched, changed = self._patch(source)
+        self.assertTrue(changed)
+        self.assertIn("return 2 ^ 8;", patched)
+        self.assertIn("return 2 ** 16;", patched)
+
+    def test_a_commented_out_occurrence_is_not_patched(self):
+        source = """contract A {
+    function f() external pure returns (uint256) {
+        // return 2 ^ 32;
+        return 4;
+    }
+}
+"""
+        _, changed = self._patch(source)
+        self.assertFalse(changed)

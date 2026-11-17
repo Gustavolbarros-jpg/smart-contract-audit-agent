@@ -507,6 +507,47 @@ def _encode_instead_of_encode_packed(source: str, function_name: str, vuln_id: s
     return source, True
 
 
+# Slither's incorrect-exp fires on `^` written where `**` was meant. The tell is a decimal
+# literal base: `2 ^ 256` and `10 ^ decimals()` are exponentiation spelled with the XOR
+# operator, while `a ^ b` between two identifiers is usually a genuine XOR and `0x1f ^ mask`
+# is a mask -- so only a decimal base is rewritten.
+_XOR_WITH_LITERAL_BASE = re.compile(
+    rf"(?<![\w.])(?P<base>\d+)\s*\^\s*(?P<exp>{_SIMPLE_OPERAND}(?:\s*\(\s*\))?)"
+)
+
+
+def _exponentiation_instead_of_xor(source: str, function_name: str, vuln_id: str) -> tuple[str, bool]:
+    """Rewrite ``base ^ exp`` as ``base ** exp`` when the base is a decimal literal.
+
+    In Solidity ``^`` is bitwise XOR, not exponentiation: ``2 ^ 256`` evaluates to 258, not
+    to 2**256. The repair is the operator itself, which is why this is mechanical; validate
+    by rerunning Slither.
+    """
+    masked = mask_comments_and_strings(source)
+    spans = _function_bodies(masked, function_name) if function_name else []
+    matches = [
+        match
+        for start, end in spans
+        for match in _XOR_WITH_LITERAL_BASE.finditer(masked, start, end + 1)
+    ]
+
+    if not matches:
+        return source, False
+
+    fix = f" // FIX {vuln_id}" if vuln_id else ""
+    for match in reversed(matches):
+        caret = source.find("^", match.start(), match.end())
+        if caret == -1:
+            continue
+        source = source[:caret] + "**" + source[caret + 1:]
+        if fix:
+            line_end = source.find("\n", caret)
+            line_end = len(source) if line_end == -1 else line_end
+            if "// FIX" not in source[caret:line_end]:
+                source = source[:line_end] + fix + source[line_end:]
+    return source, True
+
+
 _STATEMENT_PATCHES = {
     "arbitrary-send-erc20": _use_msg_sender_as_token_source,
     "suicidal": _require_owner,
@@ -517,4 +558,5 @@ _STATEMENT_PATCHES = {
     "unchecked-transfer": _require_token_transfer_success,
     "divide-before-multiply": _multiply_before_divide,
     "encode-packed-collision": _encode_instead_of_encode_packed,
+    "incorrect-exp": _exponentiation_instead_of_xor,
 }
