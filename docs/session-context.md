@@ -1,3 +1,11 @@
+> **AVISO (2026-11-11): este documento está desatualizado.**
+> Ele descreve a branch `feature/pipeline-guardrails`, o modelo
+> `llama-3.3-70b-versatile` (hoje dá 404 no Groq) e "83 testes".
+> O estado atual é a branch `analysis/catalog-coverage`, o modelo
+> `openai/gpt-oss-120b` e 307 testes.
+> **Para o estado atual e os comandos corretos, leia `CLAUDE.md` na raiz.**
+> Este arquivo permanece como histórico das etapas de maio a agosto de 2026.
+
 # Session Context
 
 This file is a compact handoff note for resuming the project after context loss.

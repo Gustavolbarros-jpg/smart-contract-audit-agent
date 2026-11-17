@@ -11,6 +11,8 @@ import os
 import re
 from pathlib import Path
 
+from core.contract_choice import blank_harness_contracts
+from core.solidity_source import mask_comments_and_strings
 from core.vulnerability_catalog import get_catalog_entry
 
 
@@ -300,6 +302,11 @@ def _parse_params_from_signature(params_raw: str) -> list[dict]:
     return params
 
 
+# `IVirtualAccount(account).call(data)` is a high-level call to an interface method that happens
+# to be named call. Casts to address and payable are lowercase, so a capitalized cast marks it.
+_INTERFACE_CAST_CALL = re.compile(r"\b[A-Z][A-Za-z0-9_]*\s*\([^;()]*(?:\([^()]*\)[^;()]*)*\)\s*\.call\b")
+
+
 def _low_level_call_contexts(source: str) -> list[dict]:
     contexts = []
     assignment_pattern = re.compile(
@@ -334,7 +341,7 @@ def _low_level_call_contexts(source: str) -> list[dict]:
                 )
                 continue
 
-            if bare_pattern.search(line):
+            if bare_pattern.search(line) and not _INTERFACE_CAST_CALL.search(line):
                 contexts.append(
                     {
                         "function": function["signature"],
@@ -363,12 +370,20 @@ def _success_var_checked(lines: list[str], start_index: int, success_var: str) -
         (re.compile(rf"\bif\s*\(\s*{escaped}\s*\)"), "if_success"),
         (re.compile(rf"\breturn\s+{escaped}\s*;"), "return_success"),
     ]
+    # The success value handed to a helper that does the check ("return verify(target, success, ...)").
+    delegated = re.compile(
+        rf"(?<!emit\s)\b(?!emit\b|require\b|assert\b|if\b|revert\b)[A-Za-z_]\w*\s*\([^;]*\b{escaped}\b"
+    )
     for offset, line in enumerate(lines[start_index:], start=start_index):
         if re.search(rf"\b{escaped}\s*=", line):
             return False, 0, ""
+        # A few lines joined, because "require(" often ends a line and the variable starts the next.
+        window = " ".join(part.strip() for part in lines[offset:offset + 4])
         for pattern, kind in check_patterns:
-            if pattern.search(line):
+            if pattern.search(line) or pattern.search(window):
                 return True, offset + 1, kind
+        if delegated.search(window) and re.search(rf"\b{escaped}\b", line):
+            return True, offset + 1, "delegated_check"
     return False, 0, ""
 
 
@@ -877,7 +892,7 @@ def _fallback_findings(contract_path: str, existing_types: set[str], start_index
     if not contract_path or not os.path.exists(contract_path):
         return []
 
-    source = Path(contract_path).read_text(encoding="utf-8")
+    source = blank_harness_contracts(Path(contract_path).read_text(encoding="utf-8"))
     findings = []
     idx = start_index
 
@@ -907,7 +922,9 @@ def _fallback_findings(contract_path: str, existing_types: set[str], start_index
         )
         idx += 1
 
-    if "tx.origin" in source and "tx-origin" not in existing_types:
+    # Masked so a comment or string that merely mentions tx.origin (typically a note that it
+    # was replaced) is not reported as a use.
+    if re.search(r"\btx\.origin\b", mask_comments_and_strings(source)) and "tx-origin" not in existing_types:
         add("tx-origin", "modifier/function", "Contract source uses tx.origin.", "medium", "high")
     if "selfdestruct" in source and "suicidal" not in existing_types:
         findings.extend(_find_selfdestruct_fallbacks(source, idx))
@@ -928,16 +945,24 @@ def _fallback_findings(contract_path: str, existing_types: set[str], start_index
     return findings
 
 
+# safeTransfer, safeTransferFrom, safeTransferETH and the like (solmate, OpenZeppelin SafeERC20) revert
+# on failure and return nothing, so Slither's "ignores return value" on them is not a defect and
+# wrapping them in require would not compile.
+_SAFE_TRANSFER_CALL = re.compile(r"\.safe(?:Transfer|TransferFrom|TransferETH|Approve)\w*\(")
+
+
 def normalize_slither_json(slither_json: dict, contract_path: str = "") -> dict:
     detectors = slither_json.get("results", {}).get("detectors", [])
     vulnerabilities = []
     low_level_contexts = []
     if contract_path and os.path.exists(contract_path):
-        source = Path(contract_path).read_text(encoding="utf-8")
+        source = blank_harness_contracts(Path(contract_path).read_text(encoding="utf-8"))
         low_level_contexts = _low_level_call_contexts(source)
 
     for idx, detector in enumerate(detectors, start=1):
         check_type = detector.get("check", "")
+        if check_type == "unchecked-transfer" and _SAFE_TRANSFER_CALL.search(detector.get("description", "")):
+            continue
         entry = get_catalog_entry(check_type)
         description = detector.get("description", "").strip()
         elements = _elements(detector)

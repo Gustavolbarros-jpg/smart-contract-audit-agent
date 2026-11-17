@@ -33,10 +33,11 @@ from core.diagnosis_context import (
     sanitize_diagnosis_ids,
 )
 from core.deterministic_patch import apply_deterministic_patches
+from core.repair_origin import repair_origins, stamp_origins
 from core.deterministic_spec import build_deterministic_spec
 from core.formal_candidate import build_formal_candidates
 from core.formal_plan import build_planner_input, build_spec_plan_input, sanitize_formal_plan
-from core.import_context import has_imports
+from core.import_context import declared_type_kinds, has_imports
 from core.perspectives import build_perspective_guidance
 from core.patch_guard import (
     analyze_patch,
@@ -47,6 +48,10 @@ from core.certora_counterexample import extract_counterexamples, format_countere
 from core.fix_library import get_examples_for_prompt, save_pattern
 from core.run_store import copy_contract, create_run_dir, save_json, save_text, write_metadata
 from core.slither_normalizer import normalize_slither_json
+from core.contract_choice import contract_with_most_critical_findings
+from core.slither_scope import scoped_to_file, without_harness_contracts
+from core.static_only import _plugin_findings, with_plugin_findings
+from core.vulnerability_catalog import get_catalog_entry
 from core.spec_patterns import build_spec_pattern_context
 from core.static_analysis import (
     analyze_static_after_fix,
@@ -59,6 +64,7 @@ from tools.slither_cli import run_slither_raw
 from tools.certora_cli import run_certora
 from tools.spec_validator import (
     corrigir_spec,
+    declarar_owner_envfree,
     validar_spec,
     deduplicar_spec,
     aplicar_auth_probe_rules,
@@ -290,6 +296,7 @@ def preparar_spec(
     rule_name_by_id: dict[str, str] | None = None,
     auth_probe: dict | None = None,
     rule_context_by_id: dict[str, dict] | None = None,
+    contract_source: str = "",
 ) -> str:
     """Remove vazias, deduplica, autocorrige, valida e salva o spec."""
     rule_name_by_id = rule_name_by_id or {}
@@ -337,6 +344,8 @@ def preparar_spec(
             print(f"      → {d}")
 
     spec_corrigido, correcoes = corrigir_spec(spec_corrigido)
+    spec_corrigido, owner_fix = declarar_owner_envfree(spec_corrigido, contract_source)
+    correcoes = correcoes + owner_fix
     if correcoes:
         print(f"   🔧 Auto-correções no spec ({len(correcoes)}):")
         for c in correcoes:
@@ -390,7 +399,11 @@ def certora_tem_erro(log: str) -> bool:
     return has_certora_blocking_error(log)
 
 
-def comparar_resultados(vulns_confirmadas_original: list, analise_pos: dict) -> dict:
+def comparar_resultados(
+    vulns_confirmadas_original: list,
+    analise_pos: dict,
+    repair_origin: dict | None = None,
+) -> dict:
     def normalizar_rule(nome):
         return nome.split('-rule_not_vacuous')[0].split('-sanity')[0].strip()
 
@@ -422,13 +435,18 @@ def comparar_resultados(vulns_confirmadas_original: list, analise_pos: dict) -> 
         else:
             inconclusivas.append({"id": vuln_id, "status": status, "motivo": res.get("evidencia", "inconclusive/erro")})
 
-    return {
+    comparacao = {
         "total_original": len(ids_orig),
         "resolvidas": resolvidas,
         "persistentes": persistentes,
         "inconclusivas": inconclusivas,
         "taxa_resolucao": f"{len(resolvidas)}/{len(ids_orig)}"
     }
+    # Sem a origem, "resolveu 6 de 9" não diz se foi o patch mecânico ou a LLM, que é
+    # exatamente a pergunta do experimento de generalização.
+    if repair_origin:
+        stamp_origins(comparacao, repair_origin)
+    return comparacao
 
 
 def imprimir_comparacao(comparacao: dict):
@@ -550,9 +568,19 @@ def executar_pipeline(contract_path: str, copy_final: bool = True):
     # ── ETAPA 1: Slither ─────────────────────────────────────────
     print("\n▶️  ETAPA 1: Executando Slither e normalizando deterministicamente...")
     slither_raw = run_slither_raw(contract_path)
+    if os.getenv("AUDIT_WITH_PLUGINS") == "1":
+        # Opt-in, like --static-only --with-plugins: the project's own detectors add findings
+        # that Slither's catalog cannot see (e.g. a privileged setter with no caller check).
+        slither_raw = with_plugin_findings(slither_raw, _plugin_findings(contract_path))
     save_json(run_dir / "slither_raw.json", slither_raw)
 
-    relatorio_normalizado = normalize_slither_json(slither_raw, contract_path)
+    slither_raw_escopo = without_harness_contracts(scoped_to_file(slither_raw, Path(contract_path)))
+    escolhido = contract_with_most_critical_findings(slither_raw_escopo)
+    if escolhido and escolhido != nome_contrato:
+        print(f"ℹ️  Contrato verificado: {escolhido} (concentra os achados críticos; antes: {nome_contrato})")
+        nome_contrato = escolhido
+        write_metadata(run_dir, contract_path, MODELO_LLM, internal_contract_name=nome_contrato)
+    relatorio_normalizado = normalize_slither_json(slither_raw_escopo, contract_path)
     save_json(run_dir / "slither_normalized.json", relatorio_normalizado)
 
     candidatos_formais = build_formal_candidates(relatorio_normalizado)
@@ -636,10 +664,11 @@ def executar_pipeline(contract_path: str, copy_final: bool = True):
         # ── ETAPA 3: Gerar + autocorrigir Spec ───────────────────────
         print("\n▶️  ETAPA 3: Gerando e validando Spec CVL...")
         plano_spec = build_spec_plan_input(plano_formal)
-        contrato_resumido = build_contract_brief(contract_source, vulns_planejadas)
+        contrato_resumido = build_contract_brief(contract_source, vulns_planejadas, contract_name=nome_contrato)
         spec_patterns = build_spec_pattern_context(plano_formal["selected_rules"])
-        methods_block = build_methods_block(contract_source)
-        auth_probe = choose_auth_probe_function(contract_source)
+        declared_types = declared_type_kinds(contract_path, contract_source)
+        methods_block = build_methods_block(contract_source, nome_contrato, declared_types=declared_types)
+        auth_probe = choose_auth_probe_function(contract_source, nome_contrato)
         save_json(run_dir / "spec_plan_input.json", plano_spec)
         save_text(run_dir / "contract_brief.txt", contrato_resumido)
         save_text(run_dir / "spec_patterns.md", spec_patterns)
@@ -655,7 +684,11 @@ def executar_pipeline(contract_path: str, copy_final: bool = True):
             item["id"]: item
             for item in plano_formal["selected_rules"]
         }
-        deterministic_spec = build_deterministic_spec(methods_block, plano_formal["selected_rules"])
+        deterministic_spec = build_deterministic_spec(
+            methods_block,
+            plano_formal["selected_rules"],
+            declared_types,
+        )
         if deterministic_spec:
             print("   🧱 Spec determinística aplicada para padrão mecânico conhecido.")
             save_text(run_dir / "llm_spec_generation_status.json", json.dumps(
@@ -694,6 +727,7 @@ def executar_pipeline(contract_path: str, copy_final: bool = True):
             rule_name_by_id,
             auth_probe,
             rule_context_by_id,
+            contract_source,
         )
         save_text(run_dir / "generated.spec", spec_corrigido)
 
@@ -754,7 +788,22 @@ def executar_pipeline(contract_path: str, copy_final: bool = True):
                 json.dumps(vulns_inconclusivas, ensure_ascii=False),
             )
             return
-        print("\n✅ Nenhuma vulnerabilidade confirmada! O contrato já está seguro.")
+        analisados = {v.get("id") for v in analise["analises"]}
+        em_revisao = [
+            v for v in relatorio_normalizado["vulnerabilidades"]
+            if v.get("id") not in analisados
+            and (get_catalog_entry(v.get("type", "")) or {}).get("category") == "security"
+        ]
+        if em_revisao:
+            # Not proved vulnerable, but not proved safe either: say so instead of "seguro".
+            print(
+                f"\n⚠️  Nenhuma vulnerabilidade confirmada formalmente, mas {len(em_revisao)} achado(s) "
+                "de seguranca sem verificacao formal exigem revisao:"
+            )
+            for v in em_revisao[:10]:
+                print(f"   - {v.get('type')} em {v.get('function')}")
+        else:
+            print("\n✅ Nenhuma vulnerabilidade confirmada! O contrato já está seguro.")
         return
 
     if vulns_inconclusivas:
@@ -794,6 +843,23 @@ def executar_pipeline(contract_path: str, copy_final: bool = True):
         vulns_confirmadas_full,
         diagnosis_plan,
     )
+    # A finding that a deterministic patch will repair needs no LLM diagnosis. Without this, a
+    # failing LLM call for one uncovered ID blocked the run before the patch that fixes it.
+    _, pre_patches = apply_deterministic_patches(contract_source, vulns_confirmadas_full)
+    covered_by_hints = {item["id"] for item in diagnostico.get("falhas", [])}
+    full_by_id = {item.get("id"): item for item in vulns_confirmadas_full}
+    for patch in pre_patches:
+        if patch["id"] in covered_by_hints:
+            continue
+        finding = full_by_id.get(patch["id"], {})
+        diagnostico.setdefault("falhas", []).append({
+            "id": patch["id"],
+            "rule_que_falhou": str(finding.get("rule") or ""),
+            "motivo": str(finding.get("description") or patch.get("type") or "deterministic repair"),
+            "linha": None,
+            "codigo_atual": None,
+            "correcao_necessaria": f"Repaired by the deterministic {patch.get('type')} patch.",
+        })
     deterministic_ids = {item["id"] for item in diagnostico.get("falhas", [])}
     if deterministic_ids:
         save_json(run_dir / "diagnosis_t0_deterministic.json", diagnostico)
@@ -912,6 +978,16 @@ def executar_pipeline(contract_path: str, copy_final: bool = True):
 
         codigo_fix = limpar_strings_solidity(limpar_codigo_solidity(fix_bruto))
 
+    # Origem do reparo por achado, escrita pelo caminho de código em vez de inferida dos
+    # artefatos depois. É o campo que o experimento de generalização precisa para separar
+    # "o patch mecânico resolveu" de "a LLM resolveu".
+    repair_origin = repair_origins(
+        ids_confirmadas,
+        deterministic_patch_ids,
+        ids_confirmadas - deterministic_patch_ids,
+    )
+    save_json(run_dir / "repair_origin.json", repair_origin)
+
     if has_imports(contract_source):
         caminho_fix_temp = Path(contract_path).parent / f"{nome_contrato}_AGENT_FIXED.sol"
     else:
@@ -965,6 +1041,8 @@ def executar_pipeline(contract_path: str, copy_final: bool = True):
             analises_fix_certora = analyze_certora_log(certora_fix_log, vulns_confirmadas_formais, spec_corrigido)["analises"]
 
         fixed_slither_raw = run_slither_raw(str(caminho_fix_temp))
+        if os.getenv("AUDIT_WITH_PLUGINS") == "1":
+            fixed_slither_raw = with_plugin_findings(fixed_slither_raw, _plugin_findings(str(caminho_fix_temp)))
         fixed_relatorio_normalizado = normalize_slither_json(fixed_slither_raw, str(caminho_fix_temp))
         save_json(run_dir / f"slither_fixed_t{tentativa}.json", fixed_relatorio_normalizado)
         analise_fix = {
@@ -974,7 +1052,7 @@ def executar_pipeline(contract_path: str, copy_final: bool = True):
                        json.dumps(analise_fix, indent=2, ensure_ascii=False))
         save_json(run_dir / f"analysis_fixed_t{tentativa}.json", analise_fix)
 
-        comparacao = comparar_resultados(vulns_confirmadas, analise_fix)
+        comparacao = comparar_resultados(vulns_confirmadas, analise_fix, repair_origin)
         salvar_arquivo(str(pasta_output / f"comparacao_t{tentativa}.json"),
                        json.dumps(comparacao, indent=2, ensure_ascii=False))
         save_json(run_dir / f"comparison_t{tentativa}.json", comparacao)

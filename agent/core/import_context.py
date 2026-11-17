@@ -20,6 +20,77 @@ def has_imports(source: str) -> bool:
     return bool(solidity_imports(source))
 
 
+TYPE_DECLARATION_RE = re.compile(
+    r"\b(struct|enum|contract|interface|library)\s+([A-Za-z_][A-Za-z0-9_]*)"
+)
+VALUE_TYPE_RE = re.compile(r"\btype\s+([A-Za-z_][A-Za-z0-9_]*)\s+is\b")
+# A struct or enum only exists in CVL under the qualified name of the contract that
+# declares it, so it must never be guessed to be an ``address``; a contract, an
+# interface and a library are all addresses there.
+NOT_AN_ADDRESS = frozenset({"struct", "enum", "type"})
+
+
+def _strip_comments(source: str) -> str:
+    without_blocks = re.sub(r"/\*.*?\*/", " ", source, flags=re.DOTALL)
+    return re.sub(r"//[^\n]*", " ", without_blocks)
+
+
+def _merge_kind(kinds: dict[str, str], name: str, kind: str) -> None:
+    """Keep the kind that CVL cannot spell, so an ambiguous name errs on being dropped."""
+    previous = kinds.get(name)
+    if previous is None or (kind in NOT_AN_ADDRESS and previous not in NOT_AN_ADDRESS):
+        kinds[name] = kind
+
+
+def declared_types_in_source(source: str) -> dict[str, str]:
+    """Every type name declared in one Solidity source, mapped to what declares it."""
+    kinds: dict[str, str] = {}
+    stripped = _strip_comments(source or "")
+    for kind, name in TYPE_DECLARATION_RE.findall(stripped):
+        _merge_kind(kinds, name, kind)
+    for name in VALUE_TYPE_RE.findall(stripped):
+        _merge_kind(kinds, name, "type")
+    return kinds
+
+
+def declared_type_kinds(
+    contract_path: str | Path,
+    source: str | None = None,
+    limit: int = 400,
+) -> dict[str, str]:
+    """Type names declared by the contract or by the files it imports, mapped to their kind.
+
+    The declaration is usually not in the contract's own file: ``Receipt`` of
+    GovernorBravoDelegateMaia lives in an imported interfaces file, which is why a
+    file-local scan reported nothing and the generated spec called it an ``address``.
+    """
+    path = Path(contract_path).resolve()
+    root_source = _read_source(path) if source is None else source
+    remaps = solc_remappings(path, root_source)
+
+    kinds: dict[str, str] = {}
+    seen: set[Path] = set()
+    queue: list[tuple[Path, str | None]] = [(path, root_source)]
+    while queue and len(seen) < limit:
+        current, known_source = queue.pop()
+        if current in seen:
+            continue
+        seen.add(current)
+        current_source = _read_source(current) if known_source is None else known_source
+        if not current_source:
+            continue
+        for name, kind in declared_types_in_source(current_source).items():
+            _merge_kind(kinds, name, kind)
+        for import_path in solidity_imports(current_source):
+            if import_path.startswith((".", "/")):
+                queue.append(((current.parent / import_path).resolve(), None))
+                continue
+            match = _remap_for(import_path, remaps)
+            if match is not None:
+                queue.append((match[1].resolve(), None))
+    return kinds
+
+
 def _package_prefix(import_path: str) -> str | None:
     if import_path.startswith((".", "/")):
         return None
@@ -78,8 +149,52 @@ def _foundry_remappings(contract_path: str | Path) -> list[str]:
         target_path = Path(target)
         if not target_path.is_absolute():
             target_path = project_root / target_path
-        remaps.append(f"{prefix}={target_path.resolve()}")
+        resolved = str(target_path.resolve())
+        # solc joins the target and the rest of the import verbatim, so a prefix ending in a slash
+        # needs a target ending in one: `forge-std/=/x/src` would turn forge-std/Test.sol into /x/srcTest.sol.
+        if prefix.endswith("/") and not resolved.endswith("/"):
+            resolved += "/"
+        remaps.append(f"{prefix}={resolved}")
     return remaps
+
+
+def _remap_for(import_path: str, remaps: list[str]) -> tuple[str, Path] | None:
+    """The remapping with the longest prefix that covers ``import_path``, and the file it points to."""
+    best = None
+    for remap in remaps:
+        prefix, target = remap.split("=", 1)
+        if import_path.startswith(prefix) and (best is None or len(prefix) > len(best[0])):
+            best = (prefix, target)
+    if best is None:
+        return None
+    prefix, target = best
+    return best[0] + "=" + target, Path(target) / import_path[len(prefix):]
+
+
+def needed_remappings(contract_path: str | Path, remaps: list[str], limit: int = 5000) -> list[str]:
+    """Remappings needed by the contract's imports, followed through the files they resolve to.
+
+    A contract rarely imports the package that matters (openzeppelin, solmate) itself; the files
+    it imports do. Only direct imports used to be considered, so the Prover could not find them,
+    and a prefix with several segments (``@openzeppelin/contracts/``) never matched.
+    """
+    needed: dict[str, None] = {}
+    seen: set[Path] = set()
+    queue = [Path(contract_path).resolve()]
+    while queue and len(seen) < limit:
+        current = queue.pop()
+        if current in seen:
+            continue
+        seen.add(current)
+        for import_path in solidity_imports(_read_source(current)):
+            if import_path.startswith((".", "/")):
+                queue.append((current.parent / import_path).resolve())
+                continue
+            match = _remap_for(import_path, remaps)
+            if match is not None:
+                needed[match[0]] = None
+                queue.append(match[1].resolve())
+    return list(needed)
 
 
 def solc_remappings(contract_path: str | Path, source: str | None = None) -> list[str]:
@@ -87,11 +202,7 @@ def solc_remappings(contract_path: str | Path, source: str | None = None) -> lis
     source = _read_source(path) if source is None else source
     prefixes = sorted({prefix for imp in solidity_imports(source) if (prefix := _package_prefix(imp))})
     foundry_remaps = _foundry_remappings(path)
-    matched_foundry = []
-    for remap in foundry_remaps:
-        remap_prefix = remap.split("=", 1)[0].rstrip("/")
-        if any(remap_prefix == prefix for prefix in prefixes):
-            matched_foundry.append(remap)
+    matched_foundry = needed_remappings(path, foundry_remaps)
     if not prefixes:
         return foundry_remaps
 
@@ -114,3 +225,34 @@ def packages_path(contract_path: str | Path) -> Path | None:
         return None
     node_modules = package_root / "node_modules"
     return node_modules if node_modules.is_dir() else None
+
+
+def certora_compiler_flags(contract_path: str | Path) -> list[str]:
+    """Compiler flags for certoraRun that match how a Foundry project compiles itself.
+
+    Foundry turns the optimizer on by default, and the Prover compiles to bytecode, so without
+    these flags a contract that builds fine in its own project can fail with "Stack too deep".
+    Returns nothing for a project without a foundry.toml.
+    """
+    root = find_project_root(contract_path)
+    config = root / "foundry.toml" if root else None
+    if config is None or not config.is_file():
+        return []
+    text = "\n".join(
+        line for line in config.read_text(encoding="utf-8", errors="ignore").splitlines()
+        if not line.strip().startswith("#")
+    )
+
+    def value(*names: str) -> str | None:
+        for name in names:
+            found = re.search(rf"^\s*{re.escape(name)}\s*=\s*[\"']?([\w.]+)[\"']?\s*$", text, re.MULTILINE)
+            if found:
+                return found.group(1)
+        return None
+
+    flags: list[str] = []
+    if value("optimizer") != "false":
+        flags += ["--solc_optimize", value("optimizer_runs", "optimizer-runs") or "200"]
+    if value("via_ir", "via-ir") == "true":
+        flags.append("--solc_via_ir")
+    return flags
