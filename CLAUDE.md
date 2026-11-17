@@ -86,7 +86,7 @@ Já conhecidos: DeFiVault → `0.8.21`; OpenEdition (escher) → `0.8.17`; Inver
 1. Preflight de toolchain → `agent/tools/slither_cli.py`
 2. Slither → `agent/core/slither_normalizer.py` (classes estáveis + fallbacks)
 3. Catálogo decide a estratégia → `agent/core/vulnerability_catalog.py`
-   (105 entradas; trilhas `formalizable`, `static_confirmed`, triagem)
+   (106 entradas; trilhas `formalizable`, `static_confirmed`, triagem)
 4. Candidatos formais → `formal_candidate.py` / `formal_plan.py`
 5. Spec CVL: determinística (`deterministic_spec.py`) ou LLM, depois
    **sempre** por `tools/spec_validator.py`
