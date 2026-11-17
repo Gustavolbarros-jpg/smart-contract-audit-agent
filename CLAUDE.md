@@ -19,6 +19,8 @@ Pipeline de auditoria de contratos Solidity: **Slither → catálogo → correç
 | Medir generalização | `SOLC_VERSION=0.8.21 python3 agent/generalization_probe.py <X>_FIXED.sol --detectable-only` |
 | Ver o que o Slither enxerga de um mutante | `SOLC_VERSION=0.8.21 python3 agent/mutant_detection.py <X>_FIXED.sol` |
 | Oráculo formal grátis sobre os mutantes | `SOLC_VERSION=0.8.21 python3 agent/mutant_oracle.py /caminho/absoluto/X_FIXED.sol --spec specs/oracle/DeFiVault.spec --contract-name DeFiVault` |
+| Braço determinístico cobrado pelo oráculo | o comando acima + `--repair static --only-from runs/<varredura>/report.json` |
+| Braço só-LLM (gasta Groq, não gasta Certora) | `AUDIT_NO_DETERMINISTIC_PATCH=1 AUDIT_CERTORA_LOCAL=1 AUDIT_WITH_PLUGINS=1 AUDIT_LLM_MODEL=openai/gpt-oss-120b AUDIT_FIX_LIBRARY=<cópia> SOLC_VERSION=0.8.21 python3 agent/generalization_probe.py <X>_FIXED.sol --only-labels "MD@136,FXR@39" --oracle-spec specs/oracle/DeFiVault.spec` |
 
 **Sempre passe caminho absoluto do contrato.** Caminho relativo faz o Slither
 falhar em projetos com imports (Foundry/remappings).
