@@ -201,6 +201,17 @@ Duas coisas, no mesmo dia e pelo mesmo motivo (a verificação deixou de custar 
   verificada (cota)". Rodada completa com `AUDIT_CERTORA_LOCAL=1`: original `Violated`,
   reparo mínimo (`finalize()` ganhou `onlyOwner`), corrigido `Verified` com as duas regras
   ainda alcançáveis, 1/1, **sem job na nuvem**. `runs/20261117_095428_OpenEdition/`.
+- **GovTokenEscrow (inverse) fechado, 4 de 4, com a origem separada.** Pendência desde
+  09/11 — "Certora confirma 4 achados; parou no 400 do Groq". `comparison_t1.json`:
+  `{"deterministic": {"resolvidas": 2}, "llm": {"resolvidas": 2}}`, e
+  `zero_address_reverts` passou de `Violated` a `Verified` com a regra ainda alcançável.
+  **Primeira medição do projeto com metade mecânica e metade LLM separadas por campo**, na
+  mesma rodada. `runs/20261117_100413_GovTokenEscrow/`.
+- **Dois limites do Groq que eram registrados como "limite do Groq" e não eram.**
+  `400 json_validate_failed` com `failed_generation` vazio é o modelo de raciocínio gastando
+  o `max_tokens` pensando (repetir com 4× o espaço resolve, `8254c4b`), e o `429` de TPM diz
+  na mensagem quanto esperar (esperar e repetir resolve, `cf99fbf`). Eram eles que travavam
+  este contrato desde 09/11.
 - **Um bug que travava toda rodada completa desde `ffa56ee`.** `preparar_spec` chamava
   `declarar_owner_envfree(spec, contract_source)` sem receber `contract_source`, então
   **qualquer** pipeline completo morria na ETAPA 3 com `NameError`. Nenhum teste chamava a
