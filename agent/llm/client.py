@@ -54,6 +54,7 @@ def chamar_ia_json(
     user_prompt: str,
     schema_esperado: BaseModel,
     max_tokens: int | None = None,
+    _room_to_answer: bool = True,
 ) -> dict:
     client = get_client()
     system_com_schema = (
@@ -73,6 +74,10 @@ def chamar_ia_json(
         }
         if max_tokens:
             kwargs["max_tokens"] = max_tokens
+        if not _room_to_answer and "gpt-oss" in MODELO_LLM:
+            # Na segunda tentativa, pede menos raciocinio: o que falta e orcamento, e esse
+            # parametro e dos modelos gpt-oss, por isso vai so quando o modelo e um deles.
+            kwargs["extra_body"] = {"reasoning_effort": "low"}
         response = client.chat.completions.create(**kwargs)
         conteudo_bruto = response.choices[0].message.content
         dados_json = _normalizar_chaves(json.loads(conteudo_bruto))
@@ -94,6 +99,16 @@ def chamar_ia_json(
                     return dados_validados.model_dump()
             except Exception:
                 pass
+        if _room_to_answer and "json_validate_failed" in err_str:
+            # Modelo de raciocinio: os tokens de raciocinio contam no `max_tokens`, entao um
+            # orcamento apertado termina com o modelo tendo pensado e nao dito nada -- e o
+            # Groq reporta `json_validate_failed` com `failed_generation` vazio, que nao da
+            # nada para recuperar. O que falta e espaco, nao outro prompt.
+            folga = max(4 * (max_tokens or 1400), 4000)
+            print(f"   ↩️  Repetindo com max_tokens={folga} e menos raciocinio")
+            return chamar_ia_json(
+                system_prompt, user_prompt, schema_esperado, folga, _room_to_answer=False
+            )
         print(f"[ERRO DE API/PARSE] Falha ao consultar o Groq: {e}")
         raise
 
