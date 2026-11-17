@@ -5,9 +5,11 @@ inside a string literal closed the body early. The truncated body hid an existin
 guard and a second, identical require was inserted.
 """
 
+import os
 import sys
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "agent"))
@@ -423,4 +425,35 @@ class EncodePackedCollisionTests(unittest.TestCase):
         patched, applied = _patch(source, "encode-packed-collision")
 
         self.assertIn("abi.encode(uint160(a), uint8(n))", patched)
+        self.assertEqual(len(applied), 1)
+
+
+class DisableSwitchTests(unittest.TestCase):
+    """O braço "só LLM" do experimento precisa desligar a trilha mecânica."""
+
+    SOURCE = """contract A {
+    address public owner;
+    function f(address to) external {
+        require(tx.origin == owner, "no");
+        payable(to).transfer(1);
+    }
+}
+"""
+    FINDINGS = [{"id": "VULN_001", "type": "tx-origin", "function": "f(address)"}]
+
+    def test_unset_keeps_patching(self):
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("AUDIT_NO_DETERMINISTIC_PATCH", None)
+            _, applied = apply_deterministic_patches(self.SOURCE, self.FINDINGS)
+        self.assertEqual([item["id"] for item in applied], ["VULN_001"])
+
+    def test_one_disables_the_whole_mechanical_track(self):
+        with mock.patch.dict(os.environ, {"AUDIT_NO_DETERMINISTIC_PATCH": "1"}):
+            patched, applied = apply_deterministic_patches(self.SOURCE, self.FINDINGS)
+        self.assertEqual(applied, [])
+        self.assertEqual(patched, self.SOURCE)
+
+    def test_zero_is_not_a_request_to_disable(self):
+        with mock.patch.dict(os.environ, {"AUDIT_NO_DETERMINISTIC_PATCH": "0"}):
+            _, applied = apply_deterministic_patches(self.SOURCE, self.FINDINGS)
         self.assertEqual(len(applied), 1)

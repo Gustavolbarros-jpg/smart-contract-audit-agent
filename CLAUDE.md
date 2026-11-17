@@ -44,6 +44,8 @@ exercita Slither + catálogo + patch determinístico sem tocar em LLM nem Certor
 | `AUDIT_CERTORA_TIMEOUT` | default `600` (10 min) | Suba para contratos grandes. |
 | `AUDIT_CERTORA_LOCAL` | `1` para local | Acrescenta `--compilation_steps_only`: o `emv.jar` roda aqui, imprime `Verified:`/`Violated:` de verdade e **não envia job nenhum**. Use para rodar contrato novo sem gastar cota de nuvem; o número final do relatório continua vindo da nuvem. |
 | `AUDIT_ORACLE_TIMEOUT` | default `300` | Segundos por verificação local (`verify_locally`, `mutant_oracle.py`). |
+| `AUDIT_NO_DETERMINISTIC_PATCH` | `1` para desligar | Desliga a trilha mecânica de reparo **e** as dicas de diagnóstico determinístico. É o braço "só LLM" do experimento de generalização; sem isso a LLM só vê resíduo. |
+| `AUDIT_FIX_LIBRARY` | caminho | Aponta a biblioteca de moldes para outro arquivo. Um braço do experimento usa a própria cópia, senão `save_pattern` contamina o braço seguinte. |
 | `GROQ_API_KEY` | vem do `.env` | Nunca imprima o valor. |
 | `CERTORAKEY` | já está no shell | Se faltar, o Certora falha no envio, não na spec. |
 

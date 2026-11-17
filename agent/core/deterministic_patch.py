@@ -2,16 +2,34 @@
 
 from __future__ import annotations
 
+import os
 import re
 from typing import Any
 
 from core.solidity_source import mask_comments_and_strings, matching_brace
 
 
+def deterministic_patches_disabled() -> bool:
+    """``AUDIT_NO_DETERMINISTIC_PATCH=1`` desliga a trilha mecânica de reparo.
+
+    O braço "só LLM" do experimento de generalização precisa disso. Por construção o patch
+    determinístico é calculado **antes** da diagnose da LLM — de propósito, para que uma
+    falha de LLM não bloqueie o que já era mecânico — e o efeito colateral é que a LLM só é
+    exercitada no resíduo, então a medição nunca separa os dois efeitos.
+
+    O desligamento vale também para as dicas de diagnóstico determinístico, que saem da
+    mesma função: no braço só-LLM, a LLM tem de diagnosticar tudo.
+    """
+    return os.getenv("AUDIT_NO_DETERMINISTIC_PATCH", "").strip().lower() not in ("", "0", "false", "no")
+
+
 def apply_deterministic_patches(
     source: str,
     confirmed_findings: list[dict[str, Any]],
 ) -> tuple[str, list[dict[str, Any]]]:
+    if deterministic_patches_disabled():
+        return source, []
+
     patched = source
     applied: list[dict[str, Any]] = []
 
