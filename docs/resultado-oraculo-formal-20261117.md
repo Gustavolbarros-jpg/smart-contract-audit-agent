@@ -170,6 +170,46 @@ E o que isso **não** autoriza a dizer:
    comparava perspectiva (`unrestricted_write`) com nome de detector (`unrestricted-write`),
    conjunto vazio, "novel" por construção. Corrigido em `1cac001`, depois da rodada.
 
+## 4.5 Até onde o catálogo pode crescer (e onde ele não alcança)
+
+Pergunta direta: já que o oráculo expõe 15 defeitos que o Slither não reporta, dá para
+**crescer o catálogo** até cobri-los? A resposta sai da classe esperada de cada um dos 18
+mutantes que a spec mata:
+
+| classe esperada | mortos | o Slither reporta? | existe molde? |
+|---|---|---|---|
+| `integer_overflow` (AOR) | 6 | não | **não pode existir** |
+| `comparison_logic` (BOR/UOR) | 5 | não | **não pode existir** |
+| `unrestricted_write` (MD) | 4 | 2 de 4 | sim (`restore_access_modifier`) |
+| `tx-origin` (FXR) | 1 | sim | sim |
+| `missing-zero-check` (FXR) | 1 | sim, como `validation` | sim |
+| `arbitrary-send-eth` (FXR) | 1 | não | não |
+
+**Os 11 primeiros não são uma lacuna do catálogo — são uma lacuna da análise estática.**
+`integer_overflow` e `comparison_logic` nem são nomes de detector do Slither: são
+perspectivas do CodeXplain. O mutante AOR troca `balances[msg.sender] -= amount` por
+`+=`; o BOR troca `>=` por `>`. As duas versões são Solidity perfeitamente válido, com a
+mesma forma sintática e o mesmo fluxo de dados. Não há padrão a casar, então não há
+entrada de catálogo a escrever: só uma **especificação** separa as duas, que é exatamente
+o que o oráculo traz.
+
+Os outros 4 são lacunas reais e nomeáveis:
+
+- **2× `unrestricted_write` em `MD@78`** — removem `notPaused` e `onlyWhitelisted` de
+  `withdraw`. O detector próprio exige um gate de **identidade contra `msg.sender`** para
+  disparar; `notPaused` testa estado e `onlyWhitelisted` testa um mapping. Ele não dispara
+  por desenho, e alargar o desenho para "função externa que escreve estado sem modificador"
+  faria alarme em código correto. Detectar a *remoção* de um guard exige um ponto de
+  referência (a lista de modificadores de antes) que a análise de um arquivo só não tem.
+- **1× `arbitrary-send-eth` em `FXR@167`** — classe que está no catálogo, mas sem molde.
+  É a candidata mais concreta a molde novo.
+
+Resumo: das 18 mortes, **4 estão ao alcance do catálogo** (e as 4 já foram reparadas pelo
+braço A2), 1 é molde faltante, 2 são limite de desenho do detector e **11 são
+indetectáveis estaticamente por natureza**. Crescer o catálogo continua valendo, mas não
+é o caminho para a maior parte do espaço de defeito — o caminho é a fase 2, diagnosticar a
+partir do contraexemplo do oráculo.
+
 ## 5. Custo
 
 | | |
