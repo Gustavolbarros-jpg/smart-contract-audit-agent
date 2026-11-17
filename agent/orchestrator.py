@@ -264,6 +264,29 @@ def revisar_patch_rejeitado_por_guard(
     return False, codigo_atual, ultimo_guard
 
 
+def preservar_e_limpar_scratch(
+    caminho_fix_temp: Path,
+    run_dir: Path,
+    nome_contrato: str,
+    remover: bool,
+) -> Path:
+    """Keep the patched source under run_dir and drop the scratch copy in src/.
+
+    The patched contract has to be written beside the original: relative imports
+    and Foundry remappings only resolve there, and the Prover refuses files
+    outside the repo directory. That leaves an ``*_AGENT_FIXED.sol`` inside a
+    production ``src/`` tree, where any corpus sweep counts it as one more
+    contract. Every version is already stored under ``run_dir``, so the scratch
+    is redundant once the run ends. Only a file this run created is removed.
+    """
+    destino = run_dir / f"{nome_contrato}_FIXED.sol"
+    if caminho_fix_temp.exists():
+        save_text(destino, caminho_fix_temp.read_text(encoding="utf-8"))
+        if remover:
+            caminho_fix_temp.unlink()
+    return destino
+
+
 def limpar_strings_solidity(codigo: str) -> str:
     """Remove caracteres não-ASCII de strings literais no Solidity."""
     substituicoes = {
@@ -992,6 +1015,11 @@ def executar_pipeline(contract_path: str, copy_final: bool = True):
         caminho_fix_temp = Path(contract_path).parent / f"{nome_contrato}_AGENT_FIXED.sol"
     else:
         caminho_fix_temp = pasta_output / f"{nome_contrato}_FIXED.sol"
+    # Only a scratch file beside the original that did not exist before this run
+    # may be removed at the end; one left by an earlier run is not ours to touch.
+    scratch_no_src = caminho_fix_temp.parent == Path(contract_path).parent
+    scratch_do_run = scratch_no_src and not caminho_fix_temp.exists()
+    caminho_relato = (run_dir / f"{nome_contrato}_FIXED.sol") if scratch_do_run else caminho_fix_temp
     patch_guard_ok, codigo_fix, _ = revisar_patch_rejeitado_por_guard(
         pasta_output,
         run_dir,
@@ -1003,6 +1031,7 @@ def executar_pipeline(contract_path: str, copy_final: bool = True):
         diagnostico_patch_guard,
     )
     if not patch_guard_ok:
+        preservar_e_limpar_scratch(caminho_fix_temp, run_dir, nome_contrato, scratch_do_run)
         return
 
     # ── ETAPA 6: Loop de Validação Formal ────────────────────────
@@ -1069,7 +1098,7 @@ def executar_pipeline(contract_path: str, copy_final: bool = True):
             if copy_final:
                 print(f"✅ Contrato validado copiado para: {destino_final}")
             else:
-                print(f"✅ Contrato validado mantido em: {caminho_fix_temp}")
+                print(f"✅ Contrato validado mantido em: {caminho_relato}")
             with open(str(caminho_fix_temp), "r", encoding="utf-8") as _fh:
                 codigo_fix_final = _fh.read()
             saved_count = 0
@@ -1098,7 +1127,7 @@ def executar_pipeline(contract_path: str, copy_final: bool = True):
                 print(f"   Persistentes: {[v['id'] for v in falhas_persistentes]}")
             if falhas_inconclusivas:
                 print(f"   Inconclusivas (erro/compilação): {[v['id'] for v in falhas_inconclusivas]}")
-            print(f"   Última versão em: {caminho_fix_temp}")
+            print(f"   Última versão em: {caminho_relato}")
             break
 
         todas_falhas = falhas_persistentes + falhas_inconclusivas
@@ -1231,6 +1260,8 @@ def executar_pipeline(contract_path: str, copy_final: bool = True):
             break
 
         tentativa += 1
+
+    preservar_e_limpar_scratch(caminho_fix_temp, run_dir, nome_contrato, scratch_do_run)
 
     print("\n" + "=" * 60)
     print("✨ PIPELINE CONCLUÍDO ✨")
