@@ -160,6 +160,23 @@ mais até a rodada terminar.
 5. **Mutante equivalente.** Um mutante pode ser semanticamente equivalente ao original; o
    oráculo então não o mata e ele **sai** de E1, em vez de contar como erro do agente.
 
+## 9.6 Fase 2, em uma frase e com o ponto de integração
+
+O limite do §9.3 é de arquitetura, não de modelo: o pipeline monta o diagnóstico a partir
+do relatório do Slither, e para 14 dos 18 mutantes esse relatório é vazio. A fase 2 troca a
+**fonte da evidência**, não o reparador: a regra violada pelo oráculo vira achado.
+
+`core/formal_finding.py` já faz a conversão (`findings_from_violations(log, spec)` → um
+achado por regra violada, com a função sob teste, a mensagem do assert e o contraexemplo
+parseado) e a classe `formal-property-violation` está no catálogo, deliberadamente **sem**
+molde determinístico e **sem** `static_confirmed`: o defeito é "o que quebrou a
+propriedade", não um padrão sintático.
+
+Falta o ponto de integração no `orchestrator`: depois da verificação do original, quando a
+spec congelada acusar violação que o Slither não reportou, acrescentar esses achados à lista
+que vai para diagnóstico e reparo. Isso muda o comportamento do pipeline e **não** entra na
+mesma rodada que os braços A0–A4, para não misturar duas mudanças numa medição.
+
 ## 10. Pré-condições (checklist antes de rodar)
 
 - [x] `repair_origin` escrito pelo caminho de código (`a8273cc`)
