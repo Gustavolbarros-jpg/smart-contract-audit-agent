@@ -139,6 +139,37 @@ contraexemplo do oráculo**, não só do achado do Slither. Enquanto isso não e
 afirmação sobre generalização está limitada a 3 de 46 mutantes — e dizer isso é parte do
 resultado.
 
+## 4.4 Braço A3: só LLM, trilha determinística desligada
+
+Rodado nos 3 mutantes alcançáveis, com `AUDIT_NO_DETERMINISTIC_PATCH=1` e
+`AUDIT_CERTORA_LOCAL=1` — `runs/20261117_arm_a3_llm/`:
+
+| mutante | achados reparados | oráculo |
+|---|---|---|
+| `MD@136` | `unrestricted-write` | **verified**, nenhuma regra vácua |
+| `MD@140` | `unrestricted-write` | **verified**, nenhuma regra vácua |
+| `FXR@39` | `tx-origin` + `arbitrary-send-eth` | **verified**, nenhuma regra vácua |
+
+**3 de 3 reparados e confirmados**, `patch_guard` sem erro nos três. Os 4 achados saíram
+rotulados `origem: llm` por `repair_origin.json` — primeira vez que a origem do reparo é
+campo escrito pelo caminho de código, e não inferência sobre artefatos.
+
+**A predição pré-registrada estava errada.** O pré-registro dizia, antes da rodada, "A3
+repara no máximo 1 dos 3". Reparou 3. Fica registrado.
+
+E o que isso **não** autoriza a dizer:
+
+1. **N = 3**, que é o teto da arquitetura, não uma escolha de amostra.
+2. **A3 não superou A2**: o braço determinístico repara os mesmos 3. Nesta população existe
+   molde para todas as classes, então o medido é um **empate** onde a trilha mecânica já
+   funciona.
+3. **A pergunta de generalização continua aberta, por razão estrutural**: a população
+   alcançável não tem nenhuma classe ausente da biblioteca de moldes — os 15 que só o
+   oráculo pega são justamente os que teriam essa propriedade.
+4. A classificação "novel 3/3" do probe **não informa nada aqui**: a rodada usou o filtro que
+   comparava perspectiva (`unrestricted_write`) com nome de detector (`unrestricted-write`),
+   conjunto vazio, "novel" por construção. Corrigido em `1cac001`, depois da rodada.
+
 ## 5. Custo
 
 | | |
@@ -151,8 +182,11 @@ resultado.
 
 ## 6. O que isso muda no relatório
 
-A frase "a generalização do LLM continua não demonstrada" **permanece verdadeira**, e esta
-rodada não a contradiz: nada aqui mede o LLM. O que muda é que a segunda causa da dívida
+A frase "a generalização do LLM continua não demonstrada" **permanece verdadeira**, agora
+por um motivo mais preciso do que antes: não é que a LLM falhe: é que a população em que ela
+pode ser cobrada hoje (3 mutantes) não contém nenhuma classe fora da biblioteca de moldes.
+No que é alcançável, ela repara 3 de 3 com confirmação formal — e empata com a trilha
+mecânica. O que muda é que a segunda causa da dívida
 deixa de ser um limite do método e passa a ser uma escolha de implementação — existe um
 oráculo que cobra o agente por 15 defeitos que o Slither não vê, de graça.
 

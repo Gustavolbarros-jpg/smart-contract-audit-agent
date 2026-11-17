@@ -188,5 +188,8 @@ mesma rodada que os braços A0–A4, para não misturar duas mudanças numa medi
 - [x] cópia congelada de `runs/fix_library.json`
       (`runs/20261117_experiment_library/fix_library_frozen_2c57bd0.json`)
 - [x] seleção da população no probe (`--only-labels`)
-- [ ] A3 rodado nos 3 mutantes de E1∩E2
+- [x] A3 rodado nos 3 mutantes de E1∩E2 — **3/3 reparados e confirmados pelo oráculo**
+      (`runs/20261117_arm_a3_llm/`). A predição "no máximo 1 de 3" **estava errada**, e o
+      resultado não é generalização: A2 repara os mesmos 3, porque toda classe dessa
+      população tem molde.
 - [ ] fase 2: diagnóstico a partir do contraexemplo do oráculo
