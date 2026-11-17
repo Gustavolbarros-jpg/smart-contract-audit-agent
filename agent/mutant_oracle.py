@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import sys
 import time
 from collections import Counter, defaultdict
@@ -63,6 +64,18 @@ NOT_REPAIRED = "not_repaired"
 _REPAIR_STATUS = {"verified": REPAIRED, "violated": NOT_REPAIRED, "error": "error", "timeout": "timeout"}
 
 
+def _prover_dir(run_dir: Path) -> Path:
+    """Onde o Prover despeja ``emv-*`` e ``.certora_internal``.
+
+    São ~30 MB por verificação: uma varredura de 46 mutantes passa de 1 GB. Ficam numa
+    subpasta só deles para poderem ser apagados sem tocar nos logs e no ``report.json``,
+    que são a evidência.
+    """
+    path = run_dir / "_prover"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
 def _inside_repo(path: Path) -> bool:
     # O Prover recusa fontes fora dos diretórios permitidos, e o permitido aqui é o repo.
     return REPO_ROOT == path or REPO_ROOT in path.parents
@@ -86,7 +99,9 @@ def _check_one(
         target = contract.with_name(f"{contract.stem}__oracle{index}.sol")
         target.write_text(source, encoding="utf-8")
 
-    log_path = run_dir / f"{label}.log"
+    # O índice entra no nome porque um label não é único: duas mutações MD podem cair na
+    # mesma linha (dois modificadores), e sem isso o log da primeira é sobrescrito.
+    log_path = run_dir / (f"{label}.log" if index is None else f"{label}__{index:02d}.log")
     started = time.time()
     try:
         verdict = verify_locally(
@@ -95,7 +110,7 @@ def _check_one(
             contract_name=contract_name,
             timeout=timeout,
             log_path=str(log_path),
-            cwd=str(run_dir),
+            cwd=str(_prover_dir(run_dir)),
             allow_path=str(REPO_ROOT),
         )
     finally:
@@ -163,11 +178,11 @@ def _repair_and_check(
             }
         target.write_text(patched, encoding="utf-8")
 
-        log_path = run_dir / f"{label}__repaired.log"
+        log_path = run_dir / f"{label}__{index:02d}_repaired.log"
         started = time.time()
         verdict = verify_locally(
             str(target), str(spec), contract_name=contract_name, timeout=timeout,
-            log_path=str(log_path), cwd=str(run_dir), allow_path=str(REPO_ROOT),
+            log_path=str(log_path), cwd=str(_prover_dir(run_dir)), allow_path=str(REPO_ROOT),
         )
     finally:
         target.unlink(missing_ok=True)
@@ -297,6 +312,11 @@ def main(argv: list[str] | None = None) -> int:
         help="report.json de uma varredura anterior: mede só os mutantes que o oráculo matou lá.",
     )
     parser.add_argument("--run-dir", default=None, help="Padrão: runs/<timestamp>_oracle_<Contrato>.")
+    parser.add_argument(
+        "--prune-prover-dirs",
+        action="store_true",
+        help="Apaga ao final a subpasta _prover/ (emv-*, .certora_internal), ~30 MB por verificação. Os logs e o report.json ficam.",
+    )
     args = parser.parse_args(argv)
 
     contract = Path(args.contract).resolve()
@@ -330,6 +350,14 @@ def main(argv: list[str] | None = None) -> int:
     (run_dir / "report.json").write_text(
         json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8"
     )
+
+    prover_dir = run_dir / "_prover"
+    if args.prune_prover_dirs and prover_dir.is_dir():
+        shutil.rmtree(prover_dir)
+        print(f"Apagado {prover_dir} (evidência preservada: logs e report.json).")
+    elif prover_dir.is_dir():
+        size = sum(f.stat().st_size for f in prover_dir.rglob("*") if f.is_file())
+        print(f"Saída do Prover em {prover_dir}: {size / 1e9:.2f} GB (--prune-prover-dirs apaga).")
 
     if report.get("aborted"):
         print(f"\nAbortado: {report['aborted']}  (veja {run_dir / 'original.log'})")
