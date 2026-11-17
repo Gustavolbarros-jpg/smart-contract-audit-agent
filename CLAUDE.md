@@ -14,7 +14,7 @@ Pipeline de auditoria de contratos Solidity: **Slither → catálogo → correç
 | Pipeline completo (gasta cota) | `SOLC_VERSION=<ver> AUDIT_WITH_PLUGINS=1 AUDIT_LLM_MODEL=openai/gpt-oss-120b python3 agent/main.py --contract /caminho/absoluto/X.sol` |
 | Sem gastar nada (sem LLM, sem Certora) | `python3 agent/main.py --contract /caminho/absoluto/X.sol --static-only --with-plugins` |
 | Pipeline completo **sem cota de Certora** | `AUDIT_CERTORA_LOCAL=1 SOLC_VERSION=<ver> AUDIT_WITH_PLUGINS=1 AUDIT_LLM_MODEL=openai/gpt-oss-120b python3 agent/main.py --contract /caminho/absoluto/X.sol` |
-| Testes | `python3 -m pytest tests/ -q` → **342 passed, 1 skipped, ~10 s** |
+| Testes | `python3 -m pytest tests/ -q` → **378 passed, 1 skipped, ~10 s** |
 | Listar contratos | `python3 agent/main.py --list-contracts --contract-group benchmark` |
 | Medir generalização | `SOLC_VERSION=0.8.21 python3 agent/generalization_probe.py <X>_FIXED.sol --detectable-only` |
 | Ver o que o Slither enxerga de um mutante | `SOLC_VERSION=0.8.21 python3 agent/mutant_detection.py <X>_FIXED.sol` |
