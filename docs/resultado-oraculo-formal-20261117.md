@@ -87,6 +87,58 @@ lacuna, não corrigida depois do fato.
 O mutante equivalente **sai da população** do experimento em vez de contar como erro do
 agente — está declarado assim no pré-registro.
 
+## 4.1 Braço A2: a trilha determinística cobrada pelo oráculo
+
+Dos 18 mutantes que a spec mata, o patch determinístico (Slither → catálogo → molde, sem
+LLM e sem cota) conserta **4** — `runs/20261117_arm_a2_deterministic/`:
+
+| operador | reparados | não reparados |
+|---|---|---|
+| AOR | 0 | 6 |
+| BOR | 0 | 4 |
+| UOR | 0 | 1 |
+| MD | 2 | 2 |
+| FXR | 2 | 1 |
+| **total** | **4** | **14** |
+
+Os 4 são exatamente os que caem numa classe da biblioteca de moldes: `unrestricted-write`
+(`MD@136`, `MD@140`), `tx-origin` (`FXR@39`) e `missing-zero-check` (`FXR@151`). Nos 14
+restantes a trilha **não aplicou patch nenhum** — o Slither não reporta nada acionável.
+Nenhum reparo vácuo.
+
+Controle (`runs/20261117_arm_a2_control/`): a mesma trilha no original não mutado não aplica
+patch e as 19 regras continuam valendo, então nenhum reparo de achado pré-existente derruba
+regra e contamina o braço.
+
+**A trilha determinística é boa e limitada nos limites exatos da biblioteca: 4 de 4 nas
+classes cobertas, 0 de 14 fora dela.** É essa a linha de base contra a qual qualquer número
+do braço só-LLM tem de ser lido.
+
+## 4.2 Um viés de instrumento, encontrado por este braço
+
+`FXR@151` consta como "o Slither não vê" e, ainda assim, o molde o reparou.
+`mutant_detection.py` só conta como detecção um achado de `category == "security"`, e
+`missing-zero-check` está no catálogo como `validation`: o Slither **reporta** esse mutante,
+só não como achado de segurança.
+
+Leitura corrigida: dos 15 mortos-e-não-detectados, **14 não produzem achado de segurança
+algum** e 1 produz achado de validação. A cobertura (9 → 24 de 44) não muda; a frase "o
+Slither não vê" passa a ser "não reporta achado de segurança novo".
+
+## 4.3 O teto que a arquitetura impõe
+
+O pipeline repara o que o Slither reporta. Cruzando os dois estratos:
+
+- **E1 ∩ E2 = 3** mutantes (`MD@136`, `MD@140`, `FXR@39`) — a população que o pipeline
+  atual **consegue alcançar** com qualquer trilha de reparo.
+- Os outros 15 de E1 são inalcançáveis pela arquitetura de hoje, por mais capaz que a LLM
+  seja: não existe achado para diagnosticar.
+
+Isso dá o próximo passo sem ambiguidade: **o diagnóstico precisa poder partir do
+contraexemplo do oráculo**, não só do achado do Slither. Enquanto isso não existir, qualquer
+afirmação sobre generalização está limitada a 3 de 46 mutantes — e dizer isso é parte do
+resultado.
+
 ## 5. Custo
 
 | | |
