@@ -353,6 +353,65 @@ leitura e só existe para um contrato; esta roda em 320 arquivos do corpus e pro
 propriedade em 32 deles (90 propriedades: 52 portão de identidade, 29 de contabilidade, 9
 de totais).
 
+## 4.8 Com os guards do próprio contrato: a spec gerada passa a escrita à mão
+
+A §4.7 fecha dizendo que as 9 mortes que faltavam à spec gerada eram **domínio, não
+forma** — teto, lock, whitelist, pausa, endereço zero. Uma forma só resolve as cinco: um
+`require` numa função externa (ou no modificador dela) é um invariante que o autor já
+escreveu em código, e a propriedade correspondente não precisa saber o que ele significa —
+*violar a condição tem de reverter*.
+
+```cvl
+rule withdraw_enforces_amount_maxwithdraw(uint256 amount) {
+    env e;
+    require !(amount <= maxWithdraw());
+    withdraw@withrevert(e, amount);
+    assert lastReverted, "withdraw went through although `amount <= maxWithdraw` does not hold";
+}
+```
+
+DeFiVault vai de 14 para **28 regras geradas**, e as 28 verificam no contrato com nenhuma
+vácua — continua sem alarme falso.
+
+### O placar, nos mesmos 46 mutantes (44 compilam)
+
+| instrumento | pega | |
+|---|---|---|
+| Slither, com os plugins do projeto | 9 | 20% |
+| spec escrita à mão (19 regras, uma tarde de leitura) | 18 | 40% |
+| spec gerada v1 — 3 formas, 14 regras | 14 | 31% |
+| **spec gerada v2 — + guards, 28 regras** | **27** | **61%** |
+| Slither + spec à mão | 24 | 54% |
+| **Slither + spec gerada v2** | **28** | **63%** |
+| Slither + à mão + gerada v2 | 30 | 68% |
+
+**A spec que ninguém escreveu passou a que eu escrevi**, e não por pouco: 27 contra 18.
+Mata **11** que a minha não pega. A minha mata **2** que a dela não pega:
+
+```
+AOR@115, AOR@116   -= virou += dentro de claimReward
+```
+
+São a conservação do pool de recompensa — uma propriedade que nenhum `require` enuncia e
+que nenhuma forma de crédito/débito alcança, porque relaciona o total do pool com o que o
+usuário recebe. Para pegá-la é preciso saber que aquele total *é* um pool. O propositor
+não sabe, e não deveria fingir que sabe.
+
+### Quanto disso é automático
+
+**19 das 27 mortes são invisíveis ao Slither.** Somando os dois instrumentos sem nenhuma
+intervenção humana — Slither roda sozinho, a spec é gerada do fonte — o pipeline passa a
+alcançar **28 dos 44 (63%)**, contra os 9 (20%) de onde esta investigação começou. O ganho
+não vem de catálogo novo: vem de parar de indexar a formalização pelo achado do detector.
+
+### Os 14 que ninguém pega
+
+`{BOR: 6, EED: 5, AOR: 1, MD: 1, PKR: 1}`. Os 5 EED são eventos, inexpressáveis em CVL
+como já registrado na §4. Os 6 BOR são apertos de limite (`>=` para `>`) que precisam de
+uma propriedade de *liveness* — "esta chamada tem de passar" — e todas as formas aqui são
+de safety. Essa é a próxima fronteira, e é uma mudança de natureza da propriedade, não
+mais uma forma.
+
 ## 5. Custo
 
 | | |

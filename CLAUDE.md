@@ -169,14 +169,22 @@ Pendências conhecidas:
 - A generalização real do LLM **ainda não foi demonstrada** — e agora existe o instrumento
   para demonstrar ou refutar.
 - **Propositor de propriedades** (`agent/core/property_proposer.py`, CLI
-  `agent/propose_properties.py`): lê o fonte e emite CVL sem detector e sem LLM. Mede-se em
-  `docs/resultado-oraculo-formal-20261117.md` §4.7 — 14 regras geradas do DeFiVault matam
-  **14 dos 46** mutantes contra 18 da spec escrita à mão, 14/14 verificam no contrato
-  correto (zero alarme falso), e 6 das mortes são da classe semântica que detector nenhum
-  nomeia. Ressalva: somada ao Slither não muda o total (24/44), porque as 5 que ela
-  acrescenta sobre a spec à mão são modificadores removidos que o `unrestricted-write` já
-  vê. Três formas só (crédito, débito, portão de identidade): produz propriedade em 32 de
-  320 arquivos do corpus real.
+  `agent/propose_properties.py --verify`): lê o fonte e emite CVL **sem detector e sem
+  LLM**. Quatro formas — crédito, débito, portão de identidade e **os `require` do próprio
+  contrato**. Medido em `docs/resultado-oraculo-formal-20261117.md` §4.7–4.8:
+
+  | instrumento | pega (de 44) |
+  |---|---|
+  | Slither com plugins | 9 (20%) |
+  | spec escrita à mão, 19 regras | 18 (40%) |
+  | **spec gerada, 28 regras** | **27 (61%)** |
+  | **Slither + spec gerada** | **28 (63%)** |
+
+  28/28 verificam no contrato correto, nenhuma vácua: zero alarme falso. 19 das 27 mortes
+  são invisíveis ao Slither. A spec à mão só pega 2 que a gerada não pega (conservação do
+  pool de recompensa — nenhum `require` a enuncia). No corpus real produz propriedade em
+  **59 de 320** arquivos (213 propriedades). Faltam os 6 BOR de aperto de limite, que
+  precisam de *liveness*, não de mais uma forma.
 - `logs_antigos/` (1,4 GB, 156 entradas) ainda sem destino decidido.
 - `runs/`: 412 rodadas. Inventário completo em `docs/inventario-runs-20261117.md`
   (+ o JSON por rodada ao lado). Era **2.912 MB**, dos quais **1.966 MB** de scratch do
