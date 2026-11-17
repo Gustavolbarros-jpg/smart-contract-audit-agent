@@ -548,3 +548,95 @@ class IncorrectExponentiationTests(unittest.TestCase):
 """
         _, changed = self._patch(source)
         self.assertFalse(changed)
+
+
+class ReversedShiftTests(unittest.TestCase):
+    """Em Yul, shr(a, 8) desloca 8 por a bits: é o incorrect-shift do Slither."""
+
+    def _patch(self, source, function="f"):
+        finding = {"id": "V1", "type": "incorrect-shift", "function": f"{function}(uint256)"}
+        patched, applied = apply_deterministic_patches(source, [finding])
+        return patched, bool(applied)
+
+    def test_the_parameters_are_swapped(self):
+        source = """contract C {
+    function f(uint256 a) internal pure returns (uint256 r) {
+        assembly {
+            r := shr(a, 8)
+        }
+    }
+}
+"""
+        patched, changed = self._patch(source)
+        self.assertTrue(changed)
+        self.assertIn("shr(8, a)", patched)
+        self.assertIn("// FIX V1", patched)
+
+    def test_a_nested_first_argument_keeps_its_commas(self):
+        source = """contract C {
+    function f(uint256 a) internal pure returns (uint256 r) {
+        assembly {
+            r := shl(and(a, 0xff), 16)
+        }
+    }
+}
+"""
+        patched, changed = self._patch(source)
+        self.assertTrue(changed)
+        self.assertIn("shl(16, and(a, 0xff))", patched)
+
+    def test_the_correct_order_is_left_alone(self):
+        source = """contract C {
+    function f(uint256 a) internal pure returns (uint256 r) {
+        assembly {
+            r := shr(8, a)
+        }
+    }
+}
+"""
+        _, changed = self._patch(source)
+        self.assertFalse(changed)
+
+    def test_two_variables_are_not_decidable_and_stay(self):
+        source = """contract C {
+    function f(uint256 a, uint256 b) internal pure returns (uint256 r) {
+        assembly {
+            r := shr(a, b)
+        }
+    }
+}
+"""
+        _, changed = self._patch(source)
+        self.assertFalse(changed)
+
+    def test_a_shift_outside_assembly_is_not_touched(self):
+        source = """contract C {
+    function f(uint256 a) internal pure returns (uint256) {
+        return shr(a, 8);
+    }
+}
+"""
+        _, changed = self._patch(source)
+        self.assertFalse(changed)
+
+    def test_only_the_reported_function_is_touched(self):
+        source = """contract C {
+    function g(uint256 a) internal pure returns (uint256 r) {
+        assembly { r := shr(a, 4) }
+    }
+    function f(uint256 a) internal pure returns (uint256 r) {
+        assembly { r := shr(a, 8) }
+    }
+}
+"""
+        patched, changed = self._patch(source)
+        self.assertTrue(changed)
+        self.assertIn("shr(a, 4)", patched)
+        self.assertIn("shr(8, a)", patched)
+
+    def test_the_catalog_routes_the_class_to_the_patcher(self):
+        from core.vulnerability_catalog import get_catalog_entry
+
+        entry = get_catalog_entry("incorrect-shift")
+        self.assertTrue(entry["static_confirmed"])
+        self.assertEqual(entry["repair_strategy"], "swap_reversed_shift")

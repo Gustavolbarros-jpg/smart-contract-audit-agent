@@ -548,6 +548,80 @@ def _exponentiation_instead_of_xor(source: str, function_name: str, vuln_id: str
     return source, True
 
 
+def _split_top_level(call_args: str) -> list[str]:
+    """Argumentos de nível superior de uma chamada, preservando parênteses internos."""
+    parts: list[str] = []
+    depth = 0
+    current = []
+    for char in call_args:
+        if char in "([{":
+            depth += 1
+        elif char in ")]}":
+            depth -= 1
+        if char == "," and depth == 0:
+            parts.append("".join(current))
+            current = []
+            continue
+        current.append(char)
+    if "".join(current).strip() or parts:
+        parts.append("".join(current))
+    return parts
+
+
+_NUMERIC_LITERAL_RE = re.compile(r"^(?:0[xX][0-9a-fA-F]+|\d+)$")
+# Em Yul, `shr(a, b)` desloca **b** por **a** bits. O detector incorrect-shift do Slither
+# dispara quando o valor deslocado é constante e a quantidade não é -- ou seja, na forma
+# escrita `shr(variavel, constante)`, que desloca a constante pela variável. A recomendação
+# oficial é trocar a ordem dos parâmetros, e é só isso que este patch faz.
+_YUL_SHIFT_RE = re.compile(r"\b(shl|shr|sar)\s*\(")
+_ASSEMBLY_RE = re.compile(r"\bassembly\b[^{]*\{")
+
+
+def _swap_reversed_shift(source: str, function_name: str, vuln_id: str) -> tuple[str, bool]:
+    """Troca ``shr(amount, CONST)`` por ``shr(CONST, amount)`` dentro de ``assembly``.
+
+    Só age quando o **segundo** argumento é literal numérico e o primeiro não é: é
+    exatamente a condição do detector (valor constante, quantidade variável). Dois literais
+    ou duas variáveis ficam como estão, porque aí a ordem pretendida não é decidível.
+    """
+    masked = mask_comments_and_strings(source)
+    spans = _function_bodies(masked, function_name) if function_name else []
+    assembly_spans = []
+    for start, end in spans:
+        for block in _ASSEMBLY_RE.finditer(masked, start, end + 1):
+            close = matching_brace(masked, block.end() - 1)
+            if close != -1:
+                assembly_spans.append((block.end(), close))
+
+    edits = []
+    for start, end in assembly_spans:
+        for call in _YUL_SHIFT_RE.finditer(masked, start, end):
+            close = _matching_paren(masked, call.end() - 1)
+            if close == -1:
+                continue
+            args = _split_top_level(masked[call.end(): close])
+            if len(args) != 2:
+                continue
+            amount, value = args[0].strip(), args[1].strip()
+            if not _NUMERIC_LITERAL_RE.match(value) or _NUMERIC_LITERAL_RE.match(amount):
+                continue
+            edits.append((call.end(), close, source[call.end(): close]))
+
+    if not edits:
+        return source, False
+
+    fix = f" // FIX {vuln_id}" if vuln_id else ""
+    for start, end, original_args in reversed(edits):
+        amount, value = _split_top_level(original_args)
+        source = source[:start] + f"{value.strip()}, {amount.strip()}" + source[end:]
+        if fix:
+            line_end = source.find("\n", start)
+            line_end = len(source) if line_end == -1 else line_end
+            if "// FIX" not in source[start:line_end]:
+                source = source[:line_end] + fix + source[line_end:]
+    return source, True
+
+
 _STATEMENT_PATCHES = {
     "arbitrary-send-erc20": _use_msg_sender_as_token_source,
     "suicidal": _require_owner,
@@ -559,4 +633,5 @@ _STATEMENT_PATCHES = {
     "divide-before-multiply": _multiply_before_divide,
     "encode-packed-collision": _encode_instead_of_encode_packed,
     "incorrect-exp": _exponentiation_instead_of_xor,
+    "incorrect-shift": _swap_reversed_shift,
 }
