@@ -3,7 +3,8 @@
 **Data:** 2026-11-17
 **Status:** pré-registro — escrito **antes** de rodar qualquer braço.
 **Commits congelados:**
-`f2ca0a8` (última mudança na biblioteca de moldes determinísticos),
+`2c57bd0` (última mudança na biblioteca de moldes determinísticos — recongelada ao
+acrescentar `incorrect-exp`, antes de qualquer braço rodar),
 `e9eac64` (spec de oráculo `specs/oracle/DeFiVault.spec`),
 `24a353e` (chaves de braço: `AUDIT_NO_DETERMINISTIC_PATCH`, `AUDIT_FIX_LIBRARY`).
 
@@ -86,11 +87,15 @@ Declarada como **aposta**, não derivada de medição anterior (a derivação do
 desacreditada):
 
 - **A3 repara no máximo 30% de E1.**
-- Nas classes **ausentes** da biblioteca de moldes (as 10 classes presentes são
+- Nas classes **ausentes** da biblioteca de moldes (as 11 presentes são
   `missing-zero-check`, `tx-origin`, `suicidal`, `unrestricted-write`, `unchecked-send`,
   `unchecked-lowlevel`, `unchecked-transfer`, `arbitrary-send-erc20`,
-  `divide-before-multiply`, `encode-packed-collision`), prevejo **no máximo 1** reparo
-  bem-sucedido.
+  `divide-before-multiply`, `encode-packed-collision`, `incorrect-exp`), prevejo **no
+  máximo 1** reparo bem-sucedido.
+
+Acrescentar um molde depois do pré-registro **recongela** a biblioteca e tem de ser
+registrado aqui, com o commit. Depois de o primeiro braço rodar, a biblioteca não muda
+mais até a rodada terminar.
 
 ## 7. Como a rodada pode dar errado
 
