@@ -38,6 +38,7 @@ import time
 from collections import Counter, defaultdict
 from datetime import datetime
 from pathlib import Path
+from types import SimpleNamespace
 
 AGENT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = AGENT_DIR.parent
@@ -162,11 +163,17 @@ def _repair_and_check(
     run_dir: Path,
     label: str,
     mutation,
-    index: int,
+    index: int | None,
     timeout: int,
 ) -> dict:
-    """Aplica a trilha determinística no mutante e cobra o resultado do oráculo."""
-    target = contract.with_name(f"{contract.stem}__oracle{index}.sol")
+    """Aplica a trilha determinística no mutante e cobra o resultado do oráculo.
+
+    Com ``index=None`` o alvo é o próprio original: é o controle do braço, que responde se o
+    patch determinístico quebra alguma das regras **sem** haver mutante nenhum. Sem ele, um
+    reparo de achado pré-existente poderia derrubar uma regra e o mutante levaria a culpa.
+    """
+    suffix = "__control" if index is None else f"__oracle{index}"
+    target = contract.with_name(f"{contract.stem}{suffix}.sol")
     target.write_text(mutation.source, encoding="utf-8")
     try:
         try:
@@ -178,7 +185,9 @@ def _repair_and_check(
             }
         target.write_text(patched, encoding="utf-8")
 
-        log_path = run_dir / f"{label}__{index:02d}_repaired.log"
+        log_path = run_dir / (
+            f"{label}_repaired.log" if index is None else f"{label}__{index:02d}_repaired.log"
+        )
         started = time.time()
         verdict = verify_locally(
             str(target), str(spec), contract_name=contract_name, timeout=timeout,
@@ -239,6 +248,18 @@ def run(
     baseline = _check_one(contract, spec, contract_name, run_dir, "original", None, None, timeout)
     print(f"original: {baseline['prover_status']} ({baseline['seconds']}s) — {baseline['detail'][:80]}")
 
+    if repair == "static":
+        control = _repair_and_check(
+            contract, spec, contract_name, run_dir, "original", SimpleNamespace(source=source),
+            None, timeout,
+        )
+        print(
+            f"controle (original reparado): {control['status']} "
+            f"({control['seconds']}s) patch={control.get('patches')} {control['detail'][:60]}"
+        )
+    else:
+        control = None
+
     report = {
         "contract": str(contract),
         "spec": str(spec),
@@ -246,6 +267,7 @@ def run(
         "operators": list(operators),
         "repair": repair,
         "baseline": baseline,
+        "baseline_repaired": control,
         "mutants": [],
         "started": datetime.now().isoformat(timespec="seconds"),
     }

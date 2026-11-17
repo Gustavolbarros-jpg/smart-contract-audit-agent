@@ -73,6 +73,31 @@ class RepairArmTests(unittest.TestCase):
         self.assertEqual(result["patches"], [])
 
 
+class ControlTests(unittest.TestCase):
+    """O braço precisa saber se o patch determinístico derruba uma regra sem mutante."""
+
+    def test_the_control_patches_the_original_itself(self):
+        from types import SimpleNamespace
+
+        with tempfile.TemporaryDirectory() as tmp:
+            contract = Path(tmp) / "Vault.sol"
+            contract.write_text(SOURCE, encoding="utf-8")
+            run_dir = Path(tmp) / "run"
+            run_dir.mkdir()
+            verdict = LocalVerdict(status="verified", rules={"r": "verified"},
+                                   sanity={"r-rule_not_vacuous": "violated"})
+            with mock.patch.object(mo, "_static_repair", return_value=(SOURCE, [], [])):
+                with mock.patch.object(mo, "verify_locally", return_value=verdict) as call:
+                    result = mo._repair_and_check(
+                        contract, Path(tmp) / "Vault.spec", "Vault", run_dir,
+                        "original", SimpleNamespace(source=SOURCE), None, 60,
+                    )
+            self.assertEqual(result["status"], mo.REPAIRED)
+            # O controle usa um nome próprio, para não colidir com o mutante de índice 0.
+            self.assertIn("__control.sol", call.call_args.args[0])
+            self.assertEqual(list(contract.parent.glob("*__control.sol")), [])
+
+
 class SlitherFailureTests(unittest.TestCase):
     def test_a_mutant_that_does_not_compile_is_reported_as_such(self):
         from tools.slither_cli import SlitherRunError
