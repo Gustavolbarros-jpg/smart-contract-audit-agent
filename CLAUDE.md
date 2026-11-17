@@ -1,0 +1,158 @@
+# CLAUDE.md
+
+Pipeline de auditoria de contratos Solidity: **Slither → catálogo → correção
+(determinística ou LLM) → Certora → revalidação**. Python 3 puro, sem framework.
+
+**Fale português com o usuário.** Commits e código em inglês.
+
+---
+
+## 1. Comece por aqui
+
+| Objetivo | Comando |
+|---|---|
+| Pipeline completo (gasta cota) | `SOLC_VERSION=<ver> AUDIT_WITH_PLUGINS=1 AUDIT_LLM_MODEL=openai/gpt-oss-120b python3 agent/main.py --contract /caminho/absoluto/X.sol` |
+| Sem gastar nada (sem LLM, sem Certora) | `python3 agent/main.py --contract /caminho/absoluto/X.sol --static-only --with-plugins` |
+| Pipeline completo **sem cota de Certora** | `AUDIT_CERTORA_LOCAL=1 SOLC_VERSION=<ver> AUDIT_WITH_PLUGINS=1 AUDIT_LLM_MODEL=openai/gpt-oss-120b python3 agent/main.py --contract /caminho/absoluto/X.sol` |
+| Testes | `python3 -m pytest tests/ -q` → **342 passed, 1 skipped, ~10 s** |
+| Listar contratos | `python3 agent/main.py --list-contracts --contract-group benchmark` |
+| Medir generalização | `SOLC_VERSION=0.8.21 python3 agent/generalization_probe.py <X>_FIXED.sol --detectable-only` |
+| Ver o que o Slither enxerga de um mutante | `SOLC_VERSION=0.8.21 python3 agent/mutant_detection.py <X>_FIXED.sol` |
+| Oráculo formal grátis sobre os mutantes | `SOLC_VERSION=0.8.21 python3 agent/mutant_oracle.py /caminho/absoluto/X_FIXED.sol --spec specs/oracle/DeFiVault.spec --contract-name DeFiVault` |
+
+**Sempre passe caminho absoluto do contrato.** Caminho relativo faz o Slither
+falhar em projetos com imports (Foundry/remappings).
+
+**Use sempre `src/`, nunca `out/`.** Os projetos Foundry em
+`smart-audt/contracts/real/` tem 47 arquivos `.sol` duplicados em diretorios
+`out/` (saida de build). `OpenEdition.sol`, por exemplo, existe nos dois lugares.
+Corrigir a copia em `out/` e trabalho perdido: ela e regerada na proxima
+compilacao, e o Slither nem sempre reclama.
+
+Antes de rodar qualquer coisa que gaste cota, prefira `--static-only`: ele
+exercita Slither + catálogo + patch determinístico sem tocar em LLM nem Certora.
+
+---
+
+## 2. Variáveis de ambiente (a maior fonte de tempo perdido)
+
+| Variável | Valor | Por quê |
+|---|---|---|
+| `SOLC_VERSION` | por contrato | O preflight **ignora o pin do Foundry**. Sem isso, trava em "pragma incompatível". Vence o pin do projeto (`agent/tools/slither_cli.py:64`). |
+| `AUDIT_LLM_MODEL` | `openai/gpt-oss-120b` | O default do código é `llama-3.3-70b-versatile`, que **dá 404 no Groq hoje** (`agent/llm/client.py:14`). |
+| `AUDIT_WITH_PLUGINS` | `1` | Liga o detector próprio `unrestricted-write` no pipeline completo. Sem isso ele só roda em `--static-only --with-plugins`. |
+| `AUDIT_CERTORA_TIMEOUT` | default `600` (10 min) | Suba para contratos grandes. |
+| `AUDIT_CERTORA_LOCAL` | `1` para local | Acrescenta `--compilation_steps_only`: o `emv.jar` roda aqui, imprime `Verified:`/`Violated:` de verdade e **não envia job nenhum**. Use para rodar contrato novo sem gastar cota de nuvem; o número final do relatório continua vindo da nuvem. |
+| `AUDIT_ORACLE_TIMEOUT` | default `300` | Segundos por verificação local (`verify_locally`, `mutant_oracle.py`). |
+| `GROQ_API_KEY` | vem do `.env` | Nunca imprima o valor. |
+| `CERTORAKEY` | já está no shell | Se faltar, o Certora falha no envio, não na spec. |
+
+`solc` instalados: 0.8.13 (global), 0.8.17, 0.8.18, 0.8.19, 0.8.20, 0.8.21, 0.8.26.
+Já conhecidos: DeFiVault → `0.8.21`; OpenEdition (escher) → `0.8.17`; Inverse
+(Market, escrows) → deixe sem definir.
+
+---
+
+## 3. Armadilhas que já custaram horas
+
+**CVL / Certora**
+- CVL **não tem `assume`** — use `require`. Campos de `env` **não podem ser
+  atribuídos** (`e.msg.sender = x;` é erro). `agent/tools/spec_validator.py` já
+  conserta os dois casos automaticamente.
+- **Nada de tipos de interface** em assinatura CVL (`IERC20` etc.) → vire `address`.
+- Chamar `owner()` sem `env` exige declará-la `envfree` no bloco `methods`.
+  `declarar_owner_envfree()` faz isso quando o contrato herda de Ownable.
+- **Exit code 100 do Prover é normal** quando há violação. Não trate como falha.
+- A regra `-rule_not_vacuous` aparecendo **Violated é o sanity check** — ignore.
+- O Prover **recusa arquivos fora do diretório do repo**. Mutantes e temporários
+  vão ao lado do original, nunca em `/tmp`.
+- **Nunca abra o relatório HTML no navegador do usuário.** `agent/tools/certora_cli.py`
+  já remove `DISPLAY`/`WAYLAND_DISPLAY` do ambiente de propósito. Leia o JSON/log.
+
+**LLM (Groq)**
+- `400` = JSON inválido/validação; `413` = prompt grande demais; `429` = cota
+  diária (TPD) estourada. Nenhum dos três é bug do pipeline.
+- Se a cota acabar: ou espere o reset, ou troque para um modelo com cota separada
+  — **avisando que o resultado deixa de ser comparável** com as rodadas anteriores.
+- Patch determinístico é calculado **antes** da diagnose do LLM, justamente para
+  que uma falha de LLM não bloqueie o que já era mecânico.
+
+---
+
+## 4. Arquitetura em uma tela
+
+1. Preflight de toolchain → `agent/tools/slither_cli.py`
+2. Slither → `agent/core/slither_normalizer.py` (classes estáveis + fallbacks)
+3. Catálogo decide a estratégia → `agent/core/vulnerability_catalog.py`
+   (105 entradas; trilhas `formalizable`, `static_confirmed`, triagem)
+4. Candidatos formais → `formal_candidate.py` / `formal_plan.py`
+5. Spec CVL: determinística (`deterministic_spec.py`) ou LLM, depois
+   **sempre** por `tools/spec_validator.py`
+6. Certora → `tools/certora_cli.py`
+7. Correção: `core/deterministic_patch.py` primeiro, LLM só no resto
+8. `core/patch_guard.py` barra patch não-mínimo (assinatura pública alterada,
+   string literal mexida, variável de estado removida)
+9. Revalidação: roda Slither **e os plugins** de novo no código corrigido
+10. Artefatos em `runs/<timestamp>_<Contrato>/` — **nunca apague**
+
+Detector próprio: `agent/slither_plugins/unrestricted_write.py`,
+reparado por `restore_access_modifier` (só quando há **um** modificador de identidade).
+
+---
+
+## 5. Estado atual (2026-11-11)
+
+Branch `analysis/catalog-coverage`, **7 commits locais sem push**, PR #2 contra `develop`.
+
+Lote de contratos de produção rodado em 09/11:
+
+| Contrato | Situação |
+|---|---|
+| SimpleERC20Escrow (inverse) | **Resolvido 2/2**, aprovado pelo Certora na tentativa 2 |
+| Initializable (escher) | Sem achado real — eram 2 falsos positivos, já corrigidos no normalizador |
+| GovTokenEscrow (inverse) | Spec compila, Certora confirma 4 achados; parou no `400` do Groq |
+| OpenEdition (escher) | Correção do `owner() envfree` escrita, **não verificada** (cota) |
+| TalosBaseStrategy (maia) | LLM removeu funções públicas → barrado pelo patch guard |
+| GovernorBravoDelegateMaia (maia) | *Stack too deep* — limite sem solução no momento |
+
+Pendências conhecidas:
+- 38 arquivos de produção em que o Slither falha, não investigados.
+- A generalização real do LLM **ainda não foi demonstrada**: todos os reparos
+  medidos no probe até agora foram determinísticos.
+- Discrepância "63 vs 66" arquivos não analisáveis no relatório PIBIC.
+- `logs_antigos/` (1,4 GB, 156 entradas) ainda sem destino decidido.
+
+---
+
+## 6. Regras de trabalho
+
+- **Não dê `git push` sem pedir.** O usuário aprova cada envio.
+- **Não apague** `runs/`, nem arquivos em geral, sem permissão explícita.
+- Não sobrescreva relatórios históricos em `docs/` — crie um snapshot novo.
+- Reentrância **não é foco** agora.
+- Use os contratos Solidity 0.8 que já estão no repo; nada de exemplos 0.4/0.7.
+- O objetivo é um pipeline agêntico com guardrails determinísticos, **não** uma
+  lista de correções manuais chumbadas para um contrato específico.
+
+---
+
+## 7. Onde olhar
+
+O projeto sao **171 arquivos rastreados pelo git**. Tudo que nao esta rastreado
+(`runs/`, `logs_antigos/`, `agent_outputs/`, qualquer `out/` ou `emv-*`) e
+artefato, nao codigo: nao procure respostas ali e nao edite nada la dentro.
+
+
+| Assunto | Arquivo |
+|---|---|
+| Entrypoint CLI | `agent/main.py` |
+| Orquestração ponta a ponta | `agent/orchestrator.py` |
+| Política por classe de vulnerabilidade | `agent/core/vulnerability_catalog.py` |
+| Lições de CVL/Certora acumuladas | `docs/certora-cookbook.md`, `docs/certora-lessons.md` |
+| Detector próprio | `docs/unrestricted-write-detector.md` |
+| Relatório PIBIC (entregável) | `docs/relatorio-final-pibic-2026.md` |
+| Histórico longo do projeto | `docs/session-context.md` (**desatualizado**, ver banner) |
+| Organização do repo | `docs/repo-organization.md` |
+
+Contratos reais em `smart-audt/contracts/real/`: astaria, caviar, defivulnlabs,
+escher, inverse, maia, runes, solmate.

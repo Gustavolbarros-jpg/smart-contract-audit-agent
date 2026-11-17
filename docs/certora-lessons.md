@@ -69,3 +69,44 @@ Nao vale gastar todo o projeto tentando fazer Certora provar toda reentrancia ge
 5. So depois disso vale gastar Groq/Certora de novo.
 
 Esse ciclo evita torrar tokens para a LLM redescobrir sintaxe de CVL.
+
+## O Verificador Local — Um Oraculo De Graca (2026-11-17)
+
+`certoraRun --compilation_steps_only` para antes de **enviar** o job, nao antes de
+**verificar**: o `emv.jar` roda na maquina e imprime vereditos de regra reais. Isso foi
+validado com um par original/mutante em `runs/oracle_validation_20261116/` — mesma spec,
+original `Verified`, mutante AOR `Violated` com contraexemplo, nenhuma URL de job nos logs,
+menos de 1 min cada.
+
+Por que importa: `agent/mutant_detection.py` mediu que **36 dos 46** mutantes do DeFiVault
+nao produzem nenhum achado no Slither (AOR, BOR, UOR, EED e PKR tem detectabilidade zero).
+Um defeito que o instrumento nao ve nunca chega ao estagio de reparo, logo o benchmark nao
+cobra o agente por ele. O oraculo formal cobra, sem gastar cota de nuvem.
+
+Como ler o log:
+
+- `Verified: <regra>` e `Violated: <regra>` sao as linhas de veredito. A tabela de
+  resultados diz `Not violated`, que lida com essas duas palavras significa o contrario.
+- `<regra>-rule_not_vacuous` aparece `Violated` sempre que a regra e **alcancavel**. E o
+  sanity check: fica fora da conta (`parse_local_verdict` separa em `sanity`).
+- Sem nenhuma linha de veredito, o resultado e `error`, nao "verificado".
+
+No codigo:
+
+- `tools/certora_cli.certora_argv` e o **unico** lugar que monta uma linha de comando do
+  Prover. Tres invocacoes feitas a mao perderam, cada uma, um detalhe diferente:
+  `--solc_allow_path` (o Prover recusa fontes fora dos diretorios permitidos), as flags de
+  otimizador do Foundry (sem elas, "Stack too deep" em contrato que compila no projeto) e
+  um `--packages` por remapping.
+- `tools/certora_cli.verify_locally` escreve o log em arquivo em vez de capturar na
+  memoria: com `capture_output`, um timeout descarta tudo que o Prover ja havia impresso.
+- `agent/mutant_oracle.py` roda uma spec congelada contra todos os mutantes. Se a spec nao
+  verifica no **original**, ele aborta sem reportar nada: qualquer mutante apareceria morto
+  pelo mesmo motivo que o original.
+
+Spec de oraculo (`specs/oracle/DeFiVault.spec`, 19 regras): o contrato promete que saldos
+andam exatamente o valor pedido, que o lock e o teto de saque valem, que so o dono
+administra e que a whitelist barra deposito e saque. Nenhuma regra fala de um defeito
+especifico — e isso que permite rodar a mesma spec em todo mutante. **Regra congelada:**
+nenhuma regra pode ser adicionada, apertada ou afrouxada depois de se conhecer o resultado
+de um mutante.

@@ -77,6 +77,17 @@ def certora_argv(
     return argv
 
 
+def local_prover_requested() -> bool:
+    """``AUDIT_CERTORA_LOCAL=1`` roda o pipeline inteiro só no verificador local.
+
+    O log local traz as mesmas linhas ``Verified:``/``Violated:`` que ``core/certora_parser``
+    já lê, então o resto do pipeline não muda — só deixa de enviar job e de gastar cota. Para
+    o número final do relatório, a nuvem continua sendo a referência: o verificador local não
+    tem o splitting nem os tempos de lá.
+    """
+    return os.getenv("AUDIT_CERTORA_LOCAL", "").strip().lower() not in ("", "0", "false", "no")
+
+
 def _prover_env() -> dict[str, str]:
     # Without a display the Prover skips opening FinalResults.html in the user's browser.
     return {k: v for k, v in os.environ.items() if k not in ("DISPLAY", "WAYLAND_DISPLAY")}
@@ -115,11 +126,15 @@ def run_certora(
 
     file_name = os.path.basename(contract_path).split('.')[0]
     contract_name = _contract_name_for(contract_path, contract_name_override)
-    cmd = certora_argv(contract_path, spec_path, contract_name)
+    local_only = local_prover_requested()
+    cmd = certora_argv(contract_path, spec_path, contract_name, local_only=local_only)
 
     try:
         print(f"🔬 [Certora] Iniciando Prover para {file_name} ({contract_name}) com {os.path.basename(spec_path)}...")
-        print("⏳ Isso pode demorar alguns minutos...")
+        if local_only:
+            print("💻 AUDIT_CERTORA_LOCAL=1: só o verificador local, nenhum job na nuvem, nenhuma cota.")
+        else:
+            print("⏳ Isso pode demorar alguns minutos...")
 
         timeout = int(os.getenv("AUDIT_CERTORA_TIMEOUT", "600"))
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=_prover_env())

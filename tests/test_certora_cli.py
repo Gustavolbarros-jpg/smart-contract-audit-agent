@@ -93,6 +93,37 @@ class ArgvTests(unittest.TestCase):
         self.assertEqual(argv[argv.index("--solc_allow_path") + 1], "/repo")
 
 
+class LocalModeTests(unittest.TestCase):
+    """AUDIT_CERTORA_LOCAL lets the whole pipeline run without cloud quota."""
+
+    def _cloud_argv(self, env):
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "Vault.sol"
+            source.write_text("contract Vault {}", encoding="utf-8")
+            spec = Path(tmp) / "Vault.spec"
+            spec.write_text("", encoding="utf-8")
+            with mock.patch.dict(certora_cli.os.environ, env, clear=False):
+                with mock.patch.object(certora_cli.subprocess, "run") as run:
+                    run.return_value = mock.Mock(stdout="", stderr="")
+                    certora_cli.run_certora(str(source), str(spec), tmp, "Vault")
+            return run.call_args.args[0]
+
+    def test_unset_means_the_cloud_run_as_before(self):
+        with mock.patch.dict(certora_cli.os.environ, {}, clear=False):
+            certora_cli.os.environ.pop("AUDIT_CERTORA_LOCAL", None)
+            self.assertNotIn(certora_cli.LOCAL_ONLY_FLAG, self._cloud_argv({}))
+
+    def test_one_means_local_only(self):
+        self.assertIn(
+            certora_cli.LOCAL_ONLY_FLAG, self._cloud_argv({"AUDIT_CERTORA_LOCAL": "1"})
+        )
+
+    def test_zero_is_not_a_request_for_the_local_verifier(self):
+        self.assertNotIn(
+            certora_cli.LOCAL_ONLY_FLAG, self._cloud_argv({"AUDIT_CERTORA_LOCAL": "0"})
+        )
+
+
 class VerdictParsingTests(unittest.TestCase):
     def test_verified_log_is_verified_and_the_vacuity_check_stays_out_of_it(self):
         verdict = certora_cli.parse_local_verdict(VERIFIED_LOG)
