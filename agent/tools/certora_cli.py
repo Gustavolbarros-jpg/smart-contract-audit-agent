@@ -170,6 +170,12 @@ class LocalVerdict:
         alcançável. Se esse sanity check vira Verified, a regra passou sem ser exercitada —
         é assim que um "reparo" que faz a função reverter sempre satisfaz a spec sem
         consertar nada, e é por isso que o veredito sozinho não basta.
+
+        Regra de ``satisfy`` não entra nessa conta, e não precisa: o Prover a reporta como
+        ``<regra>-Satisfy_<assert>_(<arquivo>_<linha>_<coluna>)``, que nunca casa com o
+        ``<regra>-rule_not_vacuous`` do sanity. Também não faria sentido -- uma regra de
+        ``satisfy`` só passa exibindo uma execução testemunha, então passar *é* ser
+        alcançável. Inalcançável nela aparece como Violated, não como passagem vácua.
         """
         return sorted(
             name for name, verdict in self.rules.items()

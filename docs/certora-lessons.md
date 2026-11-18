@@ -134,3 +134,39 @@ function _.transferFrom(address, address, uint256) external => ALWAYS(true);
 ```
 
 Ver `tests/fixtures/certora/first_deposit_inflation/`.
+
+## `satisfy` é o que vê limite apertado — e o nome da regra muda
+
+`assert` só sabe dizer que algo proibido não acontece. Nenhuma `assert` reclama de uma
+função que *recusa demais*: trocar `>=` por `>` não deixa passar nada de novo, só nega o
+caso exato da igualdade. Para isso é `satisfy`, e o veredito só sai se a fronteira for
+fixada — `satisfy` com a condição solta continua satisfeito, porque o Prover escolhe um
+caso folgado:
+
+```cvl
+rule withdraw_accepts_boundary_balances_msg_sender_amount(uint256 amount) {
+    env e;
+    require balances(e.msg.sender) == amount;   // a fronteira de `balances[...] >= amount`
+
+    withdraw(e, amount);                        // sem @withrevert: reversão é podada
+
+    satisfy true;
+}
+```
+
+Três coisas que custaram tempo:
+
+- **Sem `@withrevert`.** A chamada crua poda os caminhos que revertem, e é isso que faz o
+  `satisfy` significar "existe execução que passa". Com `@withrevert` a reversão viraria
+  um caminho válido e a regra passaria sempre.
+- **`satisfy` resolve de graça o que `assert !lastReverted` não resolveria.** A função pode
+  reverter por overflow ou porque a transferência externa falhou; "tem de passar" seria
+  alarme falso. Basta *uma* execução boa, e o Prover escolhe os valores que a tornam boa.
+- **O nome da regra no log ganha sufixo:** `<regra>-Satisfy_true_(<arquivo>_<linha>_<coluna>)`.
+  Quem casa nome de regra com achado por igualdade exata não encontra. E o par de vacuidade
+  (`<regra>-rule_not_vacuous`) nunca casa — nem precisa: `satisfy` só passa exibindo
+  testemunha, então passar já é ser alcançável.
+
+`nativeBalances[currentContract]` diz o saldo em ETH do próprio contrato, que é o único uso
+de `address(this)` com nome em CVL — serve para a fronteira de
+`require(amount <= address(this).balance)`.
