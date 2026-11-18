@@ -8,6 +8,10 @@
 the properties are checked against the contract they came from without spending any cloud
 quota. On a contract believed correct, every rule should come back Verified: a violation
 there is a false alarm from the proposer, not a defect in the contract.
+
+Two of the six shapes are liveness (`satisfy`): they claim a good execution still exists,
+not that a bad one does not. They catch what no safety rule can -- a limit tightened by
+one, or a gate that closed on everyone -- and `--no-liveness` leaves them out.
 """
 
 from __future__ import annotations
@@ -28,6 +32,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--contract-name", default=None, help="nome do contrato dentro do arquivo")
     p.add_argument("--out", default=None, help="onde gravar a spec (padrão: ao lado do contrato)")
     p.add_argument("--verify", action="store_true", help="rodar o verificador local na spec gerada")
+    p.add_argument("--no-liveness", action="store_true",
+                   help="só as formas de safety: deixa de fora `boundary` e `gate_liveness`")
     p.add_argument("--timeout", type=int, default=900)
     args = p.parse_args(argv)
 
@@ -37,7 +43,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     fonte = alvo.read_text(encoding="utf-8")
 
-    candidatos = propose(fonte, contract=args.contract_name or "")
+    candidatos = propose(fonte, contract=args.contract_name or "", liveness=not args.no_liveness)
     if not candidatos:
         print("Nenhuma forma reconhecida: o contrato não credita, não debita e não tem portão de identidade.")
         print("Isso não quer dizer que ele esteja correto — quer dizer que este propositor não tem o que dizer.")

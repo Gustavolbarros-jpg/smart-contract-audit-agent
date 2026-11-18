@@ -185,6 +185,20 @@ class TestCLI(unittest.TestCase):
 
         self.assertEqual(propose_properties.main(["/nao/existe/X.sol"]), 1)
 
+    def test_no_liveness_deixa_a_spec_so_com_safety(self):
+        import tempfile
+
+        sys.path.insert(0, str(ROOT / "agent"))
+        import propose_properties
+
+        with tempfile.TemporaryDirectory() as tmp:
+            com = Path(tmp) / "com.spec"
+            sem = Path(tmp) / "sem.spec"
+            propose_properties.main([str(POOL), "--contract-name", "Pool", "--out", str(com)])
+            propose_properties.main([str(POOL), "--contract-name", "Pool", "--out", str(sem), "--no-liveness"])
+            self.assertNotIn("satisfy true;", sem.read_text(encoding="utf-8"))
+            self.assertIn("satisfy true;", com.read_text(encoding="utf-8"))
+
 
 class TestGuardsDoProprioContrato(unittest.TestCase):
     """Todo `require` é um invariante que o autor escreveu; a regra é que violá-lo reverta.
@@ -234,8 +248,15 @@ class TestGuardsDoProprioContrato(unittest.TestCase):
     def test_chamada_desconhecida_e_recusada(self):
         self.assertIsNone(self.traduz("foo(bar) > 0"))
 
-    def test_address_this_e_recusado(self):
-        self.assertIsNone(self.traduz("amount <= address(this).balance"))
+    def test_saldo_do_proprio_contrato_e_dizivel(self):
+        """`address(this).balance` tem nome em CVL; é o único uso de `address(this)` que tem."""
+        self.assertEqual(
+            self.traduz("amount <= address(this).balance"),
+            "amount <= nativeBalances[currentContract]",
+        )
+
+    def test_outro_uso_de_address_this_continua_recusado(self):
+        self.assertIsNone(self.traduz("to != address(this)"))
 
     def test_guard_de_identidade_nao_duplica_a_regra_de_portao(self):
         nomes = [c.name for c in propose(COFRE)]
@@ -251,3 +272,102 @@ class TestGuardsDoProprioContrato(unittest.TestCase):
         self.assertIn("require !(quantia <= total());", regra.cvl)
         self.assertIn("@withrevert", regra.cvl)
         self.assertIn("assert lastReverted", regra.cvl)
+
+
+class TestFronteiraDoLimite(unittest.TestCase):
+    """Safety não reclama de limite apertado; só `satisfy` fixado na fronteira reclama.
+
+    Trocar `>=` por `>` não deixa passar nada de novo -- recusa o caso exato da igualdade,
+    que o original aceitava. Nenhuma regra de reversão vê isso, por construção: todas elas
+    afirmam que algo proibido reverte, e o mutante reverte *mais*.
+    """
+
+    def test_divide_a_comparacao_de_fora(self):
+        from core.property_proposer import split_relational
+
+        self.assertEqual(split_relational("a >= b"), ("a", ">=", "b"))
+        self.assertEqual(split_relational("balances[msg.sender] >= amount"),
+                         ("balances[msg.sender]", ">=", "amount"))
+
+    def test_recusa_condicao_composta(self):
+        from core.property_proposer import split_relational
+
+        self.assertIsNone(split_relational("a >= b && c <= d"))
+        self.assertIsNone(split_relational("a > b || c < d"))
+
+    def test_recusa_igualdade_e_deslocamento(self):
+        from core.property_proposer import split_relational
+
+        self.assertIsNone(split_relational("a == b"))
+        self.assertIsNone(split_relational("a != b"))
+        self.assertIsNone(split_relational("x >> 2"))
+        self.assertIsNone(split_relational("x << 2"))
+
+    def test_comparacao_dentro_de_parenteses_nao_conta_duas_vezes(self):
+        from core.property_proposer import split_relational
+
+        self.assertEqual(split_relational("f(a, b) >= c"), ("f(a, b)", ">=", "c"))
+        self.assertIsNone(split_relational("a >= b >= c"))
+
+    def test_fronteira_de_maior_igual_e_a_igualdade(self):
+        from core.property_proposer import _boundary_require
+
+        self.assertEqual(_boundary_require("a", ">=", "b"), "a == b")
+        self.assertEqual(_boundary_require("a", "<=", "b"), "a == b")
+
+    def test_fronteira_estrita_soma_em_mathint(self):
+        """`b + 1` em uint256 estoura no máximo e viraria um `require` impossível."""
+        from core.property_proposer import _boundary_require
+
+        self.assertEqual(_boundary_require("a", ">", "b"), "to_mathint(a) == to_mathint(b) + 1")
+        self.assertEqual(_boundary_require("a", "<", "b"), "to_mathint(a) + 1 == to_mathint(b)")
+
+    def test_a_regra_de_fronteira_usa_satisfy_e_chamada_sem_withrevert(self):
+        fonte = COFRE.replace(
+            "function sacar(uint256 quantia) external {",
+            "function sacar(uint256 quantia) external {\n        require(quantia <= total, \"acima do total\");",
+        )
+        regra = next(c for c in propose(fonte) if c.shape == "boundary")
+        self.assertIn("require quantia == total();", regra.cvl)
+        self.assertIn("satisfy true;", regra.cvl)
+        self.assertNotIn("@withrevert", regra.cvl)
+        self.assertEqual(regra.confidence, "liveness")
+
+    def test_limite_com_variavel_local_nao_gera_fronteira(self):
+        """`require(totalRewards >= reward)` com `reward` local: fronteira indizível."""
+        fonte = COFRE.replace(
+            "function sacar(uint256 quantia) external {",
+            "function sacar(uint256 quantia) external {\n        uint256 premio = quantia;\n"
+            "        require(total >= premio, \"sem fundos\");",
+        )
+        self.assertEqual([c for c in propose(fonte) if c.shape == "boundary"], [])
+
+
+class TestPortaoDeIdentidadeVivo(unittest.TestCase):
+    """O dual do portão: quem ele deixa entrar tem de conseguir entrar.
+
+    Inverter a comparação do portão (`==` virando `!=`) ou trocar a fonte da identidade
+    (`msg.sender` por `tx.origin`) deixa a regra de portão intacta -- ninguém indevido
+    entra, porque ninguém entra -- e mata a função.
+    """
+
+    def test_o_dono_tem_de_conseguir_chamar(self):
+        regra = next(c for c in propose(COFRE) if c.shape == "gate_liveness")
+        self.assertEqual(regra.name, "dono_can_call_liberar")
+        self.assertIn("require e.msg.sender == dono();", regra.cvl)
+        self.assertIn("satisfy true;", regra.cvl)
+        self.assertEqual(regra.confidence, "liveness")
+
+    def test_funcao_sem_portao_nao_ganha_a_regra(self):
+        nomes = [c.name for c in propose(COFRE) if c.shape == "gate_liveness"]
+        self.assertEqual(nomes, ["dono_can_call_liberar"])
+
+    def test_portao_que_nao_e_address_publico_e_ignorado(self):
+        fonte = COFRE.replace("address public dono;", "address private dono;")
+        self.assertEqual([c for c in propose(fonte) if c.shape == "gate_liveness"], [])
+
+    def test_liveness_pode_ser_desligada(self):
+        formas = {c.shape for c in propose(COFRE, liveness=False)}
+        self.assertNotIn("boundary", formas)
+        self.assertNotIn("gate_liveness", formas)
+        self.assertIn("identity_gate", formas)

@@ -238,8 +238,12 @@ def _decl_args(d: Definition, refs: frozenset[str] = frozenset()) -> str:
     return ", ".join(f"{t} {n}" for t, n in _params(d.signature, refs))
 
 
-def propose(source: str, contract: str = "") -> list[PropertyCandidate]:
-    """Every property the source's shape implies, in declaration order."""
+def propose(source: str, contract: str = "", liveness: bool = True) -> list[PropertyCandidate]:
+    """Every property the source's shape implies, in declaration order.
+
+    ``liveness=False`` deixa de fora as formas ``boundary`` e ``gate_liveness``, que são
+    as de `satisfy`: dizem que uma execução boa ainda existe, não que uma má não existe.
+    """
     definicoes = parse_definitions(source)
     modifier_bodies = {d.name: d.body for d in definicoes if d.kind == "modifier"}
     decls = public_state(source)
@@ -259,6 +263,9 @@ def propose(source: str, contract: str = "") -> list[PropertyCandidate]:
         candidatos.extend(_debit_rules(shape, decls))
         candidatos.extend(_gate_rules(shape, decls))
         candidatos.extend(_guard_rules(shape, decls))
+        if liveness:
+            candidatos.extend(_boundary_rules(shape, decls))
+            candidatos.extend(_gate_liveness_rules(shape, decls))
 
     vistos: set[str] = set()
     unicos = []
@@ -502,6 +509,7 @@ _SLUG = re.compile(r"[^a-z0-9]+")
 _IDENTITY_ONLY = re.compile(r"\s*(?:msg\.sender\s*==\s*[A-Za-z_]\w*|[A-Za-z_]\w*\s*==\s*msg\.sender)\s*")
 # `address(0)`, `address(this)`, chamadas, membros
 _ADDR_ZERO = re.compile(r"\baddress\s*\(\s*0\s*\)")
+_SELF_BALANCE = re.compile(r"\baddress\s*\(\s*this\s*\)\s*\.\s*balance\b")
 _CALL = re.compile(r"\b([A-Za-z_]\w*)\s*\(")
 _MEMBER = re.compile(r"\b([A-Za-z_]\w*)\s*\.\s*([A-Za-z_]\w*)")
 _INDEX = re.compile(r"\b([A-Za-z_]\w*)\s*\[\s*([^\[\]]+?)\s*\]")
@@ -563,7 +571,8 @@ def translate_condition(
     if nucleo is None:
         return None
     return (nucleo.replace("@SENDER@", "e.msg.sender").replace("@VALUE@", "e.msg.value")
-                  .replace("@TIME@", "e.block.timestamp").replace("@BLOCK@", "e.block.number"))
+                  .replace("@TIME@", "e.block.timestamp").replace("@BLOCK@", "e.block.number")
+                  .replace("@SELFBAL@", "nativeBalances[currentContract]"))
 
 
 def _translate_core(
@@ -580,6 +589,9 @@ def _translate_core(
     aproximada vira uma regra que falha em código correto.
     """
     texto = _ADDR_ZERO.sub("0", cond)
+    # o saldo em ETH do próprio contrato é dizível em CVL; qualquer outro uso de
+    # `address(this)` (comparar identidade, chamar a si mesmo) continua recusado
+    texto = _SELF_BALANCE.sub("@SELFBAL@", texto)
     if "address(this)" in texto or "this." in texto:
         return None
 
@@ -661,5 +673,169 @@ def _guard_rules(shape: _FnShape, decls: dict[str, tuple[str, str]]) -> list[Pro
             rationale=f"{d.name} requires `{cond}`; a call that breaks it must revert",
             reads=tuple(n for n, _a in getters),
             getters=getters,
+        ))
+    return regras
+
+
+# ── forma 5: a fronteira do limite que o autor declarou ─────────────────────
+#
+# As formas 1--4 são todas de *safety*: dizem que algo proibido não pode acontecer.
+# Nenhuma delas vê um limite apertado. Trocar `>=` por `>` não deixa passar nada que
+# o contrato original recusava -- ao contrário, recusa um caso que ele aceitava: o caso
+# exato da fronteira. Safety não reclama de uma função que recusa demais; só *liveness*
+# reclama. Em CVL isso é `satisfy`: existe execução que, fixada na fronteira, não reverte?
+#
+# Fixar a fronteira é o que dá o veredito. `satisfy` sem fixar nada continua satisfeito
+# no mutante (basta o Prover escolher um caso folgado); com `a == b` exigido, o mutante
+# que pede `a > b` não tem execução nenhuma e a regra fica Violated.
+#
+# O `satisfy` também resolve, de graça, o que um `assert !lastReverted` não resolveria:
+# a função pode reverter por overflow ou porque a transferência externa falhou, e aí
+# "tem de passar" seria alarme falso. Basta *uma* execução boa, e o Prover escolhe os
+# valores que a tornam boa.
+
+_RELOPS = (">=", "<=", ">", "<")
+
+
+def split_relational(cond: str) -> tuple[str, str, str] | None:
+    """`a OP b` com OP relacional no nível de fora, ou None.
+
+    Recusa condição composta (`&&`, `||` no nível de fora), porque a fronteira de uma
+    conjunção não é a conjunção das fronteiras, e recusa `=>`, `<<`, `>>`, `==` e `!=`.
+    """
+    nivel = 0
+    achado = None
+    i = 0
+    while i < len(cond):
+        ch = cond[i]
+        if ch in "([":
+            nivel += 1
+        elif ch in ")]":
+            nivel -= 1
+        elif nivel == 0:
+            if cond.startswith("&&", i) or cond.startswith("||", i):
+                return None
+            if cond.startswith("<<", i) or cond.startswith(">>", i):
+                return None
+            if cond.startswith("=>", i) or cond.startswith("==", i) or cond.startswith("!=", i):
+                i += 2
+                continue
+            for op in _RELOPS:
+                if cond.startswith(op, i):
+                    if achado is not None:
+                        return None          # mais de uma comparação: não é um limite só
+                    achado = (i, op)
+                    i += len(op) - 1
+                    break
+        i += 1
+    if achado is None:
+        return None
+    pos, op = achado
+    esquerda = cond[:pos].strip()
+    direita = cond[pos + len(op):].strip()
+    if not esquerda or not direita:
+        return None
+    return esquerda, op, direita
+
+
+def _boundary_require(esq: str, op: str, dir_: str) -> str:
+    """O caso exato da fronteira de `esq OP dir_`, em CVL.
+
+    `>=` e `<=` têm a fronteira na igualdade. `>` e `<` têm no vizinho, e aí o `+ 1`
+    vai em `mathint` para a soma não estourar o tipo e virar um `require` impossível.
+    """
+    if op in (">=", "<="):
+        return f"{esq} == {dir_}"
+    if op == ">":
+        return f"to_mathint({esq}) == to_mathint({dir_}) + 1"
+    return f"to_mathint({esq}) + 1 == to_mathint({dir_})"
+
+
+def _getters_of(cvl: str, decls: dict[str, tuple[str, str]]) -> tuple[tuple[str, str], ...]:
+    usados = {n for n in _WORD.findall(cvl) if n in decls}
+    achados = tuple((n, decls[n][0]) for n in sorted(usados))
+    achados += tuple((n, decls[n][0]) for n in sorted(decls) if f"{n}(" in cvl)
+    return tuple(dict.fromkeys(achados))
+
+
+def _boundary_rules(shape: _FnShape, decls: dict[str, tuple[str, str]]) -> list[PropertyCandidate]:
+    d = shape.definition
+    params = {n: t for t, n in _params(d.signature, shape.refs)}
+    decl = _decl_args(d, shape.refs)
+    chamada = _call_args(d, shape.refs)
+    chamada = f"e, {chamada}" if chamada else "e"
+
+    regras = []
+    for cond in shape.guards:
+        partes = split_relational(cond)
+        if partes is None:
+            continue
+        esq, op, dir_ = partes
+        esq_cvl = translate_condition(esq, params, decls)
+        dir_cvl = translate_condition(dir_, params, decls)
+        if esq_cvl is None or dir_cvl is None:
+            continue
+        fronteira = _boundary_require(esq_cvl, op, dir_cvl)
+        nome = f"{d.name}_accepts_boundary_{_slugify(cond)}"
+        cvl = f"""rule {nome}({decl}) {{
+    env e;
+    require {fronteira};
+
+    {d.name}({chamada});
+
+    satisfy true;
+}}"""
+        regras.append(PropertyCandidate(
+            name=nome,
+            shape="boundary",
+            contract=d.contract,
+            function=d.name,
+            cvl=cvl,
+            rationale=(f"{d.name} declares the limit `{cond}`; the boundary case it "
+                       f"accepts must stay reachable, or the limit was tightened"),
+            reads=tuple(n for n, _a in _getters_of(fronteira, decls)),
+            getters=_getters_of(fronteira, decls),
+            confidence="liveness",
+        ))
+    return regras
+
+
+# ── forma 6: quem o portão deixa entrar tem de conseguir entrar ────────────
+#
+# O dual da forma 3. O portão de identidade diz "quem não é o dono reverte"; nada diz
+# que o dono *consegue*. Inverter a comparação (`==` virando `!=`) ou trocar a fonte da
+# identidade (`msg.sender` virando `tx.origin`) deixa a forma 3 intacta -- ninguém
+# indevido entra, porque ninguém entra -- e mata a função. Só `satisfy` vê isso.
+
+def _gate_liveness_rules(shape: _FnShape, decls: dict[str, tuple[str, str]]) -> list[PropertyCandidate]:
+    d = shape.definition
+    decl = _decl_args(d, shape.refs)
+    chamada = _call_args(d, shape.refs)
+    chamada = f"e, {chamada}" if chamada else "e"
+
+    regras = []
+    for var in dict.fromkeys(shape.gates):
+        if var not in decls or decls[var][0] != "" or decls[var][1] != "address":
+            continue
+        nome = f"{var}_can_call_{d.name}"
+        cvl = f"""rule {nome}({decl}) {{
+    env e;
+    require e.msg.sender == {var}();
+
+    {d.name}({chamada});
+
+    satisfy true;
+}}"""
+        regras.append(PropertyCandidate(
+            name=nome,
+            shape="gate_liveness",
+            contract=d.contract,
+            function=d.name,
+            cvl=cvl,
+            rationale=(f"{d.name} is gated on msg.sender == {var}; {var} must still be "
+                       f"able to call it, or the gate closed on everyone"),
+            reads=(var,),
+            getters=((var, decls[var][0]),),
+            confidence="liveness",
         ))
     return regras
