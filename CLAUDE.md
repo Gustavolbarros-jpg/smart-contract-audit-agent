@@ -171,21 +171,49 @@ Pendências conhecidas:
   para demonstrar ou refutar.
 - **Propositor de propriedades** (`agent/core/property_proposer.py`, CLI
   `agent/propose_properties.py --verify`): lê o fonte e emite CVL **sem detector e sem
-  LLM**. Quatro formas — crédito, débito, portão de identidade e **os `require` do próprio
-  contrato**. Medido em `docs/resultado-oraculo-formal-20261117.md` §4.7–4.8:
+  LLM**. **Seis formas** — crédito, débito, portão de identidade, os `require` do próprio
+  contrato, e as duas de *liveness* acrescentadas em 18/11 (`boundary`, `gate_liveness`).
+  Medido em `docs/resultado-liveness-20261118.md`, varredura
+  `runs/20261118_proposer_sweep_v3/`:
 
-  | instrumento | pega (de 44) |
+  | instrumento | pega (de 44 que compilam) |
   |---|---|
   | Slither com plugins | 9 (20%) |
-  | spec escrita à mão, 19 regras | 18 (40%) |
-  | **spec gerada, 28 regras** | **27 (61%)** |
-  | **Slither + spec gerada** | **28 (63%)** |
+  | spec escrita à mão, 19 regras | 18 (41%) |
+  | spec gerada, 28 regras (só safety) | 27 (61%) |
+  | **spec gerada, 45 regras (+liveness)** | **32 (72%)** |
+  | **Slither + spec gerada de 45** | **33 (75%)** |
 
-  28/28 verificam no contrato correto, nenhuma vácua: zero alarme falso. 19 das 27 mortes
-  são invisíveis ao Slither. A spec à mão só pega 2 que a gerada não pega (conservação do
-  pool de recompensa — nenhum `require` a enuncia). No corpus real produz propriedade em
-  **59 de 320** arquivos (213 propriedades). Faltam os 6 BOR de aperto de limite, que
-  precisam de *liveness*, não de mais uma forma.
+  45/45 verificam no contrato correto, nenhuma vácua: zero alarme falso. 24 das 32 mortes
+  são invisíveis ao Slither; só 1 mutante é exclusividade do Slither (`FXR@174`). Nenhuma
+  regressão: os 27 de antes seguem mortos, e os 5 novos são todos BOR de aperto de limite,
+  mortos **só** pelas formas novas.
+
+  **Safety não vê limite apertado, por construção.** Trocar `>=` por `>` não deixa passar
+  nada de novo — recusa o caso exato da igualdade. Para isso é `satisfy` com a fronteira
+  fixada; ver `docs/certora-lessons.md`.
+
+  Dos **11 que ninguém pega**, 2 são **mutantes equivalentes** (`MD@173` remove um
+  `onlyOwner` redundante; `PKR@164` troca `address payable` por `address` e `.call` existe
+  nos dois) — inflavam o denominador. Sobre 42 defeitos reais, Slither + gerada pegam
+  **33 (79%)**. Dos 9 restantes: 5 EED (evento é inexpressável em CVL), 3 por variável
+  local vinda de função `view` do próprio contrato, 1 em `receive()`.
+
+  No corpus real (321 arquivos): **60 com propriedade, 344 propriedades** (234 só com
+  safety). Contrato **grande vai melhor**: ≥300 linhas, 16/46 (34%); <300 linhas, 44/275
+  (16%). `inverse/src/Market.sol` (622 linhas) rende 44 propriedades.
+
+  **O que bloqueia os contratos grandes é medido**: o propositor lê `require(...)`, e
+  contrato grande moderno declara invariante com `if (cond) revert CustomError();`. No
+  corpus são **632 `require(` contra 358 `revert CustomError()`** — `caviar/PrivatePool.sol`
+  (795 linhas) tem **zero** `require` e 15 `revert`, e por isso rende zero propriedade.
+  Além disso **269 de 1.093** funções externas não-view (24%) caem por parâmetro struct/enum.
+  São os dois trabalhos seguintes, nessa ordem.
+
+  ⚠️ **Correção de medição**: a versão anterior deste arquivo dizia "59 de 320 arquivos,
+  213 propriedades" com `identity_gate` 52. Medido de novo por dois caminhos contra `HEAD`:
+  **60 arquivos, 234 propriedades**, `identity_gate` 73. Não há cópia antiga do módulo que
+  explique por import velho; foi erro de medição.
 - `logs_antigos/` (1,4 GB, 156 entradas) ainda sem destino decidido.
 - `runs/`: 412 rodadas. Inventário completo em `docs/inventario-runs-20261117.md`
   (+ o JSON por rodada ao lado). Era **2.912 MB**, dos quais **1.966 MB** de scratch do
@@ -222,8 +250,9 @@ artefato, nao codigo: nao procure respostas ali e nao edite nada la dentro.
 | Política por classe de vulnerabilidade | `agent/core/vulnerability_catalog.py` |
 | Lições de CVL/Certora acumuladas | `docs/certora-cookbook.md`, `docs/certora-lessons.md` |
 | Oráculo formal local: o que mede e quanto custa | `docs/resultado-oraculo-formal-20261117.md` |
+| Formas de *liveness* e o que elas destravaram | `docs/resultado-liveness-20261118.md` |
 | Experimento de generalização (pré-registro) | `docs/experimento-generalizacao-pre-registro.md` |
-| Spec congelada de oráculo | `specs/oracle/DeFiVault.spec` |
+| Spec congelada de oráculo | `specs/oracle/DeFiVault.spec` (à mão), `specs/oracle/DeFiVault_proposed_v3.spec` (gerada, 45 regras) |
 | Detector próprio | `docs/unrestricted-write-detector.md` |
 | Relatório PIBIC (entregável) | `docs/relatorio-final-pibic-2026.md` |
 | Histórico longo do projeto | `docs/session-context.md` (**desatualizado**, ver banner) |
