@@ -88,8 +88,20 @@ def local_prover_requested() -> bool:
     return os.getenv("AUDIT_CERTORA_LOCAL", "").strip().lower() not in ("", "0", "false", "no")
 
 
+def open_report_enabled() -> bool:
+    """Whether the Prover may open FinalResults.html in the user's browser.
+
+    Off by default: a sweep over 46 mutants would otherwise open 46 tabs, and an
+    unattended run has no one watching. Set AUDIT_OPEN_REPORT=1 to let it open —
+    useful when demonstrating a single contract to an audience.
+    """
+    return os.getenv("AUDIT_OPEN_REPORT", "").strip().lower() not in ("", "0", "false", "no")
+
+
 def _prover_env() -> dict[str, str]:
     # Without a display the Prover skips opening FinalResults.html in the user's browser.
+    if open_report_enabled():
+        return dict(os.environ)
     return {k: v for k, v in os.environ.items() if k not in ("DISPLAY", "WAYLAND_DISPLAY")}
 
 
