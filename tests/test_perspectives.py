@@ -51,6 +51,10 @@ class ClassifyDetectorTests(unittest.TestCase):
         self.assertEqual(classify_detector("some-overflow-thing"), "integer_overflow")
         self.assertEqual(classify_detector("unprotected-owner-setter"), "unrestricted_write")
 
+    def test_the_projects_own_detector_has_a_perspective(self):
+        # Sem isso, o achado mais frequente do plugin saía sem perspectiva nenhuma.
+        self.assertEqual(classify_detector("unrestricted-write"), "unrestricted_write")
+
     def test_reentrancy_events_is_reentrancy_not_missing_events(self):
         """"reentrancy-events" contains "event"; ordering must keep it a reentrancy."""
         self.assertEqual(classify_detector("reentrancy-events"), "reentrancy")

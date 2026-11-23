@@ -102,7 +102,17 @@ CERTORA_ERROR_PATTERNS = [
 ]
 
 
+# The Prover instruments sources to find internal functions and, when that fails, says so and
+# continues with the original file. The text it prints carries "solc had an error", which is not a
+# failure of the run: with forge-std's `uint256 mod` it blocked contracts that verified fine.
+_AUTOFINDER_FALLBACK = re.compile(
+    r"Encountered an exception generating autofinder.*?falling back to original file[^\n]*",
+    flags=re.DOTALL,
+)
+
+
 def analyze_certora_errors(log: str) -> dict:
+    log = _AUTOFINDER_FALLBACK.sub("", log)
     matches = []
     for entry in CERTORA_ERROR_PATTERNS:
         if re.search(entry["pattern"], log, flags=re.IGNORECASE):

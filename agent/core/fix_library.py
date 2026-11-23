@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -11,12 +12,25 @@ LIBRARY_PATH = Path(__file__).resolve().parents[2] / "runs" / "fix_library.json"
 _EMPTY_LIBRARY: dict = {"version": 1, "patterns": []}
 
 
+def library_path() -> Path:
+    """Onde a biblioteca de moldes vive nesta execução.
+
+    ``AUDIT_FIX_LIBRARY`` aponta para outro arquivo. O experimento de generalização precisa
+    de uma biblioteca **congelada por braço**: ``save_pattern`` acrescenta um padrão a cada
+    sucesso, então sem isso o braço anterior contamina o seguinte e o braço "só LLM" pode
+    receber como exemplo justamente o reparo que se quer medir.
+    """
+    override = os.getenv("AUDIT_FIX_LIBRARY", "").strip()
+    return Path(override) if override else LIBRARY_PATH
+
+
 def load_library() -> dict:
     """Load the fix library JSON, return empty structure if missing or corrupt."""
-    if not LIBRARY_PATH.exists():
+    path = library_path()
+    if not path.exists():
         return {"version": 1, "patterns": []}
     try:
-        with LIBRARY_PATH.open("r", encoding="utf-8") as fh:
+        with path.open("r", encoding="utf-8") as fh:
             data = json.load(fh)
         if not isinstance(data, dict) or "patterns" not in data:
             return {"version": 1, "patterns": []}
@@ -60,8 +74,9 @@ def save_pattern(
         }
     )
 
-    LIBRARY_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with LIBRARY_PATH.open("w", encoding="utf-8") as fh:
+    path = library_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as fh:
         json.dump(library, fh, indent=2, ensure_ascii=False)
 
 

@@ -5,11 +5,14 @@ Gerencia a comunicação com a API do Groq (Llama 3) usando Pydantic para Struct
 import os
 import json
 import re
+import time
 from pathlib import Path
 from openai import OpenAI
 from pydantic import BaseModel
 
-MODELO_LLM = "llama-3.3-70b-versatile"
+# The default is the model the pipeline was built and measured with. It is overridable because a
+# provider can withdraw a model: on 2026-11-04 the Groq account answered 404 for it.
+MODELO_LLM = os.getenv("AUDIT_LLM_MODEL", "llama-3.3-70b-versatile")
 
 
 def _load_env_file() -> None:
@@ -27,6 +30,25 @@ def _load_env_file() -> None:
         if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", key):
             continue
         os.environ.setdefault(key, value.strip().strip('"').strip("'"))
+
+_RETRY_AFTER_RE = re.compile(r"try again in ([\d.]+)s")
+
+
+def _rate_limit_wait(error: str) -> float | None:
+    """Segundos a esperar quando o Groq recusa por tokens-por-minuto, ou None se nao foi isso.
+
+    O tier on_demand e de 8000 TPM e um prompt de diagnostico ja usa metade disso, entao
+    duas chamadas seguidas estouram o limite -- foi assim que o GovTokenEscrow parou no
+    estagio de reparo com 4 achados ja confirmados pelo Prover. A propria mensagem do erro
+    diz quanto esperar; esperar e repetir e a resposta certa, e nao desistir da rodada.
+    """
+    if "rate_limit_exceeded" not in error and "429" not in error:
+        return None
+    match = _RETRY_AFTER_RE.search(error)
+    if match:
+        return min(float(match.group(1)) + 1.0, 60.0)
+    return 20.0
+
 
 def get_client() -> OpenAI:
     _load_env_file()
@@ -52,6 +74,8 @@ def chamar_ia_json(
     user_prompt: str,
     schema_esperado: BaseModel,
     max_tokens: int | None = None,
+    _room_to_answer: bool = True,
+    _rate_retries: int = 2,
 ) -> dict:
     client = get_client()
     system_com_schema = (
@@ -71,6 +95,10 @@ def chamar_ia_json(
         }
         if max_tokens:
             kwargs["max_tokens"] = max_tokens
+        if not _room_to_answer and "gpt-oss" in MODELO_LLM:
+            # Na segunda tentativa, pede menos raciocinio: o que falta e orcamento, e esse
+            # parametro e dos modelos gpt-oss, por isso vai so quando o modelo e um deles.
+            kwargs["extra_body"] = {"reasoning_effort": "low"}
         response = client.chat.completions.create(**kwargs)
         conteudo_bruto = response.choices[0].message.content
         dados_json = _normalizar_chaves(json.loads(conteudo_bruto))
@@ -92,10 +120,34 @@ def chamar_ia_json(
                     return dados_validados.model_dump()
             except Exception:
                 pass
+        espera = _rate_limit_wait(err_str)
+        if espera is not None and _rate_retries > 0:
+            print(f"   ⏳ 429 do Groq (TPM): esperando {espera:.0f}s e repetindo")
+            time.sleep(espera)
+            return chamar_ia_json(
+                system_prompt, user_prompt, schema_esperado, max_tokens,
+                _room_to_answer, _rate_retries - 1,
+            )
+        if _room_to_answer and "json_validate_failed" in err_str:
+            # Modelo de raciocinio: os tokens de raciocinio contam no `max_tokens`, entao um
+            # orcamento apertado termina com o modelo tendo pensado e nao dito nada -- e o
+            # Groq reporta `json_validate_failed` com `failed_generation` vazio, que nao da
+            # nada para recuperar. O que falta e espaco, nao outro prompt.
+            folga = max(4 * (max_tokens or 1400), 4000)
+            print(f"   ↩️  Repetindo com max_tokens={folga} e menos raciocinio")
+            return chamar_ia_json(
+                system_prompt, user_prompt, schema_esperado, folga,
+                _room_to_answer=False, _rate_retries=_rate_retries,
+            )
         print(f"[ERRO DE API/PARSE] Falha ao consultar o Groq: {e}")
         raise
 
-def chamar_ia_texto(system_prompt: str, user_prompt: str, max_tokens: int | None = None) -> str:
+def chamar_ia_texto(
+    system_prompt: str,
+    user_prompt: str,
+    max_tokens: int | None = None,
+    _rate_retries: int = 2,
+) -> str:
     client = get_client()
     try:
         kwargs = {
@@ -111,5 +163,10 @@ def chamar_ia_texto(system_prompt: str, user_prompt: str, max_tokens: int | None
         response = client.chat.completions.create(**kwargs)
         return response.choices[0].message.content
     except Exception as e:
+        espera = _rate_limit_wait(str(e))
+        if espera is not None and _rate_retries > 0:
+            print(f"   ⏳ 429 do Groq (TPM): esperando {espera:.0f}s e repetindo")
+            time.sleep(espera)
+            return chamar_ia_texto(system_prompt, user_prompt, max_tokens, _rate_retries - 1)
         print(f"❌ [ERRO DE API/TEXTO] Falha ao consultar o modelo: {e}")
         return ""

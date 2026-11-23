@@ -11,6 +11,7 @@ sys.path.insert(0, str(AGENT))
 
 from core.certora_error_catalog import analyze_certora_errors, has_certora_blocking_error
 from core.contract_context import build_methods_block, extract_primary_contract_name
+from core.import_context import declared_type_kinds, declared_types_in_source
 from core.contract_registry import (
     BENCHMARK,
     EXPLORATORY,
@@ -45,7 +46,7 @@ from core.static_analysis import (
 )
 from core.spec_patterns import build_spec_pattern_context
 from core.toolchain import extract_solidity_constraint, version_satisfies_constraint
-from core.vulnerability_catalog import get_catalog_entry
+from core.vulnerability_catalog import CATALOG, get_catalog_entry
 from tools.spec_validator import (
     aplicar_auth_probe_rules,
     aplicar_target_binding_rules,
@@ -449,11 +450,63 @@ Result for zero_address_reverts: zero_address_reverts: FAIL: lastReverted
         self.assertTrue(entry["static_confirmed"])
         self.assertEqual(entry["repair_strategy"], "block_forwarded_delegatecall_multicall")
 
+    def test_divide_before_multiply_is_static_confirmed_and_mechanical(self):
+        entry = get_catalog_entry("divide-before-multiply")
+        self.assertTrue(entry["static_confirmed"])
+        self.assertFalse(entry["formalizable"])
+        self.assertEqual(entry["repair_strategy"], "multiply_before_divide")
+
+    def test_encode_packed_collision_is_static_confirmed_and_mechanical(self):
+        entry = get_catalog_entry("encode-packed-collision")
+        self.assertTrue(entry["static_confirmed"])
+        self.assertFalse(entry["formalizable"])
+        self.assertEqual(entry["repair_strategy"], "hash_abi_encode_instead_of_packed")
+
     def test_unprotected_critical_update_is_static_review_for_now(self):
         entry = get_catalog_entry("unprotected-critical-update")
         self.assertFalse(entry["formalizable"])
         self.assertFalse(entry.get("static_confirmed", False))
         self.assertEqual(entry["repair_strategy"], "static_review")
+
+    def test_slither_scan_detectors_have_catalog_entries(self):
+        scanned = [
+            "arbitrary-send-erc20", "controlled-delegatecall", "divide-before-multiply",
+            "unused-return", "incorrect-equality", "uninitialized-local", "incorrect-exp",
+            "encode-packed-collision", "weak-prng", "locked-ether", "erc20-interface",
+            "reentrancy-events", "events-maths", "events-access", "shadowing-local",
+            "incorrect-modifier",
+        ]
+        for check in scanned:
+            with self.subTest(check=check):
+                self.assertNotEqual(get_catalog_entry(check)["reason"], "no catalog mapping yet")
+
+    def test_every_installed_slither_detector_has_a_catalog_entry(self):
+        import json
+        import shutil
+        import subprocess
+
+        if shutil.which("slither") is None:
+            self.skipTest("slither is not installed")
+        listed = subprocess.run(["slither", "--list-detectors-json"], capture_output=True, text=True, timeout=60)
+        missing = sorted(d["check"] for d in json.loads(listed.stdout) if d["check"] not in CATALOG)
+        # A new Slither release that adds detectors fails here on purpose: give each an entry.
+        self.assertEqual(missing, [])
+
+    def test_unrestricted_write_is_repaired_mechanically_not_formalized(self):
+        entry = get_catalog_entry("unrestricted-write")
+        self.assertFalse(entry["formalizable"])
+        self.assertTrue(entry["static_confirmed"])
+        self.assertEqual(entry["repair_strategy"], "restore_access_modifier")
+        self.assertNotEqual(entry["reason"], "no catalog mapping yet")
+
+    def test_new_catalog_entries_are_not_formalizable_without_a_spec_pattern(self):
+        from core.spec_patterns import pattern_for_type
+
+        for check in ["arbitrary-send-erc20", "controlled-delegatecall", "divide-before-multiply", "unused-return"]:
+            with self.subTest(check=check):
+                entry = get_catalog_entry(check)
+                if entry["formalizable"]:
+                    self.assertIsNotNone(pattern_for_type(check))
 
     def test_static_unchecked_lowlevel_resolution_uses_slither_rerun(self):
         original = {
@@ -1575,6 +1628,108 @@ contract C {
         self.assertIn("function predictEscrow(address user) external returns(address) envfree;", methods)
         self.assertNotIn("IEscrow predicted", methods)
 
+    def test_methods_block_drops_a_struct_return_from_an_unseen_file(self):
+        """CVL cannot name a struct, and calling it an address makes the Prover reject the spec.
+
+        GovernorBravoDelegateMaia declares ``Receipt`` in an imported file, so nothing in
+        this source says what the type is -- only the data location does, and Solidity
+        forbids one on a contract type.
+        """
+        source = """pragma solidity ^0.8.21;
+contract C {
+  function getReceipt(uint256 proposalId, address voter) external view returns (Receipt memory) {
+    proposalId; voter;
+  }
+  function castVote(uint256 proposalId, uint8 support) external {}
+}
+"""
+        methods = build_methods_block(source)
+
+        self.assertNotIn("getReceipt", methods)
+        self.assertNotIn("Receipt", methods)
+        self.assertIn("function castVote(uint256 proposalId, uint8 support) external;", methods)
+
+    def test_methods_block_drops_an_enum_return_declared_by_an_import(self):
+        """An enum carries no data location, so only the import closure identifies it."""
+        source = """pragma solidity ^0.8.21;
+contract C {
+  function state(uint256 proposalId) external view returns (ProposalState) {
+    proposalId;
+  }
+  function quorumVotes() external view returns (uint256) {
+    return 1;
+  }
+}
+"""
+        methods = build_methods_block(source, declared_types={"ProposalState": "enum"})
+
+        self.assertNotIn("state(", methods)
+        self.assertIn("function quorumVotes() external returns(uint256) envfree;", methods)
+
+    def test_methods_block_drops_a_struct_parameter(self):
+        source = """pragma solidity ^0.8.21;
+contract C {
+  struct Sale { address edition; uint96 price; }
+  function initialize(Sale memory _sale) public {
+    _sale;
+  }
+  function cancel() external {}
+}
+"""
+        methods = build_methods_block(source)
+
+        self.assertNotIn("initialize", methods)
+        self.assertNotIn("address _sale", methods)
+        self.assertIn("function cancel() external;", methods)
+
+    def test_methods_block_keeps_arrays_of_primitive_types(self):
+        source = """pragma solidity ^0.8.21;
+contract C {
+  function batch(uint256[] calldata ids, bytes[] calldata payloads) external returns (bytes32[] memory) {
+    ids; payloads;
+  }
+}
+"""
+        methods = build_methods_block(source)
+
+        self.assertIn(
+            "function batch(uint256[] ids, bytes[] payloads) external returns(bytes32[]);",
+            methods,
+        )
+
+    def test_declared_types_follow_a_relative_import(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / "Interfaces.sol").write_text(
+                "pragma solidity ^0.8.21;\n"
+                "interface ITimelock {}\n"
+                "contract Storage {\n"
+                "  struct Receipt { bool hasVoted; uint96 votes; }\n"
+                "  enum ProposalState { Pending, Active }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            contract = root / "Governor.sol"
+            contract.write_text(
+                'pragma solidity ^0.8.21;\nimport "./Interfaces.sol";\ncontract Governor {}\n',
+                encoding="utf-8",
+            )
+
+            kinds = declared_type_kinds(contract)
+
+        self.assertEqual(kinds.get("Receipt"), "struct")
+        self.assertEqual(kinds.get("ProposalState"), "enum")
+        self.assertEqual(kinds.get("ITimelock"), "interface")
+
+    def test_declared_types_ignore_commented_out_declarations(self):
+        kinds = declared_types_in_source(
+            "// struct Ghost { uint256 a; }\n"
+            "/* enum Phantom { A } */\n"
+            "interface IReal {}\n"
+        )
+
+        self.assertEqual(kinds, {"IReal": "interface"})
+
     def test_methods_block_ignores_top_level_interface_methods(self):
         source = """pragma solidity ^0.8.21;
 interface IERC20 {
@@ -1621,6 +1776,47 @@ contract C {
         self.assertIn("setGov@withrevert(e, x);", spec)
         self.assertIn("setPauseGuardian@withrevert(e, x);", spec)
 
+    def test_deterministic_spec_keeps_an_interface_argument_as_an_address(self):
+        methods = """methods {
+  function setRouter(address router, address token) external;
+}"""
+        spec = build_deterministic_spec(
+            methods,
+            [
+                {
+                    "id": "VULN_001",
+                    "type": "missing-zero-check",
+                    "function": "setRouter(address,IERC20)",
+                    "rule_names": ["zero_address_reverts_setRouter"],
+                },
+            ],
+            {"IERC20": "interface"},
+        )
+
+        self.assertIsNotNone(spec)
+        self.assertIn("  address arg1;", spec)
+        self.assertIn("setRouter@withrevert(e, x, arg1);", spec)
+
+    def test_deterministic_spec_declines_a_rule_with_a_struct_argument(self):
+        """Declaring a struct argument as an address would make the Prover reject the rule."""
+        methods = """methods {
+  function setConfig(address newOwner) external;
+}"""
+        spec = build_deterministic_spec(
+            methods,
+            [
+                {
+                    "id": "VULN_001",
+                    "type": "missing-zero-check",
+                    "function": "setConfig(address,Config)",
+                    "rule_names": ["zero_address_reverts_setConfig"],
+                },
+            ],
+            {"Config": "struct"},
+        )
+
+        self.assertIsNone(spec)
+
     def test_solc_remappings_reads_foundry_remappings(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -1656,6 +1852,35 @@ rule smoke {
         self.assertIn("function createCampaign(uint256 goal, uint256 duration) external returns(uint256);", fixed)
         self.assertNotIn("createCampaign(uint256 goal, uint256 duration) external returns(uint256) envfree;", fixed)
         self.assertFalse(any("envfree adicionado" in item for item in corrections))
+
+    def test_spec_validator_rewrites_assume_and_env_assignment_into_require(self):
+        spec = """methods {
+  function owner() external returns(address) envfree;
+}
+
+rule r {
+  env e;
+  address to;
+  e.msg.sender = owner();
+  assume to != owner();
+  require e.msg.value == 0;
+  assert true;
+}
+"""
+        fixed, corrections = corrigir_spec(spec)
+
+        self.assertIn("require e.msg.sender == owner();", fixed)
+        self.assertIn("require to != owner();", fixed)
+        self.assertNotIn("assume", fixed)
+        self.assertIn("require e.msg.value == 0;", fixed)
+        self.assertEqual(2, len([c for c in corrections if "assume" in c or "atribuição" in c]))
+
+    def test_interface_typed_parameter_is_declared_as_address_in_generated_rules(self):
+        from tools.spec_validator import _parse_function_reference
+
+        name, params = _parse_function_reference("initialize(IERC20 _token, address _beneficiary, uint256 n)")
+        self.assertEqual("initialize", name)
+        self.assertEqual(["address", "address", "uint256"], [item["type"] for item in params])
 
     def test_spec_validator_normalizes_solidity_types_inside_rules(self):
         spec = """methods {
@@ -1909,9 +2134,14 @@ contract SimpleBank {
 
     def test_contract_registry_covers_known_contract_files(self):
         registered_paths = {entry.path for entry in contract_entries()}
+        # A mutant is written beside the original on purpose -- the Prover and Slither both
+        # need the relative imports to keep resolving -- and removed right after. One in
+        # flight (mutant_detection.py, mutant_oracle.py) is not a corpus contract.
+        transient = ("__mut", "__oracle")
         actual_paths = {
             str(path.relative_to(ROOT))
             for path in (ROOT / "smart-audt" / "contracts").glob("*.sol")
+            if not any(marker in path.name for marker in transient)
         }
         groups = {entry.group for entry in contract_entries()}
 
@@ -2050,3 +2280,154 @@ class TestFixLibrary(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestSpecEnvFields(unittest.TestCase):
+    def test_bare_tx_origin_becomes_an_env_field(self):
+        from tools.spec_validator import corrigir_spec
+
+        spec = "rule r {\n  env e;\n  require e.msg.sender != tx.origin;\n  f@withrevert(e);\n  assert lastReverted;\n}"
+        fixed, notes = corrigir_spec(spec)
+        self.assertIn("e.msg.sender != e.tx.origin", fixed)
+        self.assertTrue(any("env" in note for note in notes))
+
+    def test_already_prefixed_fields_are_left_alone(self):
+        from tools.spec_validator import corrigir_spec
+
+        spec = "rule r {\n  env e;\n  require e.msg.sender != e.tx.origin;\n  require e.msg.value == 0;\n  f@withrevert(e);\n  assert lastReverted;\n}"
+        self.assertEqual(corrigir_spec(spec)[0], spec)
+
+    def test_a_comment_mentioning_tx_origin_is_not_rewritten(self):
+        from tools.spec_validator import corrigir_spec
+
+        spec = "// tx.origin is used here\nrule r {\n  env e;\n  f@withrevert(e);\n  assert lastReverted;\n}"
+        self.assertEqual(corrigir_spec(spec)[0], spec)
+
+
+class TestTransitiveRemappings(unittest.TestCase):
+    def _project(self, root):
+        (root / "src").mkdir()
+        (root / "lib" / "oz" / "token").mkdir(parents=True)
+        (root / "lib" / "oz" / "token" / "IERC.sol").write_text("pragma solidity ^0.8.0;\n", encoding="utf-8")
+        (root / "lib" / "other").mkdir()
+        (root / "lib" / "other" / "Lib.sol").write_text('import "@oz/contracts/token/IERC.sol";\n', encoding="utf-8")
+        (root / "remappings.txt").write_text("other/=lib/other/\n@oz/contracts/=lib/oz/\n", encoding="utf-8")
+        (root / "foundry.toml").write_text("[profile.default]\n", encoding="utf-8")
+
+    def test_package_imported_only_by_an_imported_file_is_still_mapped(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._project(root)
+            (root / "src" / "C.sol").write_text('import "other/Lib.sol";\ncontract C {}\n', encoding="utf-8")
+            prefixes = [r.split("=")[0] for r in solc_remappings(root / "src" / "C.sol")]
+            self.assertEqual(sorted(prefixes), ["@oz/contracts/", "other/"])
+
+    def test_multi_segment_prefix_is_matched(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._project(root)
+            (root / "src" / "C.sol").write_text('import "@oz/contracts/token/IERC.sol";\ncontract C {}\n', encoding="utf-8")
+            prefixes = [r.split("=")[0] for r in solc_remappings(root / "src" / "C.sol")]
+            self.assertEqual(prefixes, ["@oz/contracts/"])
+
+    def test_a_package_that_nothing_reaches_is_not_passed(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._project(root)
+            (root / "src" / "C.sol").write_text('import "other/Lib.sol";\ncontract C {}\n', encoding="utf-8")
+            (root / "remappings.txt").write_text(
+                "other/=lib/other/\n@oz/contracts/=lib/oz/\nunused/=lib/unused/\n", encoding="utf-8"
+            )
+            prefixes = [r.split("=")[0] for r in solc_remappings(root / "src" / "C.sol")]
+            self.assertNotIn("unused/", prefixes)
+
+    def test_file_with_only_relative_imports_keeps_every_project_remapping(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._project(root)
+            (root / "src" / "C.sol").write_text('import "./D.sol";\ncontract C {}\n', encoding="utf-8")
+            (root / "src" / "D.sol").write_text("contract D {}\n", encoding="utf-8")
+            prefixes = [r.split("=")[0] for r in solc_remappings(root / "src" / "C.sol")]
+            self.assertEqual(sorted(prefixes), ["@oz/contracts/", "other/"])
+
+
+class TestMethodsBlockTypes(unittest.TestCase):
+    def test_mapping_key_of_contract_type_is_an_address_in_cvl(self):
+        from core.contract_context import build_methods_block
+
+        source = "interface IMarket {}\ncontract C {\n    mapping (IMarket => uint) public supplies;\n}"
+        block = build_methods_block(source)
+        self.assertIn("function supplies(address) external returns(uint) envfree;", block)
+        self.assertNotIn("IMarket", block)
+
+
+class TestRemappingTargetSlash(unittest.TestCase):
+    def test_target_keeps_the_trailing_slash_of_its_prefix(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "lib" / "dep").mkdir(parents=True)
+            (root / "remappings.txt").write_text("dep/=lib/dep/\n@scoped=lib/dep\n", encoding="utf-8")
+            (root / "C.sol").write_text('import "dep/X.sol";\nimport "@scoped/Y.sol";\n', encoding="utf-8")
+            remaps = dict(r.split("=", 1) for r in solc_remappings(root / "C.sol"))
+            self.assertTrue(remaps["dep/"].endswith("/"))
+            self.assertFalse(remaps["@scoped"].endswith("/"))
+
+
+class TestCertoraCompilerFlags(unittest.TestCase):
+    def _flags(self, toml):
+        import tempfile
+        from core.import_context import certora_compiler_flags
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            if toml is not None:
+                (root / "foundry.toml").write_text(toml, encoding="utf-8")
+            (root / "C.sol").write_text("contract C {}\n", encoding="utf-8")
+            return certora_compiler_flags(root / "C.sol")
+
+    def test_foundry_default_turns_the_optimizer_on(self):
+        self.assertEqual(self._flags("[profile.default]\nsrc = 'src'\n"), ["--solc_optimize", "200"])
+
+    def test_optimizer_runs_are_taken_from_the_project(self):
+        self.assertEqual(self._flags("optimizer_runs = 999\n"), ["--solc_optimize", "999"])
+        self.assertEqual(self._flags("optimizer-runs = 5\n"), ["--solc_optimize", "5"])
+
+    def test_optimizer_can_be_disabled(self):
+        self.assertEqual(self._flags("optimizer = false\n"), [])
+
+    def test_via_ir_is_forwarded_only_when_enabled(self):
+        self.assertIn("--solc_via_ir", self._flags("via_ir = true\n"))
+        self.assertNotIn("--solc_via_ir", self._flags("# via_ir = true\n"))
+
+    def test_project_without_foundry_toml_gets_no_flags(self):
+        self.assertEqual(self._flags(None), [])
+
+
+class TestAutofinderFallbackIsNotAnError(unittest.TestCase):
+    FALLBACK = (
+        "Encountered an exception generating autofinder x/Visibility.sol (solc had an error:\n"
+        'ParserError: Builtin function "mod" must be called.\n   --> Test.sol:155:135:\n'
+        "), falling back to original file Visibility.sol\n"
+    )
+
+    def test_the_fallback_notice_alone_is_not_blocking(self):
+        from core.certora_error_catalog import analyze_certora_errors, has_certora_blocking_error
+
+        self.assertFalse(has_certora_blocking_error(self.FALLBACK + "Finished running verifier\n"))
+        self.assertEqual(analyze_certora_errors(self.FALLBACK)["matches"], [])
+
+    def test_a_real_compilation_error_next_to_it_still_blocks(self):
+        from core.certora_error_catalog import has_certora_blocking_error
+
+        real = "solc had an error:\nParserError: Source \"x/y.sol\" not found: File not found.\n"
+        self.assertTrue(has_certora_blocking_error(self.FALLBACK + real))

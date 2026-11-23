@@ -69,3 +69,104 @@ Nao vale gastar todo o projeto tentando fazer Certora provar toda reentrancia ge
 5. So depois disso vale gastar Groq/Certora de novo.
 
 Esse ciclo evita torrar tokens para a LLM redescobrir sintaxe de CVL.
+
+## O Verificador Local — Um Oraculo De Graca (2026-11-17)
+
+`certoraRun --compilation_steps_only` para antes de **enviar** o job, nao antes de
+**verificar**: o `emv.jar` roda na maquina e imprime vereditos de regra reais. Isso foi
+validado com um par original/mutante em `runs/oracle_validation_20261116/` — mesma spec,
+original `Verified`, mutante AOR `Violated` com contraexemplo, nenhuma URL de job nos logs,
+menos de 1 min cada.
+
+Por que importa: `agent/mutant_detection.py` mediu que **36 dos 46** mutantes do DeFiVault
+nao produzem nenhum achado no Slither (AOR, BOR, UOR, EED e PKR tem detectabilidade zero).
+Um defeito que o instrumento nao ve nunca chega ao estagio de reparo, logo o benchmark nao
+cobra o agente por ele. O oraculo formal cobra, sem gastar cota de nuvem.
+
+Como ler o log:
+
+- `Verified: <regra>` e `Violated: <regra>` sao as linhas de veredito. A tabela de
+  resultados diz `Not violated`, que lida com essas duas palavras significa o contrario.
+- `<regra>-rule_not_vacuous` aparece `Violated` sempre que a regra e **alcancavel**. E o
+  sanity check: fica fora da conta (`parse_local_verdict` separa em `sanity`).
+- Sem nenhuma linha de veredito, o resultado e `error`, nao "verificado".
+
+No codigo:
+
+- `tools/certora_cli.certora_argv` e o **unico** lugar que monta uma linha de comando do
+  Prover. Tres invocacoes feitas a mao perderam, cada uma, um detalhe diferente:
+  `--solc_allow_path` (o Prover recusa fontes fora dos diretorios permitidos), as flags de
+  otimizador do Foundry (sem elas, "Stack too deep" em contrato que compila no projeto) e
+  um `--packages` por remapping.
+- `tools/certora_cli.verify_locally` escreve o log em arquivo em vez de capturar na
+  memoria: com `capture_output`, um timeout descarta tudo que o Prover ja havia impresso.
+- `agent/mutant_oracle.py` roda uma spec congelada contra todos os mutantes. Se a spec nao
+  verifica no **original**, ele aborta sem reportar nada: qualquer mutante apareceria morto
+  pelo mesmo motivo que o original.
+
+Spec de oraculo (`specs/oracle/DeFiVault.spec`, 19 regras): o contrato promete que saldos
+andam exatamente o valor pedido, que o lock e o teto de saque valem, que so o dono
+administra e que a whitelist barra deposito e saque. Nenhuma regra fala de um defeito
+especifico — e isso que permite rodar a mesma spec em todo mutante. **Regra congelada:**
+nenhuma regra pode ser adicionada, apertada ou afrouxada depois de se conhecer o resultado
+de um mutante.
+
+## `ALWAYS(v)` não leva `expect`
+
+Um summary de função exige a cláusula (`=> recordTransferFrom(from) expect bool;`), e por
+analogia é natural escrever o mesmo para um valor constante. É erro de sintaxe:
+
+```
+function _.transferFrom(address, address, uint256) external => ALWAYS(true) expect bool;
+                                                                             ^
+Error in spec file (inflation.spec:8:81): Syntax error: unexpected token near `expect`
+```
+
+O certo é `=> ALWAYS(true);`. Custou uma rodada inteira do verificador local — que agora é
+barata justamente por isso: o erro de CVL aparece em segundos, aqui, sem job na nuvem.
+
+Sumarizar um token em vez de ligá-lo, quando a propriedade depende do saldo dele:
+
+```cvl
+function _.balanceOf(address) external => NONDET;        // qualquer saldo: a doação do atacante
+function _.transfer(address, uint256) external => ALWAYS(true);
+function _.transferFrom(address, address, uint256) external => ALWAYS(true);
+```
+
+Ver `tests/fixtures/certora/first_deposit_inflation/`.
+
+## `satisfy` é o que vê limite apertado — e o nome da regra muda
+
+`assert` só sabe dizer que algo proibido não acontece. Nenhuma `assert` reclama de uma
+função que *recusa demais*: trocar `>=` por `>` não deixa passar nada de novo, só nega o
+caso exato da igualdade. Para isso é `satisfy`, e o veredito só sai se a fronteira for
+fixada — `satisfy` com a condição solta continua satisfeito, porque o Prover escolhe um
+caso folgado:
+
+```cvl
+rule withdraw_accepts_boundary_balances_msg_sender_amount(uint256 amount) {
+    env e;
+    require balances(e.msg.sender) == amount;   // a fronteira de `balances[...] >= amount`
+
+    withdraw(e, amount);                        // sem @withrevert: reversão é podada
+
+    satisfy true;
+}
+```
+
+Três coisas que custaram tempo:
+
+- **Sem `@withrevert`.** A chamada crua poda os caminhos que revertem, e é isso que faz o
+  `satisfy` significar "existe execução que passa". Com `@withrevert` a reversão viraria
+  um caminho válido e a regra passaria sempre.
+- **`satisfy` resolve de graça o que `assert !lastReverted` não resolveria.** A função pode
+  reverter por overflow ou porque a transferência externa falhou; "tem de passar" seria
+  alarme falso. Basta *uma* execução boa, e o Prover escolhe os valores que a tornam boa.
+- **O nome da regra no log ganha sufixo:** `<regra>-Satisfy_true_(<arquivo>_<linha>_<coluna>)`.
+  Quem casa nome de regra com achado por igualdade exata não encontra. E o par de vacuidade
+  (`<regra>-rule_not_vacuous`) nunca casa — nem precisa: `satisfy` só passa exibindo
+  testemunha, então passar já é ser alcançável.
+
+`nativeBalances[currentContract]` diz o saldo em ETH do próprio contrato, que é o único uso
+de `address(this)` com nome em CVL — serve para a fronteira de
+`require(amount <= address(this).balance)`.

@@ -2,21 +2,48 @@
 
 from __future__ import annotations
 
+import os
 import re
 from typing import Any
 
 from core.solidity_source import mask_comments_and_strings, matching_brace
 
 
+def deterministic_patches_disabled() -> bool:
+    """``AUDIT_NO_DETERMINISTIC_PATCH=1`` desliga a trilha mecânica de reparo.
+
+    O braço "só LLM" do experimento de generalização precisa disso. Por construção o patch
+    determinístico é calculado **antes** da diagnose da LLM — de propósito, para que uma
+    falha de LLM não bloqueie o que já era mecânico — e o efeito colateral é que a LLM só é
+    exercitada no resíduo, então a medição nunca separa os dois efeitos.
+
+    O desligamento vale também para as dicas de diagnóstico determinístico, que saem da
+    mesma função: no braço só-LLM, a LLM tem de diagnosticar tudo.
+    """
+    return os.getenv("AUDIT_NO_DETERMINISTIC_PATCH", "").strip().lower() not in ("", "0", "false", "no")
+
+
 def apply_deterministic_patches(
     source: str,
     confirmed_findings: list[dict[str, Any]],
 ) -> tuple[str, list[dict[str, Any]]]:
+    if deterministic_patches_disabled():
+        return source, []
+
     patched = source
     applied: list[dict[str, Any]] = []
 
     for finding in confirmed_findings:
-        if finding.get("type") != "missing-zero-check":
+        kind = finding.get("type")
+        if kind in _STATEMENT_PATCHES:
+            patched_next, changed = _STATEMENT_PATCHES[kind](
+                patched, _function_name(str(finding.get("function") or "")), str(finding.get("id") or "")
+            )
+            if changed:
+                patched = patched_next
+                applied.append({"id": finding.get("id"), "type": kind, "function": finding.get("function")})
+            continue
+        if kind != "missing-zero-check":
             continue
         parameter = str(finding.get("target_parameter") or _variable_element_name(finding) or "").strip()
         function_name = _function_name(str(finding.get("function") or ""))
@@ -44,7 +71,8 @@ def apply_deterministic_patches(
 
 
 def _function_name(signature: str) -> str:
-    match = re.match(r"\s*([A-Za-z_][A-Za-z0-9_]*)\s*\(", signature)
+    # Slither writes "f(address)"; the static fallbacks write the bare name "f".
+    match = re.match(r"\s*([A-Za-z_][A-Za-z0-9_]*)\s*(?:\(|$)", signature)
     return match.group(1) if match else ""
 
 
@@ -55,12 +83,26 @@ def _variable_element_name(finding: dict[str, Any]) -> str:
     return ""
 
 
+def _find_definition(masked: str, function_name: str, parameter: str) -> re.Match | None:
+    """The function (or constructor) definition that takes ``parameter``.
+
+    A file can hold several contracts and so several constructors; the finding names only
+    "constructor", so the one whose parameter list contains the flagged name is chosen.
+    """
+    if function_name != "constructor":
+        return re.search(rf"\bfunction\s+{re.escape(function_name)}\s*\([^)]*\)[^{{;]*{{", masked, re.DOTALL)
+    for match in re.finditer(r"\bconstructor\s*\(([^)]*)\)[^{;]*{", masked, re.DOTALL):
+        if re.search(rf"\b{re.escape(parameter)}\b", match.group(1)):
+            return match
+    return None
+
+
 def _insert_zero_check(source: str, function_name: str, parameter: str, vuln_id: str) -> tuple[str, bool]:
     # Located on masked source so a "function foo(" written in a comment cannot match
     # and a brace inside a string literal cannot close the body early. A truncated body
     # made an existing guard invisible and the patch inserted a duplicate require.
     masked = mask_comments_and_strings(source)
-    match = re.search(rf"\bfunction\s+{re.escape(function_name)}\s*\([^)]*\)[^{{;]*{{", masked, re.DOTALL)
+    match = _find_definition(masked, function_name, parameter)
     if not match:
         return source, False
 
@@ -74,25 +116,522 @@ def _insert_zero_check(source: str, function_name: str, parameter: str, vuln_id:
     if re.search(rf"address\s*\(\s*0\s*\)\s*!=\s*\b{escaped}\b", body):
         return source, False
 
-    line_start = source.rfind("\n", 0, match.start()) + 1
-    base_indent = re.match(r"\s*", source[line_start:match.start()]).group(0)
-    indent = base_indent + "    "
     fix_comment = f" // FIX {vuln_id}" if vuln_id else ""
-    require_line = f'{indent}require({parameter} != address(0), "Zero address");{fix_comment}'
+    statement = f'require({parameter} != address(0), "Zero address");{fix_comment}'
+    return _insert_first_statement(source, match.start(), brace_index, end_index, statement)
+
+
+def _insert_first_statement(
+    source: str, function_start: int, brace_index: int, end_index: int, statement: str
+) -> tuple[str, bool]:
+    line_start = source.rfind("\n", 0, function_start) + 1
+    base_indent = re.match(r"\s*", source[line_start:function_start]).group(0)
+    indent = base_indent + "    "
+    line = f"{indent}{statement}"
 
     if "\n" not in source[brace_index:end_index + 1]:
         inner = source[brace_index + 1:end_index].strip()
         inner_lines = [f"{indent}{inner}"] if inner else []
-        replacement_lines = ["{", require_line, *inner_lines, f"{base_indent}}}"]
-        replacement = "\n".join(replacement_lines)
+        replacement = "\n".join(["{", line, *inner_lines, f"{base_indent}}}"])
         return source[:brace_index] + replacement + source[end_index + 1:], True
 
     line_end = source.find("\n", brace_index)
     if line_end == -1:
         return source, False
-
-    insertion = f"\n{require_line}"
-
-    return source[:line_end] + insertion + source[line_end:], True
+    return source[:line_end] + f"\n{line}" + source[line_end:], True
 
 
+_CONTROL_KEYWORDS = {"require", "assert", "if", "while", "for", "return", "emit", "revert"}
+
+
+def _function_bodies(masked: str, function_name: str) -> list[tuple[int, int]]:
+    """Body span of every definition with this name; overloads share one finding's name."""
+    spans = []
+    for match in re.finditer(rf"\bfunction\s+{re.escape(function_name)}\s*\([^)]*\)[^{{;]*{{", masked, re.DOTALL):
+        brace_index = masked.find("{", match.end() - 1)
+        spans.append((brace_index, matching_brace(masked, brace_index)))
+    return spans
+
+
+def _top_level_args(call_args: str) -> int:
+    depth = 0
+    count = 1 if call_args.strip() else 0
+    for char in call_args:
+        depth += char in "([{"
+        depth -= char in ")]}"
+        if char == "," and depth == 0:
+            count += 1
+    return count
+
+
+def _enclosing_parameters(masked: str, offset: int) -> set[str]:
+    """Parameter names of the function or modifier whose header precedes ``offset``."""
+    headers = list(re.finditer(r"\b(?:function|modifier)\s+\w*\s*\(([^)]*)\)", masked[:offset]))
+    if not headers:
+        return set()
+    return set(re.findall(r"(\w+)\s*(?:,|$)", headers[-1].group(1).strip()))
+
+
+def _replace_tx_origin(source: str, _function: str, vuln_id: str) -> tuple[str, bool]:
+    """tx.origin -> msg.sender, only where it authorizes by comparison with state.
+
+    Left alone: a line that already compares against msg.sender, and a comparison with a
+    parameter of the enclosing function. `if (caller == tx.origin)` is the usual "caller is an
+    EOA" check; rewriting it to msg.sender changes who may call, not how they are authorized.
+    """
+    masked_source = mask_comments_and_strings(source)
+    raw_lines = source.splitlines(keepends=True)
+    masked_lines = masked_source.splitlines(keepends=True)
+    changed = False
+    offset = 0
+    for index, (raw, masked) in enumerate(zip(raw_lines, masked_lines)):
+        line_offset, offset = offset, offset + len(masked)
+        if "msg.sender" in masked:
+            continue
+        compared = re.search(r"\btx\.origin\s*[!=]=\s*([A-Za-z_]\w*)|([A-Za-z_]\w*)\s*[!=]=\s*tx\.origin\b", masked)
+        if not compared:
+            continue
+        operand = compared.group(1) or compared.group(2)
+        if operand in _enclosing_parameters(masked_source, line_offset):
+            continue
+        for hit in reversed(list(re.finditer(r"\btx\.origin\b", masked))):
+            raw = raw[: hit.start()] + "msg.sender" + raw[hit.end():]
+        newline = "\n" if raw.endswith("\n") else ""
+        raw_lines[index] = f"{raw.rstrip(chr(10))} // FIX {vuln_id}{newline}" if vuln_id else raw
+        changed = True
+    return "".join(raw_lines), changed
+
+
+def _fresh_name(source: str, base: str, taken: set[str]) -> str:
+    n = 1
+    while f"{base}{n}" in source or f"{base}{n}" in taken:
+        n += 1
+    taken.add(f"{base}{n}")
+    return f"{base}{n}"
+
+
+_LOW_LEVEL_STATEMENT = re.compile(
+    r"(?m)^(?P<indent>[ \t]*)(?P<expr>[A-Za-z_][^\n;=]*?\.call\s*(?:\{[^}\n]*\})?\s*\([^\n;]*\))[ \t]*;"
+)
+_TOKEN_TRANSFER_STATEMENT = re.compile(
+    # The indent group may carry a single-line "if (cond) " prefix, which the rewrite keeps.
+    r"(?m)^(?P<indent>[ \t]*(?:if\s*\([^\n;{}]*\)\s*)?)(?P<expr>[A-Za-z_][\w.\[\]]*(?:\([^;\n()]*\))?\.(?:transfer|transferFrom)\s*\((?P<args>[^\n;]*)\))[ \t]*;"
+)
+
+
+def _rewrite_statements(source, function_name, pattern, build, accept=lambda match: True):
+    masked = mask_comments_and_strings(source)
+    spans = _function_bodies(masked, function_name) if function_name else []
+    matches = [
+        m
+        for start, end in spans
+        for m in pattern.finditer(masked, start, end + 1)
+        if m.group("expr").split("(")[0].split(".")[0].strip() not in _CONTROL_KEYWORDS and accept(m)
+    ]
+    if not matches:
+        return source, False
+    # Built in source order so generated names read top to bottom, applied back to front so
+    # earlier offsets stay valid.
+    replacements = [build(m.group("indent"), source[m.start("expr"): m.end("expr")]) for m in matches]
+    for match, replacement in reversed(list(zip(matches, replacements))):
+        source = source[: match.start()] + replacement + source[match.end():]
+    return source, bool(matches)
+
+
+def _require_low_level_success(source: str, function_name: str, vuln_id: str) -> tuple[str, bool]:
+    fix = f" // FIX {vuln_id}" if vuln_id else ""
+    taken: set[str] = set()
+
+    def build(indent: str, expr: str) -> str:
+        name = _fresh_name(source, "callOk", taken)
+        return f'{indent}(bool {name}, ) = {expr};\n{indent}require({name}, "Low-level call failed");{fix}'
+
+    # `IFoo(account).call(data)` is a high-level call to a method that happens to be named
+    # call; it returns the interface's own type, so the (bool, bytes) form would not compile.
+    # A cast to a type name (leading capital) marks it; address variables and payable() do not.
+    return _rewrite_statements(
+        source, function_name, _LOW_LEVEL_STATEMENT, build,
+        accept=lambda m: not re.match(r"\s*[A-Z]\w*\s*\(", m.group("expr")),
+    )
+
+
+def _require_token_transfer_success(source: str, function_name: str, vuln_id: str) -> tuple[str, bool]:
+    fix = f" // FIX {vuln_id}" if vuln_id else ""
+
+    def build(indent: str, expr: str) -> str:
+        return f'{indent}require({expr}, "Token transfer failed");{fix}'
+
+    # ETH transfer takes one argument and returns nothing; only the ERC20 forms are wrapped.
+    return _rewrite_statements(
+        source, function_name, _TOKEN_TRANSFER_STATEMENT, build,
+        accept=lambda m: _top_level_args(m.group("args")) >= 2,
+    )
+
+
+_OWNER_STATE_VARIABLE = re.compile(
+    r"\baddress(?:\s+payable)?\s+(?:(?:public|private|internal|immutable|constant)\s+)*owner\b"
+)
+_HEADER_KEYWORDS = {"external", "public", "internal", "private", "payable", "view", "pure", "virtual", "override"}
+
+
+def _require_owner(source: str, function_name: str, vuln_id: str) -> tuple[str, bool]:
+    """Guard an unprotected selfdestruct with the contract's own ``owner``.
+
+    Only applied when the contract already declares an ``address owner`` and the function
+    has no modifier at all, so the guard never duplicates or contradicts an existing one.
+    """
+    masked = mask_comments_and_strings(source)
+    if not function_name or not _OWNER_STATE_VARIABLE.search(masked):
+        return source, False
+    match = re.search(rf"\bfunction\s+{re.escape(function_name)}\s*\(([^)]*)\)([^{{;]*){{", masked, re.DOTALL)
+    if not match:
+        return source, False
+    header = re.sub(r"returns\s*\([^)]*\)", "", match.group(2))
+    if set(re.findall(r"[A-Za-z_]\w*", header)) - _HEADER_KEYWORDS:
+        return source, False
+
+    brace_index = masked.find("{", match.end() - 1)
+    end_index = matching_brace(masked, brace_index)
+    body = masked[brace_index:end_index + 1]
+    if re.search(r"msg\.sender\s*[!=]=\s*owner\b|\bowner\s*[!=]=\s*msg\.sender", body):
+        return source, False
+    fix = f" // FIX {vuln_id}" if vuln_id else ""
+    return _insert_first_statement(
+        source, match.start(), brace_index, end_index, f'require(msg.sender == owner, "Not owner");{fix}'
+    )
+
+
+_IDENTITY_GATE = re.compile(
+    r"require\s*\(\s*(?:msg\.sender\s*==\s*[A-Za-z_]\w*|[A-Za-z_]\w*\s*==\s*msg\.sender)\b"
+    r"|if\s*\(\s*(?:msg\.sender\s*!=\s*[A-Za-z_]\w*|[A-Za-z_]\w*\s*!=\s*msg\.sender)\s*\)\s*\{?\s*revert\b"
+)
+
+
+def _identity_gate_modifiers(masked: str) -> list[str]:
+    """Modifiers that only compare the caller with one state variable (``onlyOwner`` style).
+
+    A mapping lookup (``whitelist[msg.sender]``) or a pause flag is not an identity gate, so
+    ``onlyWhitelisted`` and ``notPaused`` never qualify.
+    """
+    found = []
+    for match in re.finditer(r"\bmodifier\s+([A-Za-z_]\w*)\s*(?:\(\s*\))?\s*(?:virtual\s*)?\{", masked):
+        end = matching_brace(masked, match.end() - 1)
+        body = masked[match.end():end]
+        if _IDENTITY_GATE.search(body) and "[" not in body and body.count(";") <= 2:
+            found.append(match.group(1))
+    return found
+
+
+def _restore_access_modifier(source: str, function_name: str, vuln_id: str) -> tuple[str, bool]:
+    """Re-apply the contract's identity-gate modifier to a privileged function that lacks it.
+
+    Only applied when the contract declares exactly one such modifier and the function name is
+    not overloaded, so the choice of guard is never a guess. A function with an unrelated
+    modifier keeps it and gains the gate after it.
+    """
+    masked = mask_comments_and_strings(source)
+    gates = _identity_gate_modifiers(masked)
+    if len(gates) != 1 or not function_name:
+        return source, False
+    matches = list(re.finditer(rf"\bfunction\s+{re.escape(function_name)}\s*\(([^)]*)\)([^{{;]*){{", masked, re.DOTALL))
+    if len(matches) != 1:
+        return source, False
+    match = matches[0]
+    gate = gates[0]
+    if re.search(rf"\b{re.escape(gate)}\b", match.group(2)):
+        return source, False
+
+    brace_index = match.end() - 1
+    insert_at = brace_index
+    while insert_at > 0 and source[insert_at - 1].isspace():
+        insert_at -= 1
+    # A block comment placed before the brace: a "//" comment would swallow the rest of a
+    # one-line function body, braces included.
+    fix = f"/* FIX {vuln_id} */ " if vuln_id else ""
+    patched = source[:insert_at] + f" {gate} " + fix + source[brace_index:]
+    return patched, True
+
+
+_SEND_STATEMENT = re.compile(
+    r"(?m)^(?P<indent>[ \t]*)(?P<expr>[A-Za-z_][^\n;=]*?\.send\s*\([^\n;]*\))[ \t]*;"
+)
+
+
+def _require_send_success(source: str, function_name: str, vuln_id: str) -> tuple[str, bool]:
+    fix = f" // FIX {vuln_id}" if vuln_id else ""
+
+    def build(indent: str, expr: str) -> str:
+        return f'{indent}require({expr}, "Send failed");{fix}'
+
+    return _rewrite_statements(source, function_name, _SEND_STATEMENT, build)
+
+
+_TRANSFER_FROM_SOURCE = re.compile(r"\.transferFrom\s*\(\s*([A-Za-z_]\w*)\s*,")
+
+
+def _use_msg_sender_as_token_source(source: str, function_name: str, vuln_id: str) -> tuple[str, bool]:
+    """``token.transferFrom(from, ...)`` -> ``token.transferFrom(msg.sender, ...)``.
+
+    Slither only accepts a literal msg.sender as the source: a ``require(from == msg.sender)``
+    guard leaves the finding in place. Applied only where ``from`` is a parameter of the flagged
+    function and the function never mentions msg.sender or a modifier, because an allowance or
+    operator check keyed on the caller means the pull is authorized some other way and the
+    rewrite would break it.
+    """
+    masked = mask_comments_and_strings(source)
+    edits: list[tuple[int, int]] = []
+    for match in re.finditer(
+        rf"\bfunction\s+{re.escape(function_name)}\s*\(([^)]*)\)([^{{;]*){{", masked, re.DOTALL
+    ):
+        parameters = set(re.findall(r"(\w+)\s*(?:,|$)", match.group(1).strip()))
+        header = re.sub(r"returns\s*\([^)]*\)", "", match.group(2))
+        if set(re.findall(r"[A-Za-z_]\w*", header)) - _HEADER_KEYWORDS:
+            continue
+        brace_index = masked.find("{", match.end() - 1)
+        end_index = matching_brace(masked, brace_index)
+        body = masked[brace_index:end_index + 1]
+        if "msg.sender" in body:
+            continue
+        for call in _TRANSFER_FROM_SOURCE.finditer(masked, brace_index, end_index + 1):
+            if call.group(1) in parameters:
+                edits.append((call.start(1), call.end(1)))
+    if not edits or not function_name:
+        return source, False
+    for start, end in reversed(edits):
+        line_end = source.find("\n", end)
+        line_end = len(source) if line_end == -1 else line_end
+        source = source[:start] + "msg.sender" + source[end:line_end] + (
+            f" // FIX {vuln_id}" if vuln_id else ""
+        ) + source[line_end:]
+    return source, True
+
+
+# A simple operand: an identifier, a number, a member access or an index. Anything with a
+# call, a cast or nested arithmetic is left alone, because reordering it is not mechanical.
+_SIMPLE_OPERAND = r"[A-Za-z_0-9][\w.\[\]]*"
+_DIVIDE_THEN_MULTIPLY = re.compile(
+    rf"(?P<open>\(\s*)?(?P<a>{_SIMPLE_OPERAND})\s*/\s*(?P<b>{_SIMPLE_OPERAND})"
+    rf"(?P<close>\s*\))?\s*\*\s*(?P<c>{_SIMPLE_OPERAND})"
+)
+_ARITHMETIC_TAIL = re.compile(r"\s*[*/%+-]")
+
+
+def _multiply_before_divide(source: str, function_name: str, vuln_id: str) -> tuple[str, bool]:
+    """Reorder ``(a / b) * c`` into ``(a * c) / b``, which is the precision fix itself.
+
+    Solidity truncates integer division, so dividing first throws away the remainder before
+    the multiplication can use it. Multiplying first keeps it. Under 0.8 arithmetic the
+    larger intermediate product cannot wrap silently -- it reverts -- so the reorder does not
+    hide an overflow.
+    """
+    masked = mask_comments_and_strings(source)
+    spans = _function_bodies(masked, function_name) if function_name else []
+    matches = []
+    for start, end in spans:
+        for match in _DIVIDE_THEN_MULTIPLY.finditer(masked, start, end + 1):
+            # Parentheses must match: "(a / b) * c" or "a / b * c", never a half pair taken
+            # out of a larger expression.
+            if bool(match.group("open")) != bool(match.group("close")):
+                continue
+            # A longer chain such as "a / b * c / d" is not a two-operation reorder.
+            if _ARITHMETIC_TAIL.match(masked, match.end()):
+                continue
+            matches.append(match)
+
+    if not matches:
+        return source, False
+
+    fix = f" // FIX {vuln_id}" if vuln_id else ""
+    for match in reversed(matches):
+        a, b, c = match.group("a"), match.group("b"), match.group("c")
+        replacement = f"({a} * {c}) / {b}" if match.group("open") else f"{a} * {c} / {b}"
+        source = source[: match.start()] + replacement + source[match.end():]
+        if fix:
+            line_end = source.find("\n", match.start())
+            line_end = len(source) if line_end == -1 else line_end
+            if "// FIX" not in source[match.start():line_end]:
+                source = source[:line_end] + fix + source[line_end:]
+    return source, True
+
+
+def _matching_paren(masked: str, open_index: int) -> int:
+    """Index of the ``)`` closing the ``(`` at ``open_index``, on masked source."""
+    depth = 0
+    for index in range(open_index, len(masked)):
+        if masked[index] == "(":
+            depth += 1
+        elif masked[index] == ")":
+            depth -= 1
+            if depth == 0:
+                return index
+    return -1
+
+
+_ENCODE_PACKED_IN_HASH = re.compile(r"keccak256\s*\(\s*abi\s*\.\s*encodePacked\s*\(")
+
+
+def _encode_instead_of_encode_packed(source: str, function_name: str, vuln_id: str) -> tuple[str, bool]:
+    """Hash ``abi.encode`` instead of ``abi.encodePacked`` when the arguments can collide.
+
+    ``encodePacked`` concatenates without lengths, so ("a", "bc") and ("ab", "c") hash to the
+    same value. ``abi.encode`` pads each argument, which removes the collision. Only done for
+    a hashed call with two or more arguments: with one argument there is nothing to collide,
+    and the padding would change the hash for no reason.
+    """
+    masked = mask_comments_and_strings(source)
+    spans = _function_bodies(masked, function_name) if function_name else []
+    matches = []
+    for start, end in spans:
+        for match in _ENCODE_PACKED_IN_HASH.finditer(masked, start, end + 1):
+            args_close = _matching_paren(masked, match.end() - 1)
+            if args_close == -1:
+                continue
+            if _top_level_args(masked[match.end(): args_close]) < 2:
+                continue
+            matches.append(match)
+
+    if not matches:
+        return source, False
+
+    fix = f" // FIX {vuln_id}" if vuln_id else ""
+    for match in reversed(matches):
+        packed = source.find("encodePacked", match.start(), match.end())
+        if packed == -1:
+            continue
+        source = source[:packed] + "encode" + source[packed + len("encodePacked"):]
+        if fix:
+            line_end = source.find("\n", packed)
+            line_end = len(source) if line_end == -1 else line_end
+            if "// FIX" not in source[packed:line_end]:
+                source = source[:line_end] + fix + source[line_end:]
+    return source, True
+
+
+# Slither's incorrect-exp fires on `^` written where `**` was meant. The tell is a decimal
+# literal base: `2 ^ 256` and `10 ^ decimals()` are exponentiation spelled with the XOR
+# operator, while `a ^ b` between two identifiers is usually a genuine XOR and `0x1f ^ mask`
+# is a mask -- so only a decimal base is rewritten.
+_XOR_WITH_LITERAL_BASE = re.compile(
+    rf"(?<![\w.])(?P<base>\d+)\s*\^\s*(?P<exp>{_SIMPLE_OPERAND}(?:\s*\(\s*\))?)"
+)
+
+
+def _exponentiation_instead_of_xor(source: str, function_name: str, vuln_id: str) -> tuple[str, bool]:
+    """Rewrite ``base ^ exp`` as ``base ** exp`` when the base is a decimal literal.
+
+    In Solidity ``^`` is bitwise XOR, not exponentiation: ``2 ^ 256`` evaluates to 258, not
+    to 2**256. The repair is the operator itself, which is why this is mechanical; validate
+    by rerunning Slither.
+    """
+    masked = mask_comments_and_strings(source)
+    spans = _function_bodies(masked, function_name) if function_name else []
+    matches = [
+        match
+        for start, end in spans
+        for match in _XOR_WITH_LITERAL_BASE.finditer(masked, start, end + 1)
+    ]
+
+    if not matches:
+        return source, False
+
+    fix = f" // FIX {vuln_id}" if vuln_id else ""
+    for match in reversed(matches):
+        caret = source.find("^", match.start(), match.end())
+        if caret == -1:
+            continue
+        source = source[:caret] + "**" + source[caret + 1:]
+        if fix:
+            line_end = source.find("\n", caret)
+            line_end = len(source) if line_end == -1 else line_end
+            if "// FIX" not in source[caret:line_end]:
+                source = source[:line_end] + fix + source[line_end:]
+    return source, True
+
+
+def _split_top_level(call_args: str) -> list[str]:
+    """Argumentos de nível superior de uma chamada, preservando parênteses internos."""
+    parts: list[str] = []
+    depth = 0
+    current = []
+    for char in call_args:
+        if char in "([{":
+            depth += 1
+        elif char in ")]}":
+            depth -= 1
+        if char == "," and depth == 0:
+            parts.append("".join(current))
+            current = []
+            continue
+        current.append(char)
+    if "".join(current).strip() or parts:
+        parts.append("".join(current))
+    return parts
+
+
+_NUMERIC_LITERAL_RE = re.compile(r"^(?:0[xX][0-9a-fA-F]+|\d+)$")
+# Em Yul, `shr(a, b)` desloca **b** por **a** bits. O detector incorrect-shift do Slither
+# dispara quando o valor deslocado é constante e a quantidade não é -- ou seja, na forma
+# escrita `shr(variavel, constante)`, que desloca a constante pela variável. A recomendação
+# oficial é trocar a ordem dos parâmetros, e é só isso que este patch faz.
+_YUL_SHIFT_RE = re.compile(r"\b(shl|shr|sar)\s*\(")
+_ASSEMBLY_RE = re.compile(r"\bassembly\b[^{]*\{")
+
+
+def _swap_reversed_shift(source: str, function_name: str, vuln_id: str) -> tuple[str, bool]:
+    """Troca ``shr(amount, CONST)`` por ``shr(CONST, amount)`` dentro de ``assembly``.
+
+    Só age quando o **segundo** argumento é literal numérico e o primeiro não é: é
+    exatamente a condição do detector (valor constante, quantidade variável). Dois literais
+    ou duas variáveis ficam como estão, porque aí a ordem pretendida não é decidível.
+    """
+    masked = mask_comments_and_strings(source)
+    spans = _function_bodies(masked, function_name) if function_name else []
+    assembly_spans = []
+    for start, end in spans:
+        for block in _ASSEMBLY_RE.finditer(masked, start, end + 1):
+            close = matching_brace(masked, block.end() - 1)
+            if close != -1:
+                assembly_spans.append((block.end(), close))
+
+    edits = []
+    for start, end in assembly_spans:
+        for call in _YUL_SHIFT_RE.finditer(masked, start, end):
+            close = _matching_paren(masked, call.end() - 1)
+            if close == -1:
+                continue
+            args = _split_top_level(masked[call.end(): close])
+            if len(args) != 2:
+                continue
+            amount, value = args[0].strip(), args[1].strip()
+            if not _NUMERIC_LITERAL_RE.match(value) or _NUMERIC_LITERAL_RE.match(amount):
+                continue
+            edits.append((call.end(), close, source[call.end(): close]))
+
+    if not edits:
+        return source, False
+
+    fix = f" // FIX {vuln_id}" if vuln_id else ""
+    for start, end, original_args in reversed(edits):
+        amount, value = _split_top_level(original_args)
+        source = source[:start] + f"{value.strip()}, {amount.strip()}" + source[end:]
+        if fix:
+            line_end = source.find("\n", start)
+            line_end = len(source) if line_end == -1 else line_end
+            if "// FIX" not in source[start:line_end]:
+                source = source[:line_end] + fix + source[line_end:]
+    return source, True
+
+
+_STATEMENT_PATCHES = {
+    "arbitrary-send-erc20": _use_msg_sender_as_token_source,
+    "suicidal": _require_owner,
+    "unrestricted-write": _restore_access_modifier,
+    "unchecked-send": _require_send_success,
+    "tx-origin": _replace_tx_origin,
+    "unchecked-lowlevel": _require_low_level_success,
+    "unchecked-transfer": _require_token_transfer_success,
+    "divide-before-multiply": _multiply_before_divide,
+    "encode-packed-collision": _encode_instead_of_encode_packed,
+    "incorrect-exp": _exponentiation_instead_of_xor,
+    "incorrect-shift": _swap_reversed_shift,
+}

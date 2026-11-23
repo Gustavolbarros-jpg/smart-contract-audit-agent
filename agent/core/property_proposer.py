@@ -1,0 +1,841 @@
+"""Propose formal properties from the contract's own shape, with no detector involved.
+
+Everything the pipeline formalises today is indexed by a Slither finding: ETAPA 2 only
+considers the catalog classes marked ``formalizable``, and all six of those are simple
+(zero check, tx-origin, suicidal, arbitrary-send-eth, over/underflow). The consequence is
+measured in ``docs/resultado-oraculo-formal-20261117.md`` §4.6 -- on contracts whose whole
+purpose is a complex defect, the pipeline reports success while the defect stays put,
+because no detector ever named it.
+
+This module takes the other route. It reads the source and recognises *accounting shapes*:
+a function that credits a per-address mapping and a total, one that debits them, one
+guarded by a modifier that checks identity against ``msg.sender``. Each shape implies a
+property that holds in any correct implementation of it, so the property can be written
+without knowing what is wrong -- which is the only way to reach a defect that no pattern
+names.
+
+Deliberately mechanical: no LLM, no Slither, no network. A shape either matches or it does
+not, and an ambiguous match is dropped rather than guessed, because a wrong property
+costs more than a missing one -- it makes a correct contract look broken.
+"""
+
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass, field
+
+from .solidity_source import Definition, mask_comments_and_strings, parse_definitions
+
+# Unsigned integer parameter: the amount a credit or debit moves.
+_UINT = re.compile(r"\buint(?:8|16|32|64|128|256)?\b")
+_LOCATION = re.compile(r"\b(calldata|memory|storage)\b")
+_IDENT = re.compile(r"[A-Za-z_]\w*")
+_CONTRACT_DECL = re.compile(r"^\s*(?:abstract\s+)?(?:contract|interface|library)\s+([A-Za-z_]\w*)", re.MULTILINE)
+_VALUE_TYPE = re.compile(r"^(u?int(?:8|16|32|64|128|256)?|bool|address|bytes(?:[1-9]|[12]\d|3[0-2])?|string)(\[\])?$")
+
+# `balances[msg.sender] += amount;` / `-=`
+_MAP_DELTA = re.compile(r"\b([A-Za-z_]\w*)\s*\[\s*([^\]]+?)\s*\]\s*(\+=|-=)\s*([^;]+);")
+# `totalDeposits += amount;` on a plain state variable (no index)
+_VAR_DELTA = re.compile(r"(?<![\]\w.])\b([A-Za-z_]\w*)\s*(\+=|-=)\s*([^;]+);")
+# `require(msg.sender == owner, ...)` and the reversed spelling
+_IDENTITY = re.compile(r"msg\.sender\s*(==|!=)\s*([A-Za-z_]\w*(?:\(\))?)|\b([A-Za-z_]\w*(?:\(\))?)\s*(==|!=)\s*msg\.sender")
+
+# `mapping(address => uint256) public balances;` and `address public owner;`
+_PUBLIC_MAPPING = re.compile(
+    r"^\s*mapping\s*\(\s*([A-Za-z_]\w*)[^=]*=>\s*([A-Za-z_]\w*)[^)]*\)\s+public\s+([A-Za-z_]\w*)\s*;",
+    re.MULTILINE,
+)
+_PUBLIC_SCALAR = re.compile(
+    r"^\s*([A-Za-z_]\w*)\s+public\s+(?:constant\s+|immutable\s+)?([A-Za-z_]\w*)\s*(?:=[^;]*)?;",
+    re.MULTILINE,
+)
+_NUMERIC = re.compile(r"^(u?int(?:8|16|32|64|128|256)?)$")
+
+
+@dataclass(frozen=True)
+class PropertyCandidate:
+    """One property, the CVL that states it, and why the shape implies it."""
+
+    name: str
+    shape: str
+    contract: str
+    function: str
+    cvl: str
+    rationale: str
+    reads: tuple[str, ...] = ()          # getters the rule calls envfree
+    getters: tuple[tuple[str, str], ...] = ()   # (name, CVL arg type; "" when nullary)
+    confidence: str = "mechanical"
+
+    @property
+    def rule_name(self) -> str:
+        return self.name
+
+
+@dataclass
+class _FnShape:
+    definition: Definition
+    refs: frozenset[str] = frozenset()
+    credits: list[tuple[str, str]] = field(default_factory=list)   # (mapping, delta expr)
+    debits: list[tuple[str, str]] = field(default_factory=list)
+    total_credits: list[str] = field(default_factory=list)
+    total_debits: list[str] = field(default_factory=list)
+    gates: list[str] = field(default_factory=list)                 # identity variables
+    guards: list[str] = field(default_factory=list)                # condições de require
+
+
+def contract_like_names(source: str) -> frozenset[str]:
+    """Contract, interface and library names: usable as `address` in a CVL signature."""
+    return frozenset(_CONTRACT_DECL.findall(mask_comments_and_strings(source)))
+
+
+def _params(signature: str, refs: frozenset[str] = frozenset()) -> list[tuple[str, str]]:
+    inner = signature[signature.index("(") + 1: signature.rindex(")")] if "(" in signature else ""
+    out = []
+    depth = 0
+    atual = ""
+    for ch in inner:
+        if ch in "([":
+            depth += 1
+        elif ch in ")]":
+            depth -= 1
+        if ch == "," and depth == 0:
+            out.append(atual)
+            atual = ""
+        else:
+            atual += ch
+    if atual.strip():
+        out.append(atual)
+    pares = []
+    for bruto in out:
+        texto = _LOCATION.sub(" ", bruto.replace("\n", " ")).strip()
+        nomes = _IDENT.findall(texto)
+        if len(nomes) < 2:
+            # no name, or a type we cannot read: refuse the whole list rather than
+            # silently drop a parameter, which would generate a call of wrong arity.
+            return []
+        nome = nomes[-1]
+        tipo = texto[: texto.rindex(nome)].strip()
+        cvl = _cvl_param_type(tipo, refs)
+        if cvl is None:
+            return []
+        pares.append((cvl, nome))
+    return pares if len(pares) == len(out) else []
+
+
+def _cvl_param_type(tipo: str, refs: frozenset[str]) -> str | None:
+    """The CVL spelling of a Solidity parameter type, or None when we must not guess.
+
+    `address payable` and any contract or interface type are plain `address`; CVL rejects
+    an interface name in a signature. A struct or an enum has no safe spelling here, so
+    the function it appears in is dropped instead of being given a wrong signature.
+    """
+    limpo = " ".join(tipo.split())
+    if limpo.startswith("address"):
+        return "address[]" if limpo.endswith("[]") else "address"
+    base = limpo[:-2] if limpo.endswith("[]") else limpo
+    if base in refs:
+        return "address[]" if limpo.endswith("[]") else "address"
+    return limpo if _VALUE_TYPE.match(limpo) else None
+
+
+def _params_are_complete(signature: str, refs: frozenset[str] = frozenset()) -> bool:
+    """False when the parameter list has text we did not turn into a parameter."""
+    if "(" not in signature:
+        return False
+    inner = signature[signature.index("(") + 1: signature.rindex(")")].strip()
+    if not inner:
+        return True
+    return bool(_params(signature, refs))
+
+
+def _is_external(signature: str) -> bool:
+    return bool(re.search(r"\b(external|public)\b", signature))
+
+
+def _is_payable(signature: str) -> bool:
+    return bool(re.search(r"\bpayable\b", signature))
+
+
+def _is_view(signature: str) -> bool:
+    return bool(re.search(r"\b(view|pure)\b", signature))
+
+
+def _modifiers(signature: str, known: set[str]) -> list[str]:
+    cabeca = signature[signature.rindex(")") + 1:] if ")" in signature else ""
+    cabeca = re.sub(r"\breturns\s*\([^)]*\)", " ", cabeca)
+    return [w for w in re.findall(r"[A-Za-z_]\w*", cabeca) if w in known]
+
+
+def public_state(source: str) -> dict[str, tuple[str, str]]:
+    """Public state variables as the getters Solidity generates: name -> (arg, return).
+
+    The return type has to come from the declaration. Assuming `uint256` for every getter
+    is a CVL type error the moment a contract has an `address public owner`, and the
+    Prover rejects the whole spec, not just that line.
+    """
+    masked = mask_comments_and_strings(source)
+    decls: dict[str, tuple[str, str]] = {}
+    for m in _PUBLIC_MAPPING.finditer(masked):
+        chave, valor, nome = m.group(1), m.group(2), m.group(3)
+        decls[nome] = (chave, valor)
+    for m in _PUBLIC_SCALAR.finditer(masked):
+        tipo, nome = m.group(1), m.group(2)
+        if tipo in ("function", "event", "return", "emit", "mapping"):
+            continue
+        decls.setdefault(nome, ("", tipo))
+    return decls
+
+
+def _numeric(tipo: str) -> bool:
+    return bool(_NUMERIC.match(tipo))
+
+
+def _public_state_names(source: str) -> set[str]:
+    return set(public_state(source))
+
+
+def _identity_vars(body: str) -> list[str]:
+    achados = []
+    for m in _IDENTITY.finditer(mask_comments_and_strings(body)):
+        var = m.group(2) or m.group(3) or ""
+        var = var.replace("()", "")
+        if var and var not in ("msg", "tx", "address"):
+            achados.append(var)
+    return achados
+
+
+def _shape_of(d: Definition, modifier_bodies: dict[str, str], refs: frozenset[str] = frozenset()) -> _FnShape:
+    shape = _FnShape(definition=d, refs=refs)
+    corpo = mask_comments_and_strings(d.body)
+    for m in _MAP_DELTA.finditer(corpo):
+        mapping, _chave, op, expr = m.group(1), m.group(2), m.group(3), m.group(4).strip()
+        (shape.credits if op == "+=" else shape.debits).append((mapping, expr))
+    corpo_sem_map = _MAP_DELTA.sub(" ", corpo)
+    for m in _VAR_DELTA.finditer(corpo_sem_map):
+        var, op, expr = m.group(1), m.group(2), m.group(3).strip()
+        (shape.total_credits if op == "+=" else shape.total_debits).append(var)
+    for nome in _modifiers(d.signature, set(modifier_bodies)):
+        shape.gates.extend(_identity_vars(modifier_bodies[nome]))
+    shape.gates.extend(_identity_vars(corpo))
+    shape.guards.extend(_require_conditions(corpo))
+    for nome in _modifiers(d.signature, set(modifier_bodies)):
+        shape.guards.extend(_require_conditions(mask_comments_and_strings(modifier_bodies[nome])))
+    shape.guards = list(dict.fromkeys(shape.guards))
+    return shape
+
+
+def _amount_param(d: Definition, refs: frozenset[str] = frozenset()) -> tuple[str, str] | None:
+    """The single unsigned amount this function moves, or None if it is not unambiguous."""
+    numericos = [(t, n) for t, n in _params(d.signature, refs) if _UINT.fullmatch(t)]
+    return numericos[0] if len(numericos) == 1 else None
+
+
+def _call_args(d: Definition, refs: frozenset[str] = frozenset()) -> str:
+    return ", ".join(n for _t, n in _params(d.signature, refs))
+
+
+def _decl_args(d: Definition, refs: frozenset[str] = frozenset()) -> str:
+    return ", ".join(f"{t} {n}" for t, n in _params(d.signature, refs))
+
+
+def propose(source: str, contract: str = "", liveness: bool = True) -> list[PropertyCandidate]:
+    """Every property the source's shape implies, in declaration order.
+
+    ``liveness=False`` deixa de fora as formas ``boundary`` e ``gate_liveness``, que são
+    as de `satisfy`: dizem que uma execução boa ainda existe, não que uma má não existe.
+    """
+    definicoes = parse_definitions(source)
+    modifier_bodies = {d.name: d.body for d in definicoes if d.kind == "modifier"}
+    decls = public_state(source)
+    refs = contract_like_names(source)
+    publicos = set(decls)
+    candidatos: list[PropertyCandidate] = []
+
+    for d in definicoes:
+        if d.kind != "function" or not _is_external(d.signature) or _is_view(d.signature):
+            continue
+        if contract and d.contract and d.contract != contract:
+            continue
+        if not _params_are_complete(d.signature, refs):
+            continue
+        shape = _shape_of(d, modifier_bodies, refs)
+        candidatos.extend(_credit_rules(shape, decls))
+        candidatos.extend(_debit_rules(shape, decls))
+        candidatos.extend(_gate_rules(shape, decls))
+        candidatos.extend(_guard_rules(shape, decls))
+        if liveness:
+            candidatos.extend(_boundary_rules(shape, decls))
+            candidatos.extend(_gate_liveness_rules(shape, decls))
+
+    vistos: set[str] = set()
+    unicos = []
+    for c in candidatos:
+        if c.name not in vistos:
+            vistos.add(c.name)
+            unicos.append(c)
+    return unicos
+
+
+def _credit_rules(shape: _FnShape, decls: dict[str, tuple[str, str]]) -> list[PropertyCandidate]:
+    d = shape.definition
+    if not shape.credits:
+        return []
+    mapping, _expr = shape.credits[0]
+    if mapping not in decls or not _numeric(decls[mapping][1]):
+        return []
+
+    amount = _amount_param(d, shape.refs)
+    paga = _is_payable(d.signature)
+    if amount is None and not paga:
+        return []
+    quantia = amount[1] if amount else "e.msg.value"
+    decl = _decl_args(d, shape.refs)
+    chamada = _call_args(d, shape.refs)
+    chamada = f"e, {chamada}" if chamada else "e"
+    assinatura = f"({decl})" if decl else "()"
+    guarda = f"    require {quantia} > 0;" if amount else "    require e.msg.value > 0;"
+
+    nome = f"{d.name}_never_credits_zero"
+    cvl = f"""rule {nome}{assinatura} {{
+    env e;
+{guarda}
+
+    uint256 antes = {mapping}(e.msg.sender);
+    {d.name}({chamada});
+    uint256 depois = {mapping}(e.msg.sender);
+
+    assert depois > antes, "a nonzero {quantia} left the caller's {mapping} untouched";
+}}"""
+    regras = [PropertyCandidate(
+        name=nome,
+        shape="credit",
+        contract=d.contract,
+        function=d.name,
+        cvl=cvl,
+        rationale=(f"{d.name} credits {mapping}[msg.sender] from a nonzero amount; a credit "
+                   f"that can round to nothing leaves value in the contract with no claim on it"),
+        reads=(mapping,),
+        getters=((mapping, "address"),),
+    )]
+
+    for total in dict.fromkeys(shape.total_credits):
+        if total not in decls or total == mapping or not _numeric(decls[total][1]):
+            continue
+        nome_t = f"{d.name}_credits_{total}_by_the_same_amount"
+        cvl_t = f"""rule {nome_t}{assinatura} {{
+    env e;
+
+    uint256 antes_conta = {mapping}(e.msg.sender);
+    uint256 antes_total = {total}();
+    {d.name}({chamada});
+    uint256 depois_conta = {mapping}(e.msg.sender);
+    uint256 depois_total = {total}();
+
+    assert to_mathint(depois_total) - to_mathint(antes_total)
+        == to_mathint(depois_conta) - to_mathint(antes_conta),
+        "{total} and {mapping}[msg.sender] moved by different amounts";
+}}"""
+        regras.append(PropertyCandidate(
+            name=nome_t,
+            shape="credit_total",
+            contract=d.contract,
+            function=d.name,
+            cvl=cvl_t,
+            rationale=f"{d.name} moves {mapping}[msg.sender] and {total} together; they must move by the same amount",
+            reads=(mapping, total),
+            getters=((mapping, "address"), (total, "")),
+        ))
+    return regras
+
+
+def _debit_rules(shape: _FnShape, decls: dict[str, tuple[str, str]]) -> list[PropertyCandidate]:
+    d = shape.definition
+    if not shape.debits:
+        return []
+    mapping, _expr = shape.debits[0]
+    if mapping not in decls or not _numeric(decls[mapping][1]):
+        return []
+    amount = _amount_param(d, shape.refs)
+    if amount is None:
+        return []
+
+    decl = _decl_args(d, shape.refs)
+    chamada = _call_args(d, shape.refs)
+    chamada = f"e, {chamada}" if chamada else "e"
+    quantia = amount[1]
+
+    nome = f"{d.name}_debits_exactly"
+    cvl = f"""rule {nome}({decl}) {{
+    env e;
+
+    uint256 antes = {mapping}(e.msg.sender);
+    {d.name}({chamada});
+    uint256 depois = {mapping}(e.msg.sender);
+
+    assert to_mathint(depois) == to_mathint(antes) - {quantia},
+        "{mapping}[msg.sender] did not fall by exactly {quantia}";
+}}"""
+    regras = [PropertyCandidate(
+        name=nome,
+        shape="debit",
+        contract=d.contract,
+        function=d.name,
+        cvl=cvl,
+        rationale=f"{d.name} debits {mapping}[msg.sender] by {quantia}; any other delta is an accounting error",
+        reads=(mapping,),
+        getters=((mapping, "address"),),
+    )]
+
+    for total in dict.fromkeys(shape.total_debits):
+        if total not in decls or total == mapping or not _numeric(decls[total][1]):
+            continue
+        nome_t = f"{d.name}_debits_{total}_by_the_same_amount"
+        cvl_t = f"""rule {nome_t}({decl}) {{
+    env e;
+
+    uint256 antes = {total}();
+    {d.name}({chamada});
+    uint256 depois = {total}();
+
+    assert to_mathint(depois) == to_mathint(antes) - {quantia},
+        "{total} did not fall by exactly {quantia}";
+}}"""
+        regras.append(PropertyCandidate(
+            name=nome_t,
+            shape="debit_total",
+            contract=d.contract,
+            function=d.name,
+            cvl=cvl_t,
+            rationale=f"{d.name} debits {total} alongside the caller's balance; both must fall by {quantia}",
+            reads=(total,),
+            getters=((total, ""),),
+        ))
+    return regras
+
+
+def _gate_rules(shape: _FnShape, decls: dict[str, tuple[str, str]]) -> list[PropertyCandidate]:
+    d = shape.definition
+    portoes = [g for g in dict.fromkeys(shape.gates) if g in decls and decls[g][1] == "address"]
+    if not portoes:
+        return []
+    porta = portoes[0]
+    decl = _decl_args(d, shape.refs)
+    chamada = _call_args(d, shape.refs)
+    chamada = f"e, {chamada}" if chamada else "e"
+    nome = f"only_{porta}_calls_{d.name}"
+    cvl = f"""rule {nome}({decl}) {{
+    env e;
+    require e.msg.sender != {porta}();
+
+    {d.name}@withrevert({chamada});
+
+    assert lastReverted, "{d.name} went through for a caller that is not {porta}";
+}}"""
+    return [PropertyCandidate(
+        name=nome,
+        shape="identity_gate",
+        contract=d.contract,
+        function=d.name,
+        cvl=cvl,
+        rationale=f"{d.name} is gated on msg.sender == {porta}; removing the gate must make it revert for anyone else",
+        reads=(porta,),
+        getters=((porta, ""),),
+    )]
+
+
+# ── montagem da spec ────────────────────────────────────────────────────────
+
+_EXTERNAL_CALL = re.compile(r"\b([A-Za-z_]\w*)\.(transferFrom|transfer|balanceOf)\s*\(")
+
+
+def _token_summaries(source: str) -> list[str]:
+    """Summarise an ERC20 the contract talks to instead of linking it.
+
+    A property about share accounting depends on a balance the contract does not own, so
+    the token is left free: `balanceOf` may return anything, which is exactly what a
+    donation to the pool produces. `transfer`/`transferFrom` are forced to succeed so a
+    failing token cannot mask the property being checked.
+    """
+    chamadas = {m.group(2) for m in _EXTERNAL_CALL.finditer(mask_comments_and_strings(source))}
+    linhas = []
+    if "balanceOf" in chamadas:
+        linhas.append("    function _.balanceOf(address) external => NONDET;")
+    if "transfer" in chamadas:
+        linhas.append("    function _.transfer(address, uint256) external => ALWAYS(true);")
+    if "transferFrom" in chamadas:
+        linhas.append("    function _.transferFrom(address, address, uint256) external => ALWAYS(true);")
+    return linhas
+
+
+def build_spec(source: str, candidates: list[PropertyCandidate], header: str = "") -> str:
+    """A complete .spec: methods block, token summaries, then every candidate rule.
+
+    `ALWAYS(v)` takes no `expect` clause -- unlike a function summary, which requires one.
+    Getting that wrong is a CVL syntax error, not a verification failure.
+    """
+    decls = public_state(source)
+    usados: set[str] = set()
+    for c in candidates:
+        for nome, _arg in c.getters:
+            usados.add(nome)
+
+    linhas = ["methods {"]
+    for nome in sorted(usados):
+        arg, ret = decls.get(nome, ("", "uint256"))
+        linhas.append(f"    function {nome}({arg}) external returns ({ret}) envfree;")
+    linhas.extend(_token_summaries(source))
+    linhas.append("}")
+
+    partes = []
+    if header:
+        partes.append("\n".join(f"// {l}" for l in header.strip().splitlines()))
+    partes.append("\n".join(linhas))
+    for c in candidates:
+        partes.append(f"// {c.shape}: {c.rationale}\n{c.cvl}")
+    return "\n\n".join(partes) + "\n"
+
+
+# ── forma 4: o guard que o próprio contrato escreveu ────────────────────────
+#
+# Um `require` numa função externa (ou no modificador dela) é um invariante que o autor
+# declarou em código. A propriedade correspondente não precisa saber o que o invariante
+# significa: *violar a condição tem de reverter*. É a forma que cobre teto, período de
+# lock, lista de permissão, pausa e endereço zero sem uma regra por assunto -- e é a que
+# um mutante de comparação (`>=` virando `>`) quebra, porque a condição deixa de valer e a
+# chamada passa assim mesmo.
+
+_REQUIRE = re.compile(r"\brequire\s*\(")
+_SLUG = re.compile(r"[^a-z0-9]+")
+_IDENTITY_ONLY = re.compile(r"\s*(?:msg\.sender\s*==\s*[A-Za-z_]\w*|[A-Za-z_]\w*\s*==\s*msg\.sender)\s*")
+# `address(0)`, `address(this)`, chamadas, membros
+_ADDR_ZERO = re.compile(r"\baddress\s*\(\s*0\s*\)")
+_SELF_BALANCE = re.compile(r"\baddress\s*\(\s*this\s*\)\s*\.\s*balance\b")
+_CALL = re.compile(r"\b([A-Za-z_]\w*)\s*\(")
+_MEMBER = re.compile(r"\b([A-Za-z_]\w*)\s*\.\s*([A-Za-z_]\w*)")
+_INDEX = re.compile(r"\b([A-Za-z_]\w*)\s*\[\s*([^\[\]]+?)\s*\]")
+# os marcadores @SENDER@ / @TIME@ são atômicos: sem excluir o "@" das bordas, a
+# tradução recursiva de `balances[msg.sender]` recusa a própria chave que ela criou
+_WORD = re.compile(r"(?<![\w.@])([A-Za-z_]\w*)(?![\w(\[@])")
+
+
+def _require_conditions(corpo: str) -> list[str]:
+    """A condição de cada `require` do corpo, sem a mensagem."""
+    fora = []
+    for m in _REQUIRE.finditer(corpo):
+        abre = m.end() - 1
+        fecha = _matching_paren_local(corpo, abre)
+        if fecha < 0:
+            continue
+        dentro = corpo[abre + 1: fecha]
+        cond = _split_top_level_comma(dentro)[0].strip()
+        if cond:
+            fora.append(" ".join(cond.split()))
+    return fora
+
+
+def _matching_paren_local(texto: str, abre: int) -> int:
+    nivel = 0
+    for i in range(abre, len(texto)):
+        if texto[i] == "(":
+            nivel += 1
+        elif texto[i] == ")":
+            nivel -= 1
+            if nivel == 0:
+                return i
+    return -1
+
+
+def _split_top_level_comma(texto: str) -> list[str]:
+    partes, atual, nivel = [], "", 0
+    for ch in texto:
+        if ch in "([":
+            nivel += 1
+        elif ch in ")]":
+            nivel -= 1
+        if ch == "," and nivel == 0:
+            partes.append(atual)
+            atual = ""
+        else:
+            atual += ch
+    partes.append(atual)
+    return partes
+
+
+def translate_condition(
+    cond: str,
+    params: dict[str, str],
+    decls: dict[str, tuple[str, str]],
+) -> str | None:
+    """Fachada: traduz e troca os marcadores por `e.msg.sender` e companhia."""
+    nucleo = _translate_core(cond, params, decls)
+    if nucleo is None:
+        return None
+    return (nucleo.replace("@SENDER@", "e.msg.sender").replace("@VALUE@", "e.msg.value")
+                  .replace("@TIME@", "e.block.timestamp").replace("@BLOCK@", "e.block.number")
+                  .replace("@SELFBAL@", "nativeBalances[currentContract]"))
+
+
+def _translate_core(
+    cond: str,
+    params: dict[str, str],
+    decls: dict[str, tuple[str, str]],
+) -> str | None:
+    """A condição em CVL, ou None quando alguma parte dela não é expressável.
+
+    Só é traduzido o que pode ser dito com certeza: parâmetros da função, estado público
+    (que vira chamada do getter), `msg.sender`, `msg.value`, `block.timestamp`,
+    `address(0)` e literais. Qualquer outro identificador -- estado privado, variável
+    local, chamada a função -- faz a condição ser recusada, porque uma tradução
+    aproximada vira uma regra que falha em código correto.
+    """
+    texto = _ADDR_ZERO.sub("0", cond)
+    # o saldo em ETH do próprio contrato é dizível em CVL; qualquer outro uso de
+    # `address(this)` (comparar identidade, chamar a si mesmo) continua recusado
+    texto = _SELF_BALANCE.sub("@SELFBAL@", texto)
+    if "address(this)" in texto or "this." in texto:
+        return None
+
+    texto = texto.replace("msg.sender", "@SENDER@").replace("msg.value", "@VALUE@")
+    texto = texto.replace("block.timestamp", "@TIME@").replace("block.number", "@BLOCK@")
+    if _MEMBER.search(texto):
+        return None
+
+    # mapping[chave] -> mapping(chave), só para estado público
+    def _idx(m):
+        nome, chave = m.group(1), m.group(2)
+        if nome not in decls or decls[nome][0] == "":
+            return "@REJECT@"
+        traduzida = _translate_core(chave, params, decls)
+        return "@REJECT@" if traduzida is None else f"{nome}({traduzida})"
+
+    texto = _INDEX.sub(_idx, texto)
+    if "@REJECT@" in texto:
+        return None
+
+    # a checagem vem depois da substituição de índice, então o getter que acabamos de
+    # criar (`balances(...)`) é legítimo; qualquer outra chamada não é traduzível
+    for m in _CALL.finditer(texto):
+        if m.group(1) not in ("uint256", "uint", "int256", "to_mathint") and m.group(1) not in decls:
+            return None
+
+    def _ident(m):
+        nome = m.group(1)
+        if nome in params or nome in ("true", "false"):
+            return nome
+        if nome in decls and decls[nome][0] == "":
+            return f"{nome}()"
+        return "@REJECT@"
+
+    texto = _WORD.sub(_ident, texto)
+    if "@REJECT@" in texto:
+        return None
+
+    return texto
+
+
+def _slugify(cond: str) -> str:
+    return _SLUG.sub("_", cond.lower()).strip("_")[:48] or "guard"
+
+
+def _guard_rules(shape: _FnShape, decls: dict[str, tuple[str, str]]) -> list[PropertyCandidate]:
+    d = shape.definition
+    params = {n: t for t, n in _params(d.signature, shape.refs)}
+    decl = _decl_args(d, shape.refs)
+    chamada = _call_args(d, shape.refs)
+    chamada = f"e, {chamada}" if chamada else "e"
+
+    regras = []
+    for cond in shape.guards:
+        if _IDENTITY_ONLY.fullmatch(cond.strip()):
+            continue  # `_gate_rules` já diz isso, e melhor: nomeia o dono
+        cvl_cond = translate_condition(cond, params, decls)
+        if cvl_cond is None:
+            continue
+        usados = {n for n in _WORD.findall(cvl_cond)}
+        getters = tuple((n, decls[n][0]) for n in sorted(usados) if n in decls)
+        getters += tuple((n, decls[n][0]) for n in sorted(decls) if f"{n}(" in cvl_cond)
+        getters = tuple(dict.fromkeys(getters))
+        nome = f"{d.name}_enforces_{_slugify(cond)}"
+        cvl = f"""rule {nome}({decl}) {{
+    env e;
+    require !({cvl_cond});
+
+    {d.name}@withrevert({chamada});
+
+    assert lastReverted, "{d.name} went through although `{cond}` does not hold";
+}}"""
+        regras.append(PropertyCandidate(
+            name=nome,
+            shape="guard",
+            contract=d.contract,
+            function=d.name,
+            cvl=cvl,
+            rationale=f"{d.name} requires `{cond}`; a call that breaks it must revert",
+            reads=tuple(n for n, _a in getters),
+            getters=getters,
+        ))
+    return regras
+
+
+# ── forma 5: a fronteira do limite que o autor declarou ─────────────────────
+#
+# As formas 1--4 são todas de *safety*: dizem que algo proibido não pode acontecer.
+# Nenhuma delas vê um limite apertado. Trocar `>=` por `>` não deixa passar nada que
+# o contrato original recusava -- ao contrário, recusa um caso que ele aceitava: o caso
+# exato da fronteira. Safety não reclama de uma função que recusa demais; só *liveness*
+# reclama. Em CVL isso é `satisfy`: existe execução que, fixada na fronteira, não reverte?
+#
+# Fixar a fronteira é o que dá o veredito. `satisfy` sem fixar nada continua satisfeito
+# no mutante (basta o Prover escolher um caso folgado); com `a == b` exigido, o mutante
+# que pede `a > b` não tem execução nenhuma e a regra fica Violated.
+#
+# O `satisfy` também resolve, de graça, o que um `assert !lastReverted` não resolveria:
+# a função pode reverter por overflow ou porque a transferência externa falhou, e aí
+# "tem de passar" seria alarme falso. Basta *uma* execução boa, e o Prover escolhe os
+# valores que a tornam boa.
+
+_RELOPS = (">=", "<=", ">", "<")
+
+
+def split_relational(cond: str) -> tuple[str, str, str] | None:
+    """`a OP b` com OP relacional no nível de fora, ou None.
+
+    Recusa condição composta (`&&`, `||` no nível de fora), porque a fronteira de uma
+    conjunção não é a conjunção das fronteiras, e recusa `=>`, `<<`, `>>`, `==` e `!=`.
+    """
+    nivel = 0
+    achado = None
+    i = 0
+    while i < len(cond):
+        ch = cond[i]
+        if ch in "([":
+            nivel += 1
+        elif ch in ")]":
+            nivel -= 1
+        elif nivel == 0:
+            if cond.startswith("&&", i) or cond.startswith("||", i):
+                return None
+            if cond.startswith("<<", i) or cond.startswith(">>", i):
+                return None
+            if cond.startswith("=>", i) or cond.startswith("==", i) or cond.startswith("!=", i):
+                i += 2
+                continue
+            for op in _RELOPS:
+                if cond.startswith(op, i):
+                    if achado is not None:
+                        return None          # mais de uma comparação: não é um limite só
+                    achado = (i, op)
+                    i += len(op) - 1
+                    break
+        i += 1
+    if achado is None:
+        return None
+    pos, op = achado
+    esquerda = cond[:pos].strip()
+    direita = cond[pos + len(op):].strip()
+    if not esquerda or not direita:
+        return None
+    return esquerda, op, direita
+
+
+def _boundary_require(esq: str, op: str, dir_: str) -> str:
+    """O caso exato da fronteira de `esq OP dir_`, em CVL.
+
+    `>=` e `<=` têm a fronteira na igualdade. `>` e `<` têm no vizinho, e aí o `+ 1`
+    vai em `mathint` para a soma não estourar o tipo e virar um `require` impossível.
+    """
+    if op in (">=", "<="):
+        return f"{esq} == {dir_}"
+    if op == ">":
+        return f"to_mathint({esq}) == to_mathint({dir_}) + 1"
+    return f"to_mathint({esq}) + 1 == to_mathint({dir_})"
+
+
+def _getters_of(cvl: str, decls: dict[str, tuple[str, str]]) -> tuple[tuple[str, str], ...]:
+    usados = {n for n in _WORD.findall(cvl) if n in decls}
+    achados = tuple((n, decls[n][0]) for n in sorted(usados))
+    achados += tuple((n, decls[n][0]) for n in sorted(decls) if f"{n}(" in cvl)
+    return tuple(dict.fromkeys(achados))
+
+
+def _boundary_rules(shape: _FnShape, decls: dict[str, tuple[str, str]]) -> list[PropertyCandidate]:
+    d = shape.definition
+    params = {n: t for t, n in _params(d.signature, shape.refs)}
+    decl = _decl_args(d, shape.refs)
+    chamada = _call_args(d, shape.refs)
+    chamada = f"e, {chamada}" if chamada else "e"
+
+    regras = []
+    for cond in shape.guards:
+        partes = split_relational(cond)
+        if partes is None:
+            continue
+        esq, op, dir_ = partes
+        esq_cvl = translate_condition(esq, params, decls)
+        dir_cvl = translate_condition(dir_, params, decls)
+        if esq_cvl is None or dir_cvl is None:
+            continue
+        fronteira = _boundary_require(esq_cvl, op, dir_cvl)
+        nome = f"{d.name}_accepts_boundary_{_slugify(cond)}"
+        cvl = f"""rule {nome}({decl}) {{
+    env e;
+    require {fronteira};
+
+    {d.name}({chamada});
+
+    satisfy true;
+}}"""
+        regras.append(PropertyCandidate(
+            name=nome,
+            shape="boundary",
+            contract=d.contract,
+            function=d.name,
+            cvl=cvl,
+            rationale=(f"{d.name} declares the limit `{cond}`; the boundary case it "
+                       f"accepts must stay reachable, or the limit was tightened"),
+            reads=tuple(n for n, _a in _getters_of(fronteira, decls)),
+            getters=_getters_of(fronteira, decls),
+            confidence="liveness",
+        ))
+    return regras
+
+
+# ── forma 6: quem o portão deixa entrar tem de conseguir entrar ────────────
+#
+# O dual da forma 3. O portão de identidade diz "quem não é o dono reverte"; nada diz
+# que o dono *consegue*. Inverter a comparação (`==` virando `!=`) ou trocar a fonte da
+# identidade (`msg.sender` virando `tx.origin`) deixa a forma 3 intacta -- ninguém
+# indevido entra, porque ninguém entra -- e mata a função. Só `satisfy` vê isso.
+
+def _gate_liveness_rules(shape: _FnShape, decls: dict[str, tuple[str, str]]) -> list[PropertyCandidate]:
+    d = shape.definition
+    decl = _decl_args(d, shape.refs)
+    chamada = _call_args(d, shape.refs)
+    chamada = f"e, {chamada}" if chamada else "e"
+
+    regras = []
+    for var in dict.fromkeys(shape.gates):
+        if var not in decls or decls[var][0] != "" or decls[var][1] != "address":
+            continue
+        nome = f"{var}_can_call_{d.name}"
+        cvl = f"""rule {nome}({decl}) {{
+    env e;
+    require e.msg.sender == {var}();
+
+    {d.name}({chamada});
+
+    satisfy true;
+}}"""
+        regras.append(PropertyCandidate(
+            name=nome,
+            shape="gate_liveness",
+            contract=d.contract,
+            function=d.name,
+            cvl=cvl,
+            rationale=(f"{d.name} is gated on msg.sender == {var}; {var} must still be "
+                       f"able to call it, or the gate closed on everyone"),
+            reads=(var,),
+            getters=((var, decls[var][0]),),
+            confidence="liveness",
+        ))
+    return regras

@@ -386,6 +386,26 @@ def corrigir_spec(spec_cvl: str) -> tuple[str, list[str]]:
             novas_linhas[i] = novas_linhas[i].replace('block.number', 'e.block.number')
             correcoes.append(f"Linha {i+1}: block.number → e.block.number")
 
+        # CORREÇÃO 2b: msg.*/tx.* soltos. Em CVL só existem como campos do env ("e.msg.sender",
+        # "e.tx.origin"); o Prover recusa o spec com "Variable `tx` has not been declared".
+        if 'methods' not in linha:
+            nova = re.sub(r'(?<![\w.])(msg|tx)\.(sender|value|origin)\b', r'e.\1.\2', novas_linhas[i])
+            if nova != novas_linhas[i]:
+                novas_linhas[i] = nova
+                correcoes.append(f"Linha {i+1}: msg/tx solto → campo do env (e.msg / e.tx)")
+
+        # CORREÇÃO 2c: construções que não existem em CVL. "assume X;" é "require X;", e os
+        # campos do env não se atribuem ("e.msg.sender = x;"), constrangem-se com require.
+        if 'methods' not in linha:
+            nova = re.sub(r'^(\s*)assume\b', r'\1require', novas_linhas[i])
+            if nova != novas_linhas[i]:
+                novas_linhas[i] = nova
+                correcoes.append(f"Linha {i+1}: assume → require")
+            nova = re.sub(r'^(\s*)(e\.(?:msg|tx|block)\.\w+)\s*=(?!=)\s*(.+;)\s*$', r'\1require \2 == \3', novas_linhas[i])
+            if nova != novas_linhas[i]:
+                novas_linhas[i] = nova
+                correcoes.append(f"Linha {i+1}: atribuição a campo do env → require ==")
+
     envfree_funcs = set()
     in_methods = False
     for linha in novas_linhas:
@@ -601,10 +621,19 @@ def _parse_params(params: str) -> list[dict]:
         cleaned = re.sub(r"\s+", " ", cleaned).strip()
         parts = cleaned.split()
         if len(parts) == 1:
-            parsed.append({"type": parts[0], "name": f"arg{index}"})
+            parsed.append({"type": _cvl_param_type(parts[0]), "name": f"arg{index}"})
         else:
-            parsed.append({"type": " ".join(parts[:-1]), "name": parts[-1]})
+            parsed.append({"type": _cvl_param_type(" ".join(parts[:-1])), "name": parts[-1]})
     return parsed
+
+
+def _cvl_param_type(solidity_type: str) -> str:
+    """CVL has no interface or contract types: ``IERC20 token`` is an ``address`` there."""
+    if re.fullmatch(r"[A-Za-z_]\w*", solidity_type) and not re.fullmatch(
+        r"address|bool|string|bytes\d*|uint\d*|int\d*", solidity_type
+    ):
+        return "address"
+    return solidity_type
 
 
 def _parse_function_reference(value: str) -> tuple[str, list[dict]]:
@@ -923,6 +952,10 @@ def aplicar_auth_probe_rules(spec_cvl: str, auth_probe: dict | None) -> tuple[st
     """Rewrite tx-origin/auth rules to call a real onlyOwner function."""
     if not auth_probe or not auth_probe.get("name"):
         return spec_cvl, []
+    # The rewritten rule constrains the caller with owner(); a contract whose methods block has
+    # no owner getter would get a spec the Prover rejects ("could not type owner()").
+    if not re.search(r"\bfunction\s+owner\s*\(", spec_cvl):
+        return spec_cvl, []
 
     linhas = spec_cvl.split('\n')
     novas = []
@@ -966,6 +999,25 @@ def aplicar_auth_probe_rules(spec_cvl: str, auth_probe: dict | None) -> tuple[st
         novas.append(linha)
 
     return '\n'.join(novas), correcoes
+
+
+def declarar_owner_envfree(spec_cvl: str, contract_source: str) -> tuple[str, list[str]]:
+    """Declare an inherited ``owner()`` as envfree when a rule calls it.
+
+    The methods block is built from the contract file alone, so an ``owner()`` that comes
+    from ``Ownable`` is missing and the Prover rejects ``owner()`` as "missing environment
+    parameter". Only done for contracts that visibly inherit or define an owner.
+    """
+    if not re.search(r"(?<![\w.])owner\s*\(\s*\)", spec_cvl) or re.search(r"\bfunction\s+owner\s*\(", spec_cvl):
+        return spec_cvl, []
+    if not re.search(r"\bOwnable\w*\b|\bfunction\s+owner\s*\(|\baddress\s+(?:public\s+)?owner\b", contract_source):
+        return spec_cvl, []
+    match = re.search(r"\bmethods\s*\{", spec_cvl)
+    if not match:
+        return spec_cvl, []
+    declaration = "\n  function owner() external returns(address) envfree;"
+    patched = spec_cvl[: match.end()] + declaration + spec_cvl[match.end():]
+    return patched, ["owner() herdado declarado como envfree no methods"]
 
 
 def validar_spec(spec_cvl: str) -> tuple[bool, list[str]]:
